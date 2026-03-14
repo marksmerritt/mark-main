@@ -1,31 +1,31 @@
 <%= render "shared/errors", errors: local_assigns[:errors] || @errors %>
 
-<%= form_with url: form_url, method: form_method, class: "trade-form" do |f| %>
+<%= form_with url: form_url, method: form_method, class: "trade-form" do %>
   <fieldset>
     <legend>Trade Info</legend>
 
     <div class="form-row">
       <div class="form-group">
-        <%= f.label "trade[symbol]", "Symbol" %>
+        <%= label_tag "trade[symbol]", "Symbol" %>
         <%= text_field_tag "trade[symbol]", trade["symbol"], class: "form-control", placeholder: "e.g. AAPL", autofocus: true %>
       </div>
 
       <div class="form-group">
-        <%= f.label "trade[asset_class]", "Asset Class" %>
+        <%= label_tag "trade[asset_class]", "Asset Class" %>
         <%= select_tag "trade[asset_class]",
               options_for_select([["Stocks", "stocks"], ["Options", "options"], ["Futures", "futures"], ["Forex", "forex"], ["Crypto", "crypto"]], trade["asset_class"]),
               include_blank: "Select asset class", class: "form-control" %>
       </div>
 
       <div class="form-group">
-        <%= f.label "trade[side]", "Side" %>
+        <%= label_tag "trade[side]", "Side" %>
         <%= select_tag "trade[side]",
               options_for_select([["Long", "long"], ["Short", "short"]], trade["side"]),
               include_blank: "Select side", class: "form-control" %>
       </div>
 
       <div class="form-group">
-        <%= f.label "trade[quantity]", "Quantity" %>
+        <%= label_tag "trade[quantity]", "Quantity" %>
         <%= number_field_tag "trade[quantity]", trade["quantity"], class: "form-control", step: "any", min: 0 %>
       </div>
     </div>
@@ -36,23 +36,23 @@
 
     <div class="form-row">
       <div class="form-group">
-        <%= f.label "trade[entry_price]", "Entry Price" %>
+        <%= label_tag "trade[entry_price]", "Entry Price" %>
         <%= number_field_tag "trade[entry_price]", trade["entry_price"], class: "form-control", step: "any", min: 0 %>
       </div>
 
       <div class="form-group">
-        <%= f.label "trade[exit_price]", "Exit Price" %>
+        <%= label_tag "trade[exit_price]", "Exit Price" %>
         <%= number_field_tag "trade[exit_price]", trade["exit_price"], class: "form-control", step: "any", min: 0 %>
       </div>
 
       <div class="form-group">
-        <%= f.label "trade[entry_time]", "Entry Time" %>
+        <%= label_tag "trade[entry_time]", "Entry Time" %>
         <% entry_time = trade["entry_time"].present? ? Time.parse(trade["entry_time"]).strftime("%Y-%m-%dT%H:%M") : nil %>
         <%= datetime_field_tag "trade[entry_time]", entry_time, class: "form-control" %>
       </div>
 
       <div class="form-group">
-        <%= f.label "trade[exit_time]", "Exit Time" %>
+        <%= label_tag "trade[exit_time]", "Exit Time" %>
         <% exit_time = trade["exit_time"].present? ? Time.parse(trade["exit_time"]).strftime("%Y-%m-%dT%H:%M") : nil %>
         <%= datetime_field_tag "trade[exit_time]", exit_time, class: "form-control" %>
       </div>
@@ -64,12 +64,12 @@
 
     <div class="form-row">
       <div class="form-group">
-        <%= f.label "trade[commissions]", "Commissions" %>
+        <%= label_tag "trade[commissions]", "Commissions" %>
         <%= number_field_tag "trade[commissions]", trade["commissions"], class: "form-control", step: "any", min: 0 %>
       </div>
 
       <div class="form-group">
-        <%= f.label "trade[fees]", "Fees" %>
+        <%= label_tag "trade[fees]", "Fees" %>
         <%= number_field_tag "trade[fees]", trade["fees"], class: "form-control", step: "any", min: 0 %>
       </div>
     </div>
@@ -80,12 +80,12 @@
 
     <div class="form-row">
       <div class="form-group">
-        <%= f.label "trade[max_favorable_excursion]", "Max Favorable Excursion (MFE)" %>
+        <%= label_tag "trade[max_favorable_excursion]", "Max Favorable Excursion (MFE)" %>
         <%= number_field_tag "trade[max_favorable_excursion]", trade["max_favorable_excursion"], class: "form-control", step: "any", min: 0 %>
       </div>
 
       <div class="form-group">
-        <%= f.label "trade[max_adverse_excursion]", "Max Adverse Excursion (MAE)" %>
+        <%= label_tag "trade[max_adverse_excursion]", "Max Adverse Excursion (MAE)" %>
         <%= number_field_tag "trade[max_adverse_excursion]", trade["max_adverse_excursion"], class: "form-control", step: "any", min: 0 %>
       </div>
     </div>
@@ -95,22 +95,22 @@
     <legend>Notes &amp; Review</legend>
 
     <div class="form-group">
-      <%= f.label "trade[setup]", "Setup" %>
+      <%= label_tag "trade[setup]", "Setup" %>
       <%= text_field_tag "trade[setup]", trade["setup"], class: "form-control", placeholder: "e.g. Bull flag breakout" %>
     </div>
 
     <div class="form-group">
-      <%= f.label "trade[notes]", "Notes" %>
+      <%= label_tag "trade[notes]", "Notes" %>
       <%= text_area_tag "trade[notes]", trade["notes"], class: "form-control", rows: 4, placeholder: "General trade notes..." %>
     </div>
 
     <div class="form-group">
-      <%= f.label "trade[mistakes]", "Mistakes" %>
+      <%= label_tag "trade[mistakes]", "Mistakes" %>
       <%= text_area_tag "trade[mistakes]", trade["mistakes"], class: "form-control", rows: 3, placeholder: "What went wrong?" %>
     </div>
 
     <div class="form-group">
-      <%= f.label "trade[lessons]", "Lessons Learned" %>
+      <%= label_tag "trade[lessons]", "Lessons Learned" %>
       <%= text_area_tag "trade[lessons]", trade["lessons"], class: "form-control", rows: 3, placeholder: "What did you learn?" %>
     </div>
   </fieldset>
@@ -132,7 +132,7 @@
   <% end %>
 
   <div class="form-actions">
-    <%= f.submit submit_label, class: "btn btn-primary" %>
+    <%= submit_tag submit_label, class: "btn btn-primary" %>
     <%= link_to "Cancel", cancel_path, class: "btn" %>
   </div>
 <% end %>
