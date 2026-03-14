@@ -44,6 +44,18 @@ class TradingJournalClient
     get("/api/v1/journal_entries/#{id}")
   end
 
+  def create_journal_entry(attrs)
+    post("/api/v1/journal_entries", { journal_entry: attrs })
+  end
+
+  def update_journal_entry(id, attrs)
+    patch("/api/v1/journal_entries/#{id}", { journal_entry: attrs })
+  end
+
+  def delete_journal_entry(id)
+    delete("/api/v1/journal_entries/#{id}")
+  end
+
   # Tags
 
   def tags
@@ -52,6 +64,18 @@ class TradingJournalClient
 
   def tag(id)
     get("/api/v1/tags/#{id}")
+  end
+
+  def create_tag(attrs)
+    post("/api/v1/tags", { tag: attrs })
+  end
+
+  def update_tag(id, attrs)
+    patch("/api/v1/tags/#{id}", { tag: attrs })
+  end
+
+  def delete_tag(id)
+    delete("/api/v1/tags/#{id}")
   end
 
   # Reports

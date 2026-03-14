@@ -1,0 +1,107 @@
+<div class="page-header">
+  <h1>Trades</h1>
+  <div class="page-actions">
+    <%= link_to "New Trade", new_trade_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2>Filters</h2>
+  </div>
+
+  <%= form_with url: trades_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :symbol, "Symbol" %>
+        <%= f.text_field :symbol, value: params[:symbol], placeholder: "e.g. AAPL", class: "form-control" %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :asset_class, "Asset Class" %>
+        <%= f.select :asset_class,
+              options_for_select([["Stocks", "stocks"], ["Options", "options"], ["Futures", "futures"], ["Forex", "forex"], ["Crypto", "crypto"]], params[:asset_class]),
+              { include_blank: "All" },
+              { class: "form-control" } %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :status, "Status" %>
+        <%= f.select :status,
+              options_for_select([["Open", "open"], ["Closed", "closed"]], params[:status]),
+              { include_blank: "All" },
+              { class: "form-control" } %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :side, "Side" %>
+        <%= f.select :side,
+              options_for_select([["Long", "long"], ["Short", "short"]], params[:side]),
+              { include_blank: "All" },
+              { class: "form-control" } %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :tag_id, "Tag" %>
+        <%= f.select :tag_id,
+              options_for_select(@tags.map { |t| [t["name"], t["id"]] }, params[:tag_id]),
+              { include_blank: "All" },
+              { class: "form-control" } %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :start_date, "From" %>
+        <%= f.date_field :start_date, value: params[:start_date], class: "form-control" %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :end_date, "To" %>
+        <%= f.date_field :end_date, value: params[:end_date], class: "form-control" %>
+      </div>
+
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Filter", class: "btn btn-primary" %>
+        <%= link_to "Clear", trades_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<div class="card">
+  <% if @trades.is_a?(Array) && @trades.any? %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Symbol</th>
+          <th>Side</th>
+          <th>Asset Class</th>
+          <th>Entry</th>
+          <th>Exit</th>
+          <th>Qty</th>
+          <th>P&L</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @trades.each do |trade| %>
+          <tr>
+            <td><%= link_to Date.parse(trade["entry_time"]).strftime("%b %d, %Y"), trade_path(trade["id"]) if trade["entry_time"] %></td>
+            <td><strong><%= trade["symbol"] %></strong></td>
+            <td><%= trade["side"]&.capitalize %></td>
+            <td><%= trade["asset_class"]&.capitalize %></td>
+            <td><%= number_to_currency(trade["entry_price"]) %></td>
+            <td><%= trade["exit_price"] ? number_to_currency(trade["exit_price"]) : "—" %></td>
+            <td><%= trade["quantity"] %></td>
+            <td class="<%= trade["pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+              <%= trade["pnl"] ? number_to_currency(trade["pnl"]) : "—" %>
+            </td>
+            <td><span class="badge badge-<%= trade["status"] %>"><%= trade["status"]&.capitalize %></span></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="empty-state">No trades match your filters.</p>
+  <% end %>
+</div>

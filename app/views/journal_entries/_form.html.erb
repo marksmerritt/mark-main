@@ -1,0 +1,40 @@
+<%= render "shared/errors", errors: local_assigns[:errors] || @errors %>
+
+<%= form_with url: form_url, method: form_method do |f| %>
+  <div class="form-group">
+    <%= f.label "journal_entry[date]", "Date" %>
+    <%= date_field_tag "journal_entry[date]", entry["date"], class: "form-control" %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label "journal_entry[mood]", "Mood" %>
+    <%= select_tag "journal_entry[mood]",
+          options_for_select(["Confident", "Neutral", "Anxious", "Frustrated", "Excited", "Disciplined", "Fearful"], entry["mood"]),
+          include_blank: "Select mood...", class: "form-control" %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label "journal_entry[content]", "Content" %>
+    <%= text_area_tag "journal_entry[content]", entry["content"], class: "form-control", rows: 6, placeholder: "What happened today? How did you feel about your trading?" %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label "journal_entry[market_conditions]", "Market Conditions" %>
+    <%= text_area_tag "journal_entry[market_conditions]", entry["market_conditions"], class: "form-control", rows: 4, placeholder: "Describe overall market conditions, trends, volatility..." %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label "journal_entry[plan]", "Plan" %>
+    <%= text_area_tag "journal_entry[plan]", entry["plan"], class: "form-control", rows: 4, placeholder: "What was your trading plan for the day?" %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label "journal_entry[review]", "Review" %>
+    <%= text_area_tag "journal_entry[review]", entry["review"], class: "form-control", rows: 4, placeholder: "End-of-day review: Did you follow your plan? What can you improve?" %>
+  </div>
+
+  <div class="form-actions">
+    <%= f.submit submit_label, class: "btn btn-primary" %>
+    <%= link_to "Cancel", cancel_path, class: "btn" %>
+  </div>
+<% end %>

@@ -1,0 +1,9 @@
+<div class="page-header">
+  <h1>Edit Tag</h1>
+</div>
+
+<div class="card">
+  <%= render "form", tag: @tag,
+             form_url: tag_path(@tag["id"]), form_method: :patch,
+             submit_label: "Update Tag", cancel_path: tag_path(@tag["id"]) %>
+</div>

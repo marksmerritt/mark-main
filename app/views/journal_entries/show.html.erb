@@ -1,0 +1,82 @@
+<div class="page-header">
+  <h1>Journal Entry — <%= Date.parse(@journal_entry["date"]).strftime("%A, %B %-d, %Y") %></h1>
+  <div class="page-actions">
+    <%= link_to "Edit", edit_journal_entry_path(@journal_entry["id"]), class: "btn btn-primary" %>
+    <%= link_to "Delete", journal_entry_path(@journal_entry["id"]), data: { turbo_method: :delete, turbo_confirm: "Are you sure you want to delete this journal entry?" }, class: "btn btn-danger" %>
+    <%= link_to "Back", journal_entries_path, class: "btn" %>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2>Overview</h2>
+    <% if @journal_entry["mood"].present? %>
+      <span class="badge badge-mood"><%= @journal_entry["mood"] %></span>
+    <% end %>
+  </div>
+
+  <div class="detail-section">
+    <h3>Content</h3>
+    <div class="text-content"><%= simple_format(@journal_entry["content"]) %></div>
+  </div>
+
+  <% if @journal_entry["market_conditions"].present? %>
+    <div class="detail-section">
+      <h3>Market Conditions</h3>
+      <div class="text-content"><%= simple_format(@journal_entry["market_conditions"]) %></div>
+    </div>
+  <% end %>
+
+  <% if @journal_entry["plan"].present? %>
+    <div class="detail-section">
+      <h3>Plan</h3>
+      <div class="text-content"><%= simple_format(@journal_entry["plan"]) %></div>
+    </div>
+  <% end %>
+
+  <% if @journal_entry["review"].present? %>
+    <div class="detail-section">
+      <h3>Review</h3>
+      <div class="text-content"><%= simple_format(@journal_entry["review"]) %></div>
+    </div>
+  <% end %>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2>Daily P&L</h2>
+    <span class="<%= @journal_entry["daily_pnl"].to_f >= 0 ? 'positive' : 'negative' %>" style="font-size: 1.25rem; font-weight: 600;">
+      <%= number_to_currency(@journal_entry["daily_pnl"] || 0) %>
+    </span>
+  </div>
+</div>
+
+<% if @journal_entry["trades"].present? && @journal_entry["trades"].any? %>
+  <div class="card">
+    <div class="card-header">
+      <h2>Trades</h2>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Side</th>
+          <th>P&L</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @journal_entry["trades"].each do |trade| %>
+          <tr>
+            <td><%= trade["symbol"] %></td>
+            <td><%= trade["side"]&.capitalize %></td>
+            <td class="<%= trade["pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+              <%= number_to_currency(trade["pnl"] || 0) %>
+            </td>
+            <td><%= link_to "View", trade_path(trade["id"]), class: "btn btn-sm" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

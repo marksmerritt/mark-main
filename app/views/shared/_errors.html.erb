@@ -1,0 +1,10 @@
+<% if errors.present? && errors.any? %>
+  <div class="form-errors">
+    <h3><%= errors.count %> error<%= errors.count == 1 ? "" : "s" %> prevented this from being saved:</h3>
+    <ul>
+      <% errors.each do |message| %>
+        <li><%= message %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>

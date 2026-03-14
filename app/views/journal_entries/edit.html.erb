@@ -1,0 +1,9 @@
+<div class="page-header">
+  <h1>Edit Journal Entry</h1>
+</div>
+
+<div class="card">
+  <%= render "form", entry: @journal_entry,
+             form_url: journal_entry_path(@journal_entry["id"]), form_method: :patch,
+             submit_label: "Update Entry", cancel_path: journal_entry_path(@journal_entry["id"]) %>
+</div>
