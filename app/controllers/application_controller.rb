@@ -12,9 +12,7 @@ class ApplicationController < ActionController::Base
   end
 
   def require_api_connection
-    unless api_token.present?
-      redirect_to root_path, alert: "Trading Journal is not connected. Set TRADING_JOURNAL_TOKEN."
-    end
+    redirect_to root_path, alert: "Trading Journal is not connected." unless api_token.present?
   end
 
   helper_method :api_token
