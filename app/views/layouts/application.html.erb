@@ -24,11 +24,26 @@
   <body>
     <nav class="navbar">
       <div class="navbar-inner">
-        <span class="brand">Mark Main</span>
+        <%= link_to "Mark Main", root_path, class: "brand" %>
+        <div class="nav-links">
+          <%= link_to "Dashboard", root_path, class: "nav-link #{current_page?(root_path) ? 'active' : ''}" %>
+          <%= link_to "Trades", trades_path, class: "nav-link #{request.path.start_with?('/trades') ? 'active' : ''}" %>
+          <%= link_to "Journal", journal_entries_path, class: "nav-link #{request.path.start_with?('/journal') ? 'active' : ''}" %>
+          <%= link_to "Tags", tags_path, class: "nav-link #{request.path.start_with?('/tags') ? 'active' : ''}" %>
+          <div class="nav-dropdown">
+            <span class="nav-link nav-link-dropdown">Reports</span>
+            <div class="nav-dropdown-content">
+              <%= link_to "Overview", reports_overview_path %>
+              <%= link_to "By Symbol", reports_by_symbol_path %>
+              <%= link_to "Equity Curve", reports_equity_curve_path %>
+            </div>
+          </div>
+        </div>
       </div>
     </nav>
 
     <main class="main-content">
+      <%= render "shared/flash" %>
       <%= yield %>
     </main>
   </body>

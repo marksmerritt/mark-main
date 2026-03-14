@@ -1,0 +1,177 @@
+<div class="page-header">
+  <h1><%= @trade["symbol"] %> — <%= @trade["side"]&.capitalize %></h1>
+  <div class="page-actions">
+    <%= link_to "Edit", edit_trade_path(@trade["id"]), class: "btn btn-primary" %>
+    <%= link_to "Delete", trade_path(@trade["id"]), data: { turbo_method: :delete, turbo_confirm: "Are you sure you want to delete this trade?" }, class: "btn btn-danger" %>
+    <%= link_to "Back to Trades", trades_path, class: "btn" %>
+  </div>
+</div>
+
+<div class="trade-detail-grid">
+  <div class="trade-detail-main">
+    <div class="card">
+      <div class="card-header">
+        <h2>Trade Details</h2>
+        <span class="badge badge-<%= @trade["status"] %>"><%= @trade["status"]&.capitalize %></span>
+      </div>
+
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Symbol</span>
+          <span class="detail-value"><%= @trade["symbol"] %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Asset Class</span>
+          <span class="detail-value"><%= @trade["asset_class"]&.capitalize %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Side</span>
+          <span class="detail-value"><%= @trade["side"]&.capitalize %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Quantity</span>
+          <span class="detail-value"><%= @trade["quantity"] %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Entry Price</span>
+          <span class="detail-value"><%= number_to_currency(@trade["entry_price"]) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Exit Price</span>
+          <span class="detail-value"><%= @trade["exit_price"] ? number_to_currency(@trade["exit_price"]) : "—" %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Entry Time</span>
+          <span class="detail-value"><%= Time.parse(@trade["entry_time"]).strftime("%b %d, %Y %l:%M %p") if @trade["entry_time"] %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Exit Time</span>
+          <span class="detail-value"><%= @trade["exit_time"] ? Time.parse(@trade["exit_time"]).strftime("%b %d, %Y %l:%M %p") : "—" %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Duration</span>
+          <span class="detail-value"><%= @trade["duration_in_minutes"] ? "#{@trade["duration_in_minutes"]} min" : "—" %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Commissions</span>
+          <span class="detail-value"><%= @trade["commissions"] ? number_to_currency(@trade["commissions"]) : "—" %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Fees</span>
+          <span class="detail-value"><%= @trade["fees"] ? number_to_currency(@trade["fees"]) : "—" %></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>P&L</h2>
+      </div>
+
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Gross P&L</span>
+          <span class="detail-value <%= @trade["gross_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+            <%= @trade["gross_pnl"] ? number_to_currency(@trade["gross_pnl"]) : "—" %>
+          </span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Net P&L</span>
+          <span class="detail-value <%= @trade["pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+            <%= @trade["pnl"] ? number_to_currency(@trade["pnl"]) : "—" %>
+          </span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Return</span>
+          <span class="detail-value <%= @trade["return_percentage"].to_f >= 0 ? 'positive' : 'negative' %>">
+            <%= @trade["return_percentage"] ? "#{@trade["return_percentage"]}%" : "—" %>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <% if @trade["max_favorable_excursion"] || @trade["max_adverse_excursion"] %>
+      <div class="card">
+        <div class="card-header">
+          <h2>MFE / MAE</h2>
+        </div>
+
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Max Favorable Excursion (MFE)</span>
+            <span class="detail-value">
+              <%= @trade["max_favorable_excursion"] ? number_to_currency(@trade["max_favorable_excursion"]) : "—" %>
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Max Adverse Excursion (MAE)</span>
+            <span class="detail-value">
+              <%= @trade["max_adverse_excursion"] ? number_to_currency(@trade["max_adverse_excursion"]) : "—" %>
+            </span>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @trade["notes"].present? %>
+      <div class="card">
+        <div class="card-header"><h2>Notes</h2></div>
+        <div class="text-content"><%= simple_format(@trade["notes"]) %></div>
+      </div>
+    <% end %>
+
+    <% if @trade["setup"].present? %>
+      <div class="card">
+        <div class="card-header"><h2>Setup</h2></div>
+        <div class="text-content"><%= simple_format(@trade["setup"]) %></div>
+      </div>
+    <% end %>
+
+    <% if @trade["mistakes"].present? %>
+      <div class="card">
+        <div class="card-header"><h2>Mistakes</h2></div>
+        <div class="text-content"><%= simple_format(@trade["mistakes"]) %></div>
+      </div>
+    <% end %>
+
+    <% if @trade["lessons"].present? %>
+      <div class="card">
+        <div class="card-header"><h2>Lessons Learned</h2></div>
+        <div class="text-content"><%= simple_format(@trade["lessons"]) %></div>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="trade-detail-sidebar">
+    <% if @trade["tags"].present? && @trade["tags"].any? %>
+      <div class="card">
+        <div class="card-header"><h2>Tags</h2></div>
+        <div class="tag-list-horizontal">
+          <% @trade["tags"].each do |tag| %>
+            <span class="tag" <% if tag["color"].present? %>style="background-color: <%= tag["color"] %>"<% end %>><%= tag["name"] %></span>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @trade["custom_field_values"].present? && @trade["custom_field_values"].any? %>
+      <div class="card">
+        <div class="card-header"><h2>Custom Fields</h2></div>
+        <div class="detail-grid">
+          <% @trade["custom_field_values"].each do |cfv| %>
+            <div class="detail-item">
+              <span class="detail-label"><%= cfv["field_name"] %></span>
+              <span class="detail-value">
+                <% if cfv["field_type"] == "boolean" %>
+                  <%= cfv["value"] == "true" ? "Yes" : "No" %>
+                <% else %>
+                  <%= cfv["value"] %>
+                <% end %>
+              </span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

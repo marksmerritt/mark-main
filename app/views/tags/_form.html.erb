@@ -1,0 +1,25 @@
+<%= render "shared/errors", errors: local_assigns[:errors] || @errors %>
+
+<%= form_with url: form_url, method: form_method do |f| %>
+  <div class="form-group">
+    <%= f.label "tag[name]", "Name" %>
+    <%= text_field_tag "tag[name]", tag["name"], class: "form-control", placeholder: "e.g. Momentum, Breakout, Scalp..." %>
+  </div>
+
+  <div class="form-group">
+    <%= f.label "tag[color]", "Color" %>
+    <div class="color-swatches">
+      <% %w[#1a73e8 #ea4335 #34a853 #fbbc04 #ff6d01 #ab47bc #00acc1 #5c6bc0 #8d6e63 #78909c].each do |hex| %>
+        <label class="color-swatch-label">
+          <input type="radio" name="tag[color]" value="<%= hex %>" <%= "checked" if tag["color"] == hex %> class="color-radio">
+          <span class="color-swatch" style="background-color: <%= hex %>"></span>
+        </label>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="form-actions">
+    <%= f.submit submit_label, class: "btn btn-primary" %>
+    <%= link_to "Cancel", cancel_path, class: "btn" %>
+  </div>
+<% end %>

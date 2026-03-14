@@ -1,0 +1,47 @@
+<div class="page-header">
+  <h1>Equity Curve</h1>
+</div>
+
+<div class="card">
+  <%= form_with url: reports_equity_curve_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :start_date, "Start Date" %>
+        <%= f.date_field :start_date, value: params[:start_date], class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :end_date, "End Date" %>
+        <%= f.date_field :end_date, value: params[:end_date], class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+        <%= link_to "Clear", reports_equity_curve_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<div class="card">
+  <% if @equity_data.is_a?(Array) && @equity_data.any? %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th style="text-align: right;">Cumulative P&L</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @equity_data.each do |point| %>
+          <tr>
+            <td><%= point["date"] %></td>
+            <td style="text-align: right;" class="<%= point["cumulative_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+              <%= number_to_currency(point["cumulative_pnl"]) %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="empty-state">No data available.</p>
+  <% end %>
+</div>

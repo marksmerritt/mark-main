@@ -1,0 +1,9 @@
+<div class="page-header">
+  <h1>New Trade</h1>
+</div>
+
+<div class="card">
+  <%= render "form", trade: @trade, tags: @tags,
+             form_url: trades_path, form_method: :post,
+             submit_label: "Create Trade", cancel_path: trades_path %>
+</div>

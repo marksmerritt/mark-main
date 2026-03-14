@@ -9,5 +9,16 @@ Rails.application.routes.draw do
   get "service-worker" => "rails/pwa#service_worker", as: :pwa_service_worker
   get "manifest" => "rails/pwa#manifest", as: :pwa_manifest
 
+  # Trading Journal
+  resources :trades
+  resources :journal_entries
+  resources :tags
+
+  scope :reports, controller: :reports, as: :reports do
+    get :overview
+    get :by_symbol
+    get :equity_curve
+  end
+
   root "home#index"
 end
