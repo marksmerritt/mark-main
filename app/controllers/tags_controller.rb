@@ -19,7 +19,7 @@ class TagsController < ApplicationController
       redirect_to tag_path(result["id"]), notice: "Tag created successfully."
     else
       @tag = tag_params
-      @errors = result["errors"] || [result["message"]]
+      @errors = result["errors"] || [ result["message"] ]
       render :new, status: :unprocessable_entity
     end
   end
@@ -34,7 +34,7 @@ class TagsController < ApplicationController
       redirect_to tag_path(result["id"]), notice: "Tag updated successfully."
     else
       @tag = api_client.tag(params[:id])
-      @errors = result["errors"] || [result["message"]]
+      @errors = result["errors"] || [ result["message"] ]
       render :edit, status: :unprocessable_entity
     end
   end

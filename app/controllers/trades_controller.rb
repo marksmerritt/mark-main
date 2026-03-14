@@ -23,7 +23,7 @@ class TradesController < ApplicationController
     else
       @trade = trade_params
       @tags = cached_tags
-      @errors = result["errors"] || [result["message"]]
+      @errors = result["errors"] || [ result["message"] ]
       render :new, status: :unprocessable_entity
     end
   end
@@ -40,7 +40,7 @@ class TradesController < ApplicationController
     else
       @trade = api_client.trade(params[:id])
       @tags = cached_tags
-      @errors = result["errors"] || [result["message"]]
+      @errors = result["errors"] || [ result["message"] ]
       render :edit, status: :unprocessable_entity
     end
   end

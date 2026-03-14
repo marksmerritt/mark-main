@@ -20,7 +20,7 @@ class JournalEntriesController < ApplicationController
       redirect_to journal_entry_path(result["id"]), notice: "Journal entry created successfully."
     else
       @journal_entry = journal_entry_params
-      @errors = result["errors"] || [result["message"]]
+      @errors = result["errors"] || [ result["message"] ]
       render :new, status: :unprocessable_entity
     end
   end
@@ -35,7 +35,7 @@ class JournalEntriesController < ApplicationController
       redirect_to journal_entry_path(result["id"]), notice: "Journal entry updated successfully."
     else
       @journal_entry = api_client.journal_entry(params[:id])
-      @errors = result["errors"] || [result["message"]]
+      @errors = result["errors"] || [ result["message"] ]
       render :edit, status: :unprocessable_entity
     end
   end
