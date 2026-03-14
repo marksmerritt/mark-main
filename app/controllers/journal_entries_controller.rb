@@ -7,7 +7,7 @@ class JournalEntriesController < ApplicationController
     @journal_entries = result["journal_entries"] || result
     @meta = result["meta"] || {}
 
-    render partial: "entry_cards", layout: false if params[:page].to_i > 1
+    return render partial: "entry_cards", layout: false if params[:page].to_i > 1
   end
 
   def show

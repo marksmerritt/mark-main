@@ -6,9 +6,12 @@ class TradesController < ApplicationController
     result = api_client.trades(filter_params)
     @trades = result["trades"] || result
     @meta = result["meta"] || {}
-    @tags = cached_tags
 
-    render partial: "trade_rows", layout: false if params[:page].to_i > 1
+    if params[:page].to_i > 1
+      render partial: "trade_rows", layout: false
+    else
+      @tags = cached_tags
+    end
   end
 
   def show
