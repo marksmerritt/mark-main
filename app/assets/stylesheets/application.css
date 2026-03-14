@@ -519,7 +519,7 @@ legend {
 }
 
 /* Empty & setup */
-.empty-state { color: var(--text-secondary); padding: 1rem 0; }
+.empty-state { color: var(--text-secondary); }
 .setup-notice {
   text-align: center;
   padding: 3rem 1rem;
