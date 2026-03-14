@@ -2,8 +2,12 @@ class JournalEntriesController < ApplicationController
   before_action :require_api_connection
 
   def index
-    filter_params = params.permit(:mood, :start_date, :end_date).to_h.compact_blank
-    @journal_entries = api_client.journal_entries(filter_params)
+    filter_params = params.permit(:mood, :start_date, :end_date, :page).to_h.compact_blank
+    result = api_client.journal_entries(filter_params)
+    @journal_entries = result["journal_entries"] || result
+    @meta = result["meta"] || {}
+
+    render partial: "entry_cards", layout: false if params[:page].to_i > 1
   end
 
   def show

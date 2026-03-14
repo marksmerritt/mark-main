@@ -29,24 +29,22 @@
   <% end %>
 </div>
 
-<div class="entries-list">
-  <% if @journal_entries.is_a?(Array) && @journal_entries.any? %>
-    <% @journal_entries.each do |entry| %>
-      <div class="card entry-card">
-        <div class="entry-card-header">
-          <span class="entry-date"><%= Date.parse(entry["date"]).strftime("%A, %B %-d, %Y") %></span>
-          <% if entry["mood"].present? %>
-            <span class="badge badge-mood"><%= entry["mood"] %></span>
-          <% end %>
-        </div>
-        <div class="entry-card-footer">
-          <%= link_to "View", journal_entry_path(entry["id"]), class: "btn btn-sm" %>
-        </div>
-      </div>
-    <% end %>
-  <% else %>
-    <div class="card empty-state">
-      <p>No journal entries found. <%= link_to "Create your first entry", new_journal_entry_path %>.</p>
+<% if @journal_entries.is_a?(Array) && @journal_entries.any? %>
+  <div class="entries-list"
+       data-controller="infinite-scroll"
+       data-infinite-scroll-url-value="<%= journal_entries_path(params.permit(:mood, :start_date, :end_date).to_h.compact_blank) %>"
+       data-infinite-scroll-page-value="<%= @meta["page"] || 1 %>"
+       data-infinite-scroll-total-pages-value="<%= @meta["total_pages"] || 1 %>">
+    <div data-infinite-scroll-target="entries">
+      <%= render "entry_cards" %>
     </div>
-  <% end %>
-</div>
+    <div data-infinite-scroll-target="loading" class="infinite-scroll-loading hidden">
+      Loading more entries...
+    </div>
+    <div data-infinite-scroll-target="sentinel" class="infinite-scroll-sentinel"></div>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No journal entries found. <%= link_to "Create your first entry", new_journal_entry_path %>.</p>
+  </div>
+<% end %>

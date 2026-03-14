@@ -2,9 +2,13 @@ class TradesController < ApplicationController
   before_action :require_api_connection
 
   def index
-    filter_params = params.permit(:symbol, :asset_class, :status, :side, :tag_id, :start_date, :end_date).to_h.compact_blank
-    @trades = api_client.trades(filter_params)
+    filter_params = params.permit(:symbol, :asset_class, :status, :side, :tag_id, :start_date, :end_date, :page).to_h.compact_blank
+    result = api_client.trades(filter_params)
+    @trades = result["trades"] || result
+    @meta = result["meta"] || {}
     @tags = cached_tags
+
+    render partial: "trade_rows", layout: false if params[:page].to_i > 1
   end
 
   def show
