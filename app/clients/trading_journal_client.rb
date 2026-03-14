@@ -101,7 +101,8 @@ class TradingJournalClient
     when Net::HTTPSuccess
       JSON.parse(response.body)
     else
-      { "error" => response.code, "message" => JSON.parse(response.body) rescue response.body }
+      body = begin JSON.parse(response.body) rescue response.body end
+      { "error" => response.code, "message" => body }
     end
   end
 end
