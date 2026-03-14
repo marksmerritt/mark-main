@@ -15,5 +15,9 @@ class ApplicationController < ActionController::Base
     redirect_to root_path, alert: "Trading Journal is not connected." unless api_token.present?
   end
 
-  helper_method :api_token
+  def cached_tags
+    @cached_tags ||= api_client.tags
+  end
+
+  helper_method :api_token, :cached_tags
 end

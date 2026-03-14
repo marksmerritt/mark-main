@@ -4,7 +4,7 @@ class TradesController < ApplicationController
   def index
     filter_params = params.permit(:symbol, :asset_class, :status, :side, :tag_id, :start_date, :end_date).to_h.compact_blank
     @trades = api_client.trades(filter_params)
-    @tags = api_client.tags
+    @tags = cached_tags
   end
 
   def show
@@ -13,7 +13,7 @@ class TradesController < ApplicationController
 
   def new
     @trade = {}
-    @tags = api_client.tags
+    @tags = cached_tags
   end
 
   def create
@@ -22,7 +22,7 @@ class TradesController < ApplicationController
       redirect_to trade_path(result["id"]), notice: "Trade created successfully."
     else
       @trade = trade_params
-      @tags = api_client.tags
+      @tags = cached_tags
       @errors = result["errors"] || [result["message"]]
       render :new, status: :unprocessable_entity
     end
@@ -30,7 +30,7 @@ class TradesController < ApplicationController
 
   def edit
     @trade = api_client.trade(params[:id])
-    @tags = api_client.tags
+    @tags = cached_tags
   end
 
   def update
@@ -39,7 +39,7 @@ class TradesController < ApplicationController
       redirect_to trade_path(result["id"]), notice: "Trade updated successfully."
     else
       @trade = api_client.trade(params[:id])
-      @tags = api_client.tags
+      @tags = cached_tags
       @errors = result["errors"] || [result["message"]]
       render :edit, status: :unprocessable_entity
     end

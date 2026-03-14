@@ -3,7 +3,7 @@ class HomeController < ApplicationController
     if api_token.present?
       @stats = api_client.overview
       @recent_trades = api_client.trades
-      @tags = api_client.tags
+      @tags = cached_tags
     end
   end
 end

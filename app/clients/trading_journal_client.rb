@@ -85,14 +85,31 @@ class TradingJournalClient
 
   def perform(uri, request)
     self.class.execute(uri, request)
+  rescue IOError, Errno::EPIPE
+    self.class.execute(uri, request)  # retry once with fresh connection
+  end
+
+  def self.connection
+    Thread.current[:trading_journal_http] ||= begin
+      uri = URI(BASE_URL)
+      http = Net::HTTP.new(uri.host, uri.port)
+      http.use_ssl = uri.scheme == "https"
+      http.open_timeout = 5
+      http.read_timeout = 10
+      http.keep_alive_timeout = 30
+      http.start
+      http
+    end
   end
 
   def self.execute(uri, request)
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = uri.scheme == "https"
-    response = http.request(request)
+    response = connection.request(request)
     parse_response(response)
+  rescue IOError, Errno::EPIPE
+    Thread.current[:trading_journal_http] = nil
+    raise
   rescue Errno::ECONNREFUSED, Net::OpenTimeout, Net::ReadTimeout
+    Thread.current[:trading_journal_http] = nil
     { "error" => "connection_failed", "message" => "Trading Journal is not reachable" }
   end
 
