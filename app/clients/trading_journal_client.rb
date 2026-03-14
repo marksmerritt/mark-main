@@ -1,5 +1,5 @@
 class TradingJournalClient
-  BASE_URL = ENV.fetch("TRADING_JOURNAL_URL", "http://localhost:3000")
+  BASE_URL = ENV.fetch("TRADING_JOURNAL_URL", "http://localhost:3001")
 
   def initialize(token)
     @token = token
