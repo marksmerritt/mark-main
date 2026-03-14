@@ -1,3 +1,5 @@
+require "net/http"
+
 class TradingJournalClient
   BASE_URL = ENV.fetch("TRADING_JOURNAL_URL", "http://localhost:3001")
 
