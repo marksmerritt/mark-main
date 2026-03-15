@@ -1,0 +1,130 @@
+<%
+  all_tags = @tags.is_a?(Array) ? @tags : []
+  tag_stats_map = {}
+  (@tag_stats || []).each { |s| tag_stats_map[s["tag_id"] || s["id"]] = s }
+%>
+
+<div class="page-header">
+  <h1>Note Tags</h1>
+  <div class="page-actions">
+    <button onclick="document.getElementById('add-tag-form').style.display = document.getElementById('add-tag-form').style.display === 'none' ? 'block' : 'none'; return false;"
+            class="btn btn-primary">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">add</span> New Tag
+    </button>
+  </div>
+</div>
+
+<% if all_tags.any? %>
+  <div class="card" style="margin-bottom: 1rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0;">
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Tags</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= all_tags.count %></div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">With Color</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= all_tags.count { |t| t["color"].present? } %></div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Most Used</div>
+        <div style="font-size: 1.25rem; font-weight: 700;">
+          <%
+            most_used = all_tags.max_by { |t| (tag_stats_map[t["id"]] || {})["notes_count"].to_i }
+            most_used_name = most_used ? most_used["name"] : "—"
+          %>
+          <span style="font-size: 0.875rem;"><%= most_used_name %></span>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div id="add-tag-form" class="card" style="display: none; margin-bottom: 1rem;">
+  <div class="card-header"><h2>Create Tag</h2></div>
+  <div style="padding: 1rem 1.25rem;">
+    <%= form_with url: note_tags_path, method: :post do |f| %>
+      <div style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;">
+        <div style="flex: 2; min-width: 160px;">
+          <label style="font-size: 0.75rem; color: var(--text-secondary);">Tag Name</label>
+          <%= f.text_field "tag[name]", class: "form-control", placeholder: "e.g. research, ideas, project" %>
+        </div>
+        <div style="flex: 0 0 80px;">
+          <label style="font-size: 0.75rem; color: var(--text-secondary);">Color</label>
+          <%= f.color_field "tag[color]", value: "#1a73e8", class: "form-control", style: "padding: 0.25rem; height: 38px;" %>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <%= f.submit "Create Tag", class: "btn btn-primary" %>
+          <button type="button" onclick="document.getElementById('add-tag-form').style.display='none'" class="btn">Cancel</button>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<% if all_tags.any? %>
+  <div class="tags-grid">
+    <% all_tags.sort_by { |t| t["name"].to_s.downcase }.each do |tag| %>
+      <%
+        t_stats = tag_stats_map[tag["id"]] || {}
+        t_notes_count = t_stats["notes_count"] || tag["notes_count"] || 0
+        t_word_count = t_stats["word_count"] || tag["word_count"] || 0
+        t_color = tag["color"]
+      %>
+      <div class="card">
+        <div class="card-header">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <% if t_color.present? %>
+              <span style="width: 12px; height: 12px; border-radius: 3px; background: <%= t_color %>; flex-shrink: 0;"></span>
+            <% end %>
+            <h2 style="font-size: 1rem;"><%= tag["name"] %></h2>
+          </div>
+          <div style="display: flex; gap: 0.25rem;">
+            <button onclick="document.getElementById('edit-tag-<%= tag["id"] %>').style.display = document.getElementById('edit-tag-<%= tag["id"] %>').style.display === 'none' ? 'block' : 'none'; return false;"
+                    class="btn-icon" title="Edit">
+              <span class="material-icons-outlined" style="font-size: 1rem;">edit</span>
+            </button>
+            <%= link_to note_tag_path(tag["id"]),
+                  data: { turbo_method: :delete, turbo_confirm: "Delete tag '#{tag["name"]}'?" },
+                  class: "btn-icon", title: "Delete" do %>
+              <span class="material-icons-outlined" style="font-size: 1rem; color: var(--negative);">delete</span>
+            <% end %>
+          </div>
+        </div>
+
+        <div id="edit-tag-<%= tag["id"] %>" style="display: none; padding: 0.75rem 1.25rem; background: var(--bg); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+          <%= form_with url: note_tag_path(tag["id"]), method: :patch do |f| %>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <%= f.text_field "tag[name]", value: tag["name"], class: "form-control", style: "flex: 2; font-size: 0.8125rem;" %>
+              <%= f.color_field "tag[color]", value: t_color || "#1a73e8", class: "form-control", style: "flex: 0 0 50px; padding: 0.125rem; height: 34px;" %>
+              <%= f.submit "Save", class: "btn btn-sm btn-primary" %>
+              <button type="button" onclick="document.getElementById('edit-tag-<%= tag["id"] %>').style.display='none'" class="btn btn-sm">Cancel</button>
+            </div>
+          <% end %>
+        </div>
+
+        <div style="padding: 0.75rem 1.25rem;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8125rem;">
+            <div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Notes</div>
+              <div style="font-weight: 600;"><%= t_notes_count %></div>
+            </div>
+            <% if t_word_count.to_i > 0 %>
+              <div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">Words</div>
+                <div style="font-weight: 600;"><%= number_with_delimiter(t_word_count) %></div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+
+        <div style="padding: 0.5rem 1.25rem 0.75rem;">
+          <%= link_to "View Notes", notes_path(tag_id: tag["id"]), class: "btn btn-sm", style: "width: 100%; justify-content: center;" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No tags yet. Create your first tag to organize your notes.</p>
+  </div>
+<% end %>

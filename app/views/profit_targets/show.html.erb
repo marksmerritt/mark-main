@@ -1,0 +1,417 @@
+<% content_for(:title) { "Profit Targets" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">track_changes</span>
+    Profit Targets
+  </h1>
+  <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= Date.current.strftime("%A, %B %-d, %Y") %></span>
+</div>
+
+<div data-controller="profit-targets"
+     data-profit-targets-suggested-daily-value="<%= @suggested_daily %>"
+     data-profit-targets-suggested-weekly-value="<%= @suggested_weekly %>"
+     data-profit-targets-suggested-monthly-value="<%= @suggested_monthly %>"
+     data-profit-targets-today-pnl-value="<%= @today_pnl %>"
+     data-profit-targets-week-pnl-value="<%= @week_pnl %>"
+     data-profit-targets-month-pnl-value="<%= @month_pnl %>"
+     data-profit-targets-daily-pnl-json-value="<%= @daily_pnl_floats.to_json %>"
+     data-profit-targets-default-daily-target-value="<%= @default_daily_target %>">
+
+  <%# Motivational Banner %>
+  <div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem; background: linear-gradient(135deg, rgba(33,150,243,0.06), rgba(33,150,243,0.02)); border-left: 4px solid <%= @motivation[:color] %>;">
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <span class="material-icons-outlined" style="font-size: 2rem; color: <%= @motivation[:color] %>;"><%= @motivation[:icon] %></span>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Today's Outlook</div>
+        <div style="font-size: 0.9375rem; color: var(--text); font-weight: 500;"><%= @motivation[:message] %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Set Your Targets Card %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);">tune</span>
+        Set Your Targets
+        <span style="float: right; font-size: 0.6875rem; color: var(--text-secondary); font-weight: 400;">Based on your avg daily P&L of <%= number_to_currency(@avg_daily_pnl) %></span>
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+        <div>
+          <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.375rem;">Daily Target</label>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="color: var(--text-secondary); font-size: 0.875rem;">$</span>
+            <input type="number" step="1" min="0"
+                   data-profit-targets-target="dailyInput"
+                   data-action="input->profit-targets#updateTargets"
+                   value="<%= @suggested_daily.to_i %>"
+                   style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 1rem; font-weight: 600;">
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">Suggested: <%= number_to_currency(@suggested_daily, precision: 0) %></div>
+        </div>
+        <div>
+          <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.375rem;">Weekly Target</label>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="color: var(--text-secondary); font-size: 0.875rem;">$</span>
+            <input type="number" step="1" min="0"
+                   data-profit-targets-target="weeklyInput"
+                   data-action="input->profit-targets#updateTargets"
+                   value="<%= @suggested_weekly.to_i %>"
+                   style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 1rem; font-weight: 600;">
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">Suggested: <%= number_to_currency(@suggested_weekly, precision: 0) %></div>
+        </div>
+        <div>
+          <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.375rem;">Monthly Target</label>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="color: var(--text-secondary); font-size: 0.875rem;">$</span>
+            <input type="number" step="1" min="0"
+                   data-profit-targets-target="monthlyInput"
+                   data-action="input->profit-targets#updateTargets"
+                   value="<%= @suggested_monthly.to_i %>"
+                   style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 1rem; font-weight: 600;">
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">Suggested: <%= number_to_currency(@suggested_monthly, precision: 0) %></div>
+        </div>
+      </div>
+      <button data-action="click->profit-targets#saveTargets"
+              style="padding: 0.5rem 1.25rem; background: var(--primary); color: #fff; border: none; border-radius: 8px; font-size: 0.8125rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 0.375rem;">
+        <span class="material-icons-outlined" style="font-size: 1rem;">save</span>
+        Save Targets
+      </button>
+      <span data-profit-targets-target="saveStatus" style="font-size: 0.75rem; color: var(--positive); margin-left: 0.75rem;"></span>
+    </div>
+  </div>
+
+  <%# Progress Cards %>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <%# Daily Progress %>
+    <div class="card" style="padding: 1.25rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Daily P&L</div>
+          <div style="font-size: 1.75rem; font-weight: 700; color: <%= @today_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@today_pnl) %></div>
+        </div>
+        <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(33,150,243,0.1); display: flex; align-items: center; justify-content: center;">
+          <span class="material-icons-outlined" style="font-size: 1.5rem; color: #2196f3;">today</span>
+        </div>
+      </div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.375rem;">
+        Target: <span data-profit-targets-target="dailyTargetLabel"><%= number_to_currency(@suggested_daily, precision: 0) %></span>
+      </div>
+      <div style="height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+        <% daily_pct = @suggested_daily > 0 ? [(@today_pnl / @suggested_daily * 100).round(0), 0].max : 0 %>
+        <div data-profit-targets-target="dailyBar"
+             style="height: 100%; width: <%= [daily_pct, 100].min %>%; background: <%= daily_pct >= 100 ? 'var(--positive)' : '#2196f3' %>; border-radius: 4px; transition: width 0.4s ease;"></div>
+      </div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.375rem; text-align: right;">
+        <span data-profit-targets-target="dailyPct"><%= daily_pct %>%</span>
+      </div>
+    </div>
+
+    <%# Weekly Progress %>
+    <div class="card" style="padding: 1.25rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Weekly P&L</div>
+          <div style="font-size: 1.75rem; font-weight: 700; color: <%= @week_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@week_pnl) %></div>
+        </div>
+        <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(156,39,176,0.1); display: flex; align-items: center; justify-content: center;">
+          <span class="material-icons-outlined" style="font-size: 1.5rem; color: #9c27b0;">date_range</span>
+        </div>
+      </div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.375rem;">
+        Target: <span data-profit-targets-target="weeklyTargetLabel"><%= number_to_currency(@suggested_weekly, precision: 0) %></span>
+      </div>
+      <div style="height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+        <% weekly_pct = @suggested_weekly > 0 ? [(@week_pnl / @suggested_weekly * 100).round(0), 0].max : 0 %>
+        <div data-profit-targets-target="weeklyBar"
+             style="height: 100%; width: <%= [weekly_pct, 100].min %>%; background: <%= weekly_pct >= 100 ? 'var(--positive)' : '#9c27b0' %>; border-radius: 4px; transition: width 0.4s ease;"></div>
+      </div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.375rem; text-align: right;">
+        <span data-profit-targets-target="weeklyPct"><%= weekly_pct %>%</span>
+      </div>
+    </div>
+
+    <%# Monthly Progress %>
+    <div class="card" style="padding: 1.25rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Monthly P&L</div>
+          <div style="font-size: 1.75rem; font-weight: 700; color: <%= @month_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@month_pnl) %></div>
+        </div>
+        <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(230,81,0,0.1); display: flex; align-items: center; justify-content: center;">
+          <span class="material-icons-outlined" style="font-size: 1.5rem; color: #e65100;">calendar_month</span>
+        </div>
+      </div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.375rem;">
+        Target: <span data-profit-targets-target="monthlyTargetLabel"><%= number_to_currency(@suggested_monthly, precision: 0) %></span>
+      </div>
+      <div style="height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+        <% monthly_pct = @suggested_monthly > 0 ? [(@month_pnl / @suggested_monthly * 100).round(0), 0].max : 0 %>
+        <div data-profit-targets-target="monthlyBar"
+             style="height: 100%; width: <%= [monthly_pct, 100].min %>%; background: <%= monthly_pct >= 100 ? 'var(--positive)' : '#e65100' %>; border-radius: 4px; transition: width 0.4s ease;"></div>
+      </div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.375rem; text-align: right;">
+        <span data-profit-targets-target="monthlyPct"><%= monthly_pct %>%</span>
+      </div>
+    </div>
+  </div>
+
+  <%# Target Hit Rate and Best/Worst Days %>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <%# Target Hit Rate %>
+    <div class="card" style="padding: 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+        <span class="material-icons-outlined" style="font-size: 1.1rem; color: #4caf50;">check_circle</span>
+        <span style="font-size: 0.875rem; font-weight: 600;">Target Hit Rate</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1rem;">
+        <div style="position: relative; width: 80px; height: 80px; flex-shrink: 0;">
+          <svg viewBox="0 0 36 36" style="width: 80px; height: 80px; transform: rotate(-90deg);">
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" stroke-width="3"/>
+            <circle cx="18" cy="18" r="15.9" fill="none" stroke="#4caf50" stroke-width="3"
+                    data-profit-targets-target="hitRateRing"
+                    stroke-dasharray="<%= @target_hit_rate %>, 100" stroke-linecap="round"/>
+          </svg>
+          <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.875rem; font-weight: 700;" data-profit-targets-target="hitRatePct"><%= @target_hit_rate %>%</div>
+        </div>
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">
+            <span style="color: var(--positive); font-weight: 600;" data-profit-targets-target="hitDaysCount"><%= @target_hit_days %></span> days hit target
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            <span style="color: var(--negative); font-weight: 600;" data-profit-targets-target="missDaysCount"><%= @target_miss_days %></span> days missed
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            <span style="font-weight: 600;"><%= @total_trading_days %></span> total trading days
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <%# Best & Worst Days %>
+    <div class="card" style="padding: 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+        <span class="material-icons-outlined" style="font-size: 1.1rem; color: #ff9800;">insights</span>
+        <span style="font-size: 0.875rem; font-weight: 600;">Best & Worst Days</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div style="padding: 0.75rem; border-radius: 8px; background: rgba(76,175,80,0.06);">
+          <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">Best Day</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@best_day[:pnl]) %></div>
+          <% if @best_day[:date] != "N/A" %>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= begin Date.parse(@best_day[:date]).strftime("%b %-d, %Y") rescue @best_day[:date] end %></div>
+          <% end %>
+        </div>
+        <div style="padding: 0.75rem; border-radius: 8px; background: rgba(244,67,54,0.06);">
+          <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">Worst Day</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@worst_day[:pnl]) %></div>
+          <% if @worst_day[:date] != "N/A" %>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= begin Date.parse(@worst_day[:date]).strftime("%b %-d, %Y") rescue @worst_day[:date] end %></div>
+          <% end %>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.75rem;">
+        <div style="text-align: center; padding: 0.5rem; border-radius: 8px; background: rgba(33,150,243,0.06);">
+          <div style="font-size: 1.125rem; font-weight: 700; color: #2196f3;"><%= number_to_currency(@avg_daily_pnl) %></div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Avg Daily P&L</div>
+        </div>
+        <div style="text-align: center; padding: 0.5rem; border-radius: 8px; background: rgba(156,39,176,0.06);">
+          <div style="font-size: 1.125rem; font-weight: 700; color: #9c27b0;"><%= @total_trading_days %></div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Trading Days</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Last 30 Days P&L Chart %>
+  <% if @chart_data.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);">bar_chart</span>
+        Last 30 Days P&L vs Target
+      </h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        chart_values = @chart_data.map { |_, v| v }
+        max_val = [chart_values.max || 0, @default_daily_target].max
+        min_val = [chart_values.min || 0, 0].min
+        range = max_val - min_val
+        range = 1.0 if range == 0
+        chart_h = 200
+        chart_w = [(@chart_data.length * 24), 720].max
+        bar_w = (chart_w.to_f / @chart_data.length * 0.7).round(1)
+        gap = (chart_w.to_f / @chart_data.length).round(1)
+        zero_y = (chart_h * max_val / range).round(1)
+        target_y = (chart_h * (max_val - @default_daily_target) / range).round(1)
+      %>
+      <svg viewBox="0 0 <%= chart_w + 20 %> <%= chart_h + 40 %>" style="width: 100%; height: auto; min-height: 200px;" preserveAspectRatio="xMidYMid meet" data-profit-targets-target="chart">
+        <%# Zero line %>
+        <line x1="10" y1="<%= zero_y + 10 %>" x2="<%= chart_w + 10 %>" y2="<%= zero_y + 10 %>" stroke="var(--border)" stroke-width="1"/>
+        <%# Target line %>
+        <line x1="10" y1="<%= target_y + 10 %>" x2="<%= chart_w + 10 %>" y2="<%= target_y + 10 %>"
+              stroke="var(--primary)" stroke-width="1.5" stroke-dasharray="6,3" data-profit-targets-target="targetLine"/>
+        <text x="<%= chart_w + 12 %>" y="<%= target_y + 14 %>" fill="var(--primary)" font-size="8" font-weight="600">TARGET</text>
+
+        <%# Bars %>
+        <% @chart_data.each_with_index do |(date, pnl), i| %>
+          <%
+            x = 10 + (i * gap) + (gap - bar_w) / 2
+            bar_h = (pnl.abs / range * chart_h).round(1)
+            bar_h = [bar_h, 2].max
+            if pnl >= 0
+              y = zero_y + 10 - bar_h
+              color = pnl >= @default_daily_target ? 'var(--positive)' : 'rgba(76,175,80,0.4)'
+            else
+              y = zero_y + 10
+              color = 'var(--negative)'
+            end
+            short_date = begin Date.parse(date).strftime("%-m/%-d") rescue date end
+          %>
+          <rect x="<%= x %>" y="<%= y %>" width="<%= bar_w %>" height="<%= bar_h %>"
+                fill="<%= color %>" rx="2">
+            <title><%= date %>: <%= number_to_currency(pnl) %></title>
+          </rect>
+          <% if @chart_data.length <= 30 %>
+            <text x="<%= x + bar_w / 2 %>" y="<%= chart_h + 25 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="6"
+                  transform="rotate(-45, <%= x + bar_w / 2 %>, <%= chart_h + 25 %>)"><%= short_date %></text>
+          <% end %>
+        <% end %>
+      </svg>
+      <div style="display: flex; align-items: center; gap: 1rem; margin-top: 0.75rem; justify-content: center;">
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <div style="width: 12px; height: 12px; border-radius: 2px; background: var(--positive);"></div>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary);">Hit Target</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <div style="width: 12px; height: 12px; border-radius: 2px; background: rgba(76,175,80,0.4);"></div>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary);">Positive (Below Target)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <div style="width: 12px; height: 12px; border-radius: 2px; background: var(--negative);"></div>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary);">Loss</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <div style="width: 16px; border-top: 2px dashed var(--primary);"></div>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary);">Daily Target</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <% end %>
+
+  <%# Streaks %>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+        <span class="material-icons-outlined" style="font-size: 1.1rem; color: #ff9800;">local_fire_department</span>
+        <span style="font-size: 0.875rem; font-weight: 600;">Best Streaks</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <div style="text-align: center; padding: 0.75rem; border-radius: 8px; background: rgba(76,175,80,0.06);">
+          <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @best_streak %></div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Best Streak</div>
+          <div style="font-size: 0.5625rem; color: var(--text-secondary);">consecutive days above target</div>
+        </div>
+        <div style="text-align: center; padding: 0.75rem; border-radius: 8px; background: rgba(33,150,243,0.06);">
+          <div style="font-size: 1.5rem; font-weight: 700; color: #2196f3;"><%= @current_streak %></div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Current Streak</div>
+          <div style="font-size: 0.5625rem; color: var(--text-secondary);">days in a row</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+        <span class="material-icons-outlined" style="font-size: 1.1rem; color: var(--negative);">warning</span>
+        <span style="font-size: 0.875rem; font-weight: 600;">Caution Zone</span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <div style="text-align: center; padding: 0.75rem; border-radius: 8px; background: rgba(244,67,54,0.06);">
+          <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= @worst_streak %></div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Worst Miss Streak</div>
+          <div style="font-size: 0.5625rem; color: var(--text-secondary);">consecutive days below target</div>
+        </div>
+        <div style="text-align: center; padding: 0.75rem; border-radius: 8px; background: rgba(255,152,0,0.06);">
+          <%
+            green_days = @daily_pnl_floats.values.count { |v| v > 0 }
+            green_rate = @total_trading_days > 0 ? (green_days.to_f / @total_trading_days * 100).round(1) : 0
+          %>
+          <div style="font-size: 1.5rem; font-weight: 700; color: #ff9800;"><%= green_rate %>%</div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Green Day Rate</div>
+          <div style="font-size: 0.5625rem; color: var(--text-secondary);"><%= green_days %>/<%= @total_trading_days %> days profitable</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding: 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+        <span class="material-icons-outlined" style="font-size: 1.1rem; color: #2196f3;">speed</span>
+        <span style="font-size: 0.875rem; font-weight: 600;">Target Zone</span>
+      </div>
+      <div style="text-align: center; padding: 0.75rem;">
+        <%
+          if @today_pnl >= @default_daily_target && @default_daily_target > 0
+            zone_color = "var(--positive)"
+            zone_label = "IN THE ZONE"
+            zone_icon = "check_circle"
+          elsif @today_pnl > 0
+            zone_color = "#ff9800"
+            zone_label = "APPROACHING"
+            zone_icon = "trending_up"
+          else
+            zone_color = "var(--negative)"
+            zone_label = "BELOW TARGET"
+            zone_icon = "trending_down"
+          end
+        %>
+        <span class="material-icons-outlined" style="font-size: 2.5rem; color: <%= zone_color %>;"><%= zone_icon %></span>
+        <div style="font-size: 0.875rem; font-weight: 700; color: <%= zone_color %>; margin-top: 0.375rem; letter-spacing: 0.1em;"><%= zone_label %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          <% remaining = @default_daily_target - @today_pnl %>
+          <% if remaining > 0 %>
+            <%= number_to_currency(remaining) %> to go
+          <% else %>
+            Exceeded by <%= number_to_currency(remaining.abs) %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Overall Stats Footer %>
+  <div class="card" style="padding: 1.25rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 1.1rem; color: var(--primary);">analytics</span>
+      <span style="font-size: 0.875rem; font-weight: 600;">All-Time Summary</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem;">
+      <div style="text-align: center; padding: 0.75rem; border-radius: 8px; background: var(--surface);">
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= @total_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@total_pnl) %></div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Total P&L</div>
+      </div>
+      <div style="text-align: center; padding: 0.75rem; border-radius: 8px; background: var(--surface);">
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--text);"><%= @total_trades %></div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Total Trades</div>
+      </div>
+      <div style="text-align: center; padding: 0.75rem; border-radius: 8px; background: var(--surface);">
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--text);"><%= @win_rate %>%</div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+      </div>
+      <div style="text-align: center; padding: 0.75rem; border-radius: 8px; background: var(--surface);">
+        <div style="font-size: 1.25rem; font-weight: 700; color: #2196f3;"><%= number_to_currency(@avg_daily_pnl) %></div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Avg Daily P&L</div>
+      </div>
+      <div style="text-align: center; padding: 0.75rem; border-radius: 8px; background: var(--surface);">
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);" data-profit-targets-target="hitRateFooter"><%= @target_hit_rate %>%</div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Target Hit Rate</div>
+      </div>
+    </div>
+  </div>
+</div>

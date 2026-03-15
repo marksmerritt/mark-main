@@ -1,0 +1,334 @@
+<div class="page-header">
+  <h1>P&L Distribution</h1>
+  <div class="page-actions">
+    <button class="btn" onclick="window.print()">
+      <span class="material-icons-outlined">print</span> Print
+    </button>
+  </div>
+</div>
+
+<div class="card">
+  <%= form_with url: reports_distribution_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :start_date, "Start Date" %>
+        <%= f.date_field :start_date, value: params[:start_date], class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :end_date, "End Date" %>
+        <%= f.date_field :end_date, value: params[:end_date], class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+        <%= link_to "Clear", reports_distribution_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @distribution.present? && !@distribution["error"] %>
+  <% stats = @distribution["statistics"] || {} %>
+  <% percentiles = @distribution["percentiles"] || {} %>
+  <% buckets = @distribution["buckets"] || [] %>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= stats["count"] %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Mean P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(stats["mean"]) %>"><%= number_to_currency(stats["mean"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Median P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(stats["median"]) %>"><%= number_to_currency(stats["median"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Std Deviation</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(stats["std_dev"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Skewness</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= stats["skewness"]&.round(3) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Kurtosis</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= stats["kurtosis"]&.round(3) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Min P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(stats["min"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Max P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= number_to_currency(stats["max"]) %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Win/Loss split and Expectancy %>
+  <%
+    win_count = buckets.select { |b| b["range_start"].to_f >= 0 && b["range_end"].to_f > 0 }.sum { |b| b["count"].to_i }
+    loss_count = buckets.select { |b| b["range_end"].to_f <= 0 }.sum { |b| b["count"].to_i }
+    total_count = stats["count"].to_i
+    win_pct = total_count > 0 ? (win_count.to_f / total_count * 100).round(1) : 0
+    loss_pct = total_count > 0 ? (loss_count.to_f / total_count * 100).round(1) : 0
+    avg_win = stats["avg_win"].to_f
+    avg_loss = stats["avg_loss"].to_f.abs
+    expectancy = total_count > 0 ? ((win_pct / 100.0 * avg_win) - (loss_pct / 100.0 * avg_loss)).round(2) : 0
+    edge_ratio = avg_loss > 0 ? (avg_win / avg_loss).round(2) : 0
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Win/Loss Profile</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <%# Stacked win/loss bar %>
+      <div style="display: flex; height: 2.5rem; border-radius: var(--radius); overflow: hidden; margin-bottom: 1rem;">
+        <% if win_pct > 0 %>
+          <div style="width: <%= win_pct %>%; background: var(--positive); display: flex; align-items: center; justify-content: center; min-width: 2.5rem;">
+            <span style="font-size: 0.8125rem; font-weight: 700; color: white;"><%= win_pct %>% W</span>
+          </div>
+        <% end %>
+        <% if loss_pct > 0 %>
+          <div style="width: <%= loss_pct %>%; background: var(--negative); display: flex; align-items: center; justify-content: center; min-width: 2.5rem;">
+            <span style="font-size: 0.8125rem; font-weight: 700; color: white;"><%= loss_pct %>% L</span>
+          </div>
+        <% end %>
+      </div>
+
+      <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 140px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Expectancy</div>
+          <div style="font-size: 1.25rem; font-weight: 700;" class="<%= expectancy >= 0 ? 'positive' : 'negative' %>">
+            <%= number_to_currency(expectancy) %>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">per trade</div>
+        </div>
+        <div style="flex: 1; min-width: 140px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Edge Ratio</div>
+          <div style="font-size: 1.25rem; font-weight: 700;" class="<%= edge_ratio >= 1 ? 'positive' : 'negative' %>">
+            <%= edge_ratio %>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">avg win / avg loss</div>
+        </div>
+        <div style="flex: 1; min-width: 140px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Avg Win</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(avg_win) %></div>
+        </div>
+        <div style="flex: 1; min-width: 140px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Avg Loss</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(-avg_loss) %></div>
+        </div>
+      </div>
+
+      <% if expectancy != 0 %>
+        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.8125rem; color: var(--text-secondary); display: flex; align-items: center; gap: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 1rem;">lightbulb</span>
+          <% if expectancy > 0 %>
+            Your system has a <strong class="positive">positive edge</strong> — on average, each trade is expected to earn <%= number_to_currency(expectancy) %>.
+            <% if edge_ratio < 1 %>
+              Consider tightening stops to improve your edge ratio.
+            <% end %>
+          <% else %>
+            Your system has a <strong class="negative">negative expectancy</strong>. Focus on cutting losses faster or improving win rate.
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Visual box plot %>
+  <% if percentiles.any? %>
+    <%
+      p10 = percentiles["p10"].to_f
+      p25 = percentiles["p25"].to_f
+      p50 = percentiles["p50"].to_f
+      p75 = percentiles["p75"].to_f
+      p90 = percentiles["p90"].to_f
+      bp_min = stats["min"].to_f
+      bp_max = stats["max"].to_f
+      bp_range = bp_max - bp_min
+      bp_range = 1 if bp_range == 0
+      bp_pct = ->(val) { ((val - bp_min) / bp_range * 100).round(1) }
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>P&L Box Plot</h2></div>
+      <div style="padding: 1.5rem 1.25rem 2rem;">
+        <div style="position: relative; height: 70px; margin: 0 3rem;">
+          <%# Whisker line (P10 to P90) %>
+          <div style="position: absolute; top: 33px; left: <%= bp_pct.call(p10) %>%; right: <%= 100 - bp_pct.call(p90) %>%;
+                      height: 2px; background: var(--text-secondary);"></div>
+          <%# Box (P25 to P75) %>
+          <div style="position: absolute; top: 15px; left: <%= bp_pct.call(p25) %>%;
+                      width: <%= bp_pct.call(p75) - bp_pct.call(p25) %>%;
+                      height: 38px; background: var(--primary); opacity: 0.12;
+                      border: 2px solid var(--primary); border-radius: 4px;"></div>
+          <%# Median %>
+          <div style="position: absolute; top: 11px; left: <%= bp_pct.call(p50) %>%; width: 3px; height: 46px;
+                      background: var(--primary); border-radius: 2px; transform: translateX(-50%);"></div>
+          <%# Mean marker %>
+          <% mean_val = stats["mean"].to_f %>
+          <div style="position: absolute; top: 25px; left: <%= bp_pct.call(mean_val) %>%;
+                      width: 8px; height: 8px; background: #f9ab00; transform: translateX(-50%) rotate(45deg);"
+               title="Mean: <%= number_to_currency(mean_val) %>"></div>
+          <%# Zero line %>
+          <% if bp_min < 0 && bp_max > 0 %>
+            <div style="position: absolute; top: 5px; left: <%= bp_pct.call(0) %>%; width: 1px; height: 58px;
+                        border-left: 1px dashed var(--border);"></div>
+            <span style="position: absolute; top: -2px; left: <%= bp_pct.call(0) %>%; transform: translateX(-50%);
+                         font-size: 0.5625rem; color: var(--text-secondary);">$0</span>
+          <% end %>
+          <%# Labels %>
+          <span style="position: absolute; top: 60px; left: <%= bp_pct.call(p10) %>%; transform: translateX(-50%);
+                       font-size: 0.5625rem; color: var(--text-secondary);">P10</span>
+          <span style="position: absolute; top: 60px; left: <%= bp_pct.call(p25) %>%; transform: translateX(-50%);
+                       font-size: 0.5625rem; color: var(--text-secondary);">P25</span>
+          <span style="position: absolute; top: 60px; left: <%= bp_pct.call(p50) %>%; transform: translateX(-50%);
+                       font-size: 0.625rem; font-weight: 700; color: var(--primary);">Median</span>
+          <span style="position: absolute; top: 60px; left: <%= bp_pct.call(p75) %>%; transform: translateX(-50%);
+                       font-size: 0.5625rem; color: var(--text-secondary);">P75</span>
+          <span style="position: absolute; top: 60px; left: <%= bp_pct.call(p90) %>%; transform: translateX(-50%);
+                       font-size: 0.5625rem; color: var(--text-secondary);">P90</span>
+        </div>
+        <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1.5rem; font-size: 0.6875rem; color: var(--text-secondary);">
+          <span style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 12px; height: 12px; background: var(--primary); opacity: 0.15; border: 1px solid var(--primary); border-radius: 2px;"></span> IQR (50%)
+          </span>
+          <span style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 3px; height: 12px; background: var(--primary); border-radius: 1px;"></span> Median
+          </span>
+          <span style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 6px; height: 6px; background: #f9ab00; transform: rotate(45deg);"></span> Mean
+          </span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <% if buckets.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>P&L Histogram</h2>
+      </div>
+      <div class="chart-wrapper"
+           data-controller="chart"
+           data-chart-type-value="histogram"
+           data-chart-points-value="<%= buckets.map { |b|
+             { x: number_to_currency(b["range_start"], precision: 0),
+               x2: number_to_currency(b["range_end"], precision: 0),
+               y: b["count"],
+               midpoint: (b["range_start"].to_f + b["range_end"].to_f) / 2 }
+           }.to_json %>">
+      </div>
+    </div>
+  <% end %>
+
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header">
+        <h2>Percentiles</h2>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Percentile</th>
+            <th>P&L Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% %w[p10 p25 p50 p75 p90].each do |key| %>
+            <tr>
+              <td><strong><%= key.upcase %></strong></td>
+              <td class="<%= pnl_class(percentiles[key]) %>">
+                <%= number_to_currency(percentiles[key]) %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Distribution Shape</h2>
+      </div>
+      <table class="table">
+        <tbody>
+          <tr>
+            <td><strong>Skewness</strong></td>
+            <td>
+              <% skew = stats["skewness"].to_f %>
+              <% if skew > 0.5 %>
+                Right-skewed (more large winners) &mdash; <%= skew.round(3) %>
+              <% elsif skew < -0.5 %>
+                Left-skewed (more large losers) &mdash; <%= skew.round(3) %>
+              <% else %>
+                Approximately symmetric &mdash; <%= skew.round(3) %>
+              <% end %>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Kurtosis</strong></td>
+            <td>
+              <% kurt = stats["kurtosis"].to_f %>
+              <% if kurt > 3.5 %>
+                Leptokurtic (fat tails, more extreme outcomes) &mdash; <%= kurt.round(3) %>
+              <% elsif kurt < 2.5 %>
+                Platykurtic (thin tails, fewer extreme outcomes) &mdash; <%= kurt.round(3) %>
+              <% else %>
+                Mesokurtic (normal-like tails) &mdash; <%= kurt.round(3) %>
+              <% end %>
+            </td>
+          </tr>
+          <tr>
+            <td><strong>Range</strong></td>
+            <td><%= number_to_currency(stats["min"]) %> to <%= number_to_currency(stats["max"]) %></td>
+          </tr>
+          <tr>
+            <td><strong>Interquartile Range</strong></td>
+            <td><%= number_to_currency(percentiles["p25"]) %> to <%= number_to_currency(percentiles["p75"]) %></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Bucket Details</h2>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Range</th>
+          <th>Trades</th>
+          <th>Total P&L</th>
+          <th>Distribution</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% max_count = buckets.map { |b| b["count"].to_i }.max.to_f %>
+        <% buckets.each do |bucket| %>
+          <% next if bucket["count"].to_i == 0 %>
+          <% midpoint = (bucket["range_start"].to_f + bucket["range_end"].to_f) / 2 %>
+          <tr>
+            <td><%= number_to_currency(bucket["range_start"], precision: 0) %> to <%= number_to_currency(bucket["range_end"], precision: 0) %></td>
+            <td><%= bucket["count"] %></td>
+            <td class="<%= pnl_class(bucket["pnl_sum"]) %>"><%= number_to_currency(bucket["pnl_sum"]) %></td>
+            <td>
+              <div class="mini-bar-container">
+                <div class="mini-bar <%= midpoint >= 0 ? 'positive' : 'negative' %>"
+                     style="width: <%= max_count > 0 ? (bucket["count"].to_f / max_count * 100).round(1) : 0 %>%"></div>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p><%= @distribution&.dig("error") || "Not enough data. You need at least 5 closed trades to generate a distribution." %></p>
+  </div>
+<% end %>

@@ -1,0 +1,384 @@
+<% content_for(:title) { "Trade Simulator" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #00897b;">science</span>
+    Trade Simulator
+  </h1>
+  <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">What-if analysis based on your historical performance</p>
+</div>
+
+<% if @trades.blank? || @trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem; color: #00897b;">science</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Not enough trading data</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades with P&amp;L to run what-if simulations.</div>
+  </div>
+<% else %>
+
+  <%# ── Baseline Stats Card ── %>
+  <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #00897b;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00897b;">analytics</span>
+        Current Performance Baseline
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem;">
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total P&amp;L</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: <%= @baseline[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@baseline[:total_pnl]) %></div>
+        </div>
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: <%= @baseline[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @baseline[:win_rate] %>%</div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @baseline[:win_count] %>W / <%= @baseline[:loss_count] %>L</div>
+        </div>
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@baseline[:avg_win]) %></div>
+        </div>
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@baseline[:avg_loss]) %></div>
+        </div>
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Expectancy</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: <%= @baseline[:expectancy] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@baseline[:expectancy]) %></div>
+        </div>
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Max Drawdown</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@baseline[:max_drawdown]) %></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Stats Strip ── %>
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @baseline[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@baseline[:total_pnl]) %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Current P&amp;L</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @best_scenario ? number_to_currency(@best_scenario[:projected_pnl]) : "--" %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Best Scenario P&amp;L</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #00897b;"><%= @best_scenario ? number_to_currency(@best_scenario[:improvement_vs_baseline]) : "--" %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Potential Improvement</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #00897b;"><%= @scenarios_count %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Scenarios Analyzed</div>
+    </div>
+  </div>
+
+  <%# ── Scenario Comparison Table ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00897b;">compare_arrows</span>
+        Scenario Comparison
+      </h2>
+    </div>
+    <div style="padding: 0; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+            <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Scenario</th>
+            <th style="padding: 0.75rem 0.5rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Category</th>
+            <th style="padding: 0.75rem 0.5rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase; text-align: right;">Projected P&amp;L</th>
+            <th style="padding: 0.75rem 0.5rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase; text-align: right;">Win Rate</th>
+            <th style="padding: 0.75rem 0.5rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase; text-align: right;">Improvement</th>
+            <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase; text-align: right;">Drawdown</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @scenarios.each do |scenario| %>
+            <% is_best = @highest_impact && scenario[:name] == @highest_impact[:name] %>
+            <tr style="border-bottom: 1px solid var(--border); <%= is_best ? 'background: rgba(0,137,123,0.06);' : '' %>">
+              <td style="padding: 0.75rem 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="material-icons-outlined" style="font-size: 1rem; color: #00897b;"><%= scenario[:icon] || 'science' %></span>
+                  <div>
+                    <div style="font-weight: 600;">
+                      <%= scenario[:name] %>
+                      <% if is_best %>
+                        <span style="font-size: 0.625rem; background: #00897b; color: #fff; padding: 0.125rem 0.375rem; border-radius: 0.25rem; margin-left: 0.375rem; font-weight: 700;">HIGHEST IMPACT</span>
+                      <% end %>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); max-width: 20rem;"><%= scenario[:description] %></div>
+                  </div>
+                </div>
+              </td>
+              <td style="padding: 0.75rem 0.5rem;">
+                <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 1rem; background: var(--bg); border: 1px solid var(--border);"><%= scenario[:category] %></span>
+              </td>
+              <td style="padding: 0.75rem 0.5rem; text-align: right; font-weight: 600; color: <%= scenario[:projected_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(scenario[:projected_pnl]) %></td>
+              <td style="padding: 0.75rem 0.5rem; text-align: right;"><%= scenario[:projected_win_rate] %>%</td>
+              <td style="padding: 0.75rem 0.5rem; text-align: right;">
+                <% imp = scenario[:improvement_vs_baseline] %>
+                <span style="font-weight: 600; color: <%= imp >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                  <%= imp >= 0 ? "+" : "" %><%= number_to_currency(imp) %>
+                </span>
+                <% if @baseline[:total_pnl] != 0 %>
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= imp >= 0 ? "+" : "" %><%= (@baseline[:total_pnl] != 0 ? (imp / @baseline[:total_pnl].abs * 100).round(1) : 0) %>%</div>
+                <% end %>
+              </td>
+              <td style="padding: 0.75rem 1rem; text-align: right; color: var(--negative);"><%= number_to_currency(scenario[:projected_drawdown]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# ── Compounding Projection Chart ── %>
+  <% if @compounding.is_a?(Hash) && @compounding[:projections].is_a?(Hash) && @compounding[:projections].any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00897b;">auto_graph</span>
+          Compounding Projection (5-Year)
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">Starting capital: <%= number_to_currency(@compounding[:starting_capital]) %> | <%= @compounding[:trades_per_month] %> trades/month | Expectancy: <%= number_to_currency(@compounding[:monthly_expectancy]) %>/month</span>
+      </div>
+      <div style="padding: 1.25rem;">
+        <%
+          curve_5yr = @compounding[:projections][5][:curve] rescue []
+          if curve_5yr.any?
+            min_val = curve_5yr.min
+            max_val = curve_5yr.max
+            range = max_val - min_val
+            range = 1 if range == 0
+            svg_w = 800
+            svg_h = 280
+            pad_t = 25
+            pad_b = 35
+            pad_l = 70
+            pad_r = 20
+            chart_w = svg_w - pad_l - pad_r
+            chart_h = svg_h - pad_t - pad_b
+            points = curve_5yr.each_with_index.map do |val, i|
+              x = pad_l + (i.to_f / [curve_5yr.length - 1, 1].max * chart_w)
+              y = pad_t + chart_h - ((val - min_val) / range * chart_h)
+              [x.round(1), y.round(1)]
+            end
+            line_path = points.map { |x, y| "#{x},#{y}" }.join(" ")
+            area_path = "M#{points.first[0]},#{pad_t + chart_h} L#{line_path} L#{points.last[0]},#{pad_t + chart_h} Z"
+            # Year markers
+            months_total = curve_5yr.length - 1
+          end
+        %>
+        <% if curve_5yr.any? %>
+          <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; height: auto; display: block;" preserveAspectRatio="xMidYMid meet">
+            <defs>
+              <linearGradient id="comp-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#00897b" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#00897b" stop-opacity="0.02"/>
+              </linearGradient>
+            </defs>
+
+            <%# Grid lines %>
+            <% 5.times do |i| %>
+              <% y_pos = pad_t + (chart_h * i / 4.0) %>
+              <line x1="<%= pad_l %>" y1="<%= y_pos.round(1) %>" x2="<%= svg_w - pad_r %>" y2="<%= y_pos.round(1) %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4"/>
+              <% label_val = max_val - (range * i / 4.0) %>
+              <text x="<%= pad_l - 8 %>" y="<%= y_pos.round(1) + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="10"><%= number_to_currency(label_val, precision: 0) %></text>
+            <% end %>
+
+            <%# Year labels %>
+            <% [0, 1, 2, 3, 4, 5].each do |yr| %>
+              <% x_pos = pad_l + (yr * 12.0 / [months_total, 1].max * chart_w) %>
+              <text x="<%= x_pos.round(1) %>" y="<%= svg_h - 8 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="10">Year <%= yr %></text>
+              <line x1="<%= x_pos.round(1) %>" y1="<%= pad_t %>" x2="<%= x_pos.round(1) %>" y2="<%= pad_t + chart_h %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2"/>
+            <% end %>
+
+            <%# Area and line %>
+            <path d="<%= area_path %>" fill="url(#comp-fill)"/>
+            <polyline points="<%= line_path %>" fill="none" stroke="#00897b" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+
+            <%# Year milestone dots %>
+            <% [1, 3, 5].each do |yr| %>
+              <% proj = @compounding[:projections][yr] %>
+              <% if proj %>
+                <% idx = [yr * 12, curve_5yr.length - 1].min %>
+                <% pt = points[idx] %>
+                <% if pt %>
+                  <circle cx="<%= pt[0] %>" cy="<%= pt[1] %>" r="5" fill="#00897b" stroke="#fff" stroke-width="2"/>
+                  <text x="<%= pt[0] %>" y="<%= pt[1] - 12 %>" text-anchor="middle" fill="#00897b" font-size="10" font-weight="600"><%= number_to_currency(proj[:final_balance], precision: 0) %></text>
+                <% end %>
+              <% end %>
+            <% end %>
+          </svg>
+
+          <%# Compounding summary row %>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 1rem;">
+            <% [1, 3, 5].each do |yr| %>
+              <% proj = @compounding[:projections][yr] %>
+              <% if proj %>
+                <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;"><%= yr %>-Year</div>
+                  <div style="font-size: 1.125rem; font-weight: 700; color: <%= proj[:total_return] >= 0 ? '#00897b' : 'var(--negative)' %>;"><%= number_to_currency(proj[:final_balance]) %></div>
+                  <div style="font-size: 0.6875rem; color: <%= proj[:total_return] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= proj[:total_return] >= 0 ? "+" : "" %><%= proj[:total_return] %>% return</div>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Monte Carlo Distribution ── %>
+  <% if @monte_carlo.is_a?(Hash) && @monte_carlo[:outcomes].is_a?(Array) && @monte_carlo[:outcomes].any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7b1fa2;">casino</span>
+          Monte Carlo Simulation (100 Resamples)
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <%
+          outcomes = @monte_carlo[:outcomes]
+          # Build histogram bins
+          mc_min = outcomes.first
+          mc_max = outcomes.last
+          mc_range = mc_max - mc_min
+          mc_range = 1 if mc_range == 0
+          num_bins = 20
+          bin_width = mc_range.to_f / num_bins
+          bins = Array.new(num_bins, 0)
+          outcomes.each do |val|
+            idx = ((val - mc_min) / bin_width).to_i
+            idx = [idx, num_bins - 1].min
+            bins[idx] += 1
+          end
+          max_bin = bins.max
+          max_bin = 1 if max_bin == 0
+
+          svg_w = 800
+          svg_h = 250
+          pad_t = 20
+          pad_b = 40
+          pad_l = 60
+          pad_r = 20
+          chart_w = svg_w - pad_l - pad_r
+          chart_h = svg_h - pad_t - pad_b
+          bar_w = (chart_w.to_f / num_bins) - 2
+        %>
+        <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; height: auto; display: block;" preserveAspectRatio="xMidYMid meet">
+          <%# Grid lines %>
+          <% 4.times do |i| %>
+            <% y_pos = pad_t + (chart_h * i / 3.0) %>
+            <line x1="<%= pad_l %>" y1="<%= y_pos.round(1) %>" x2="<%= svg_w - pad_r %>" y2="<%= y_pos.round(1) %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4"/>
+            <% label_val = max_bin - (max_bin * i / 3.0) %>
+            <text x="<%= pad_l - 8 %>" y="<%= y_pos.round(1) + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="10"><%= label_val.round(0) %></text>
+          <% end %>
+
+          <%# Histogram bars %>
+          <% bins.each_with_index do |count, i| %>
+            <%
+              x = pad_l + (i.to_f / num_bins * chart_w) + 1
+              h = (count.to_f / max_bin * chart_h)
+              y = pad_t + chart_h - h
+              bin_start = mc_min + (i * bin_width)
+              # Color: red if below 0, teal/green if above
+              bar_color = bin_start < 0 ? '#ef5350' : '#00897b'
+              # Highlight median bin
+              median_bin = ((@monte_carlo[:median] - mc_min) / bin_width).to_i
+              median_bin = [median_bin, num_bins - 1].min
+              bar_opacity = (i == median_bin) ? '1' : '0.7'
+            %>
+            <rect x="<%= x.round(1) %>" y="<%= y.round(1) %>" width="<%= bar_w.round(1) %>" height="<%= h.round(1) %>" fill="<%= bar_color %>" opacity="<%= bar_opacity %>" rx="1"/>
+          <% end %>
+
+          <%# X-axis labels %>
+          <% [0, num_bins / 4, num_bins / 2, num_bins * 3 / 4, num_bins - 1].uniq.each do |i| %>
+            <% x = pad_l + ((i + 0.5).to_f / num_bins * chart_w) %>
+            <% label = mc_min + ((i + 0.5) * bin_width) %>
+            <text x="<%= x.round(1) %>" y="<%= svg_h - 8 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="10"><%= number_to_currency(label, precision: 0) %></text>
+          <% end %>
+
+          <%# Median line %>
+          <% median_x = pad_l + ((@monte_carlo[:median] - mc_min) / mc_range * chart_w) %>
+          <line x1="<%= median_x.round(1) %>" y1="<%= pad_t %>" x2="<%= median_x.round(1) %>" y2="<%= pad_t + chart_h %>" stroke="#7b1fa2" stroke-width="2" stroke-dasharray="6,3"/>
+          <text x="<%= median_x.round(1) %>" y="<%= pad_t - 6 %>" text-anchor="middle" fill="#7b1fa2" font-size="10" font-weight="600">Median</text>
+        </svg>
+
+        <%# Monte Carlo stats %>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-top: 1rem;">
+          <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Median</div>
+            <div style="font-size: 1rem; font-weight: 700; color: <%= @monte_carlo[:median] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@monte_carlo[:median]) %></div>
+          </div>
+          <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Mean</div>
+            <div style="font-size: 1rem; font-weight: 700; color: <%= @monte_carlo[:mean] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@monte_carlo[:mean]) %></div>
+          </div>
+          <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">5th Percentile</div>
+            <div style="font-size: 1rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@monte_carlo[:p5]) %></div>
+          </div>
+          <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">95th Percentile</div>
+            <div style="font-size: 1rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@monte_carlo[:p95]) %></div>
+          </div>
+          <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profitable</div>
+            <div style="font-size: 1rem; font-weight: 700; color: #00897b;"><%= @monte_carlo[:positive_pct] %>%</div>
+          </div>
+          <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Case</div>
+            <div style="font-size: 1rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@monte_carlo[:worst]) %></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Actionable Insights ── %>
+  <% if @insights.is_a?(Array) && @insights.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00897b;">tips_and_updates</span>
+          Actionable Insights
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; gap: 1rem;">
+          <% @insights.each do |insight| %>
+            <div style="display: flex; gap: 1rem; align-items: flex-start; padding: 1rem; background: var(--bg); border-radius: 0.5rem; border-left: 4px solid <%= insight[:color] %>;">
+              <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= insight[:color] %>; margin-top: 0.125rem;"><%= insight[:icon] %></span>
+              <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 0.875rem; margin-bottom: 0.25rem;"><%= insight[:title] %></div>
+                <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5;"><%= insight[:text] %></div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Bottom Nav ── %>
+  <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-top: 2rem;">
+    <%= link_to edge_finder_path, class: "card", style: "padding: 1rem 1.5rem; text-decoration: none; color: var(--text); display: flex; align-items: center; gap: 0.5rem;" do %>
+      <span class="material-icons-outlined" style="color: #2e7d32;">gps_fixed</span>
+      <span style="font-weight: 600; font-size: 0.875rem;">Edge Finder</span>
+    <% end %>
+    <%= link_to account_summary_path, class: "card", style: "padding: 1rem 1.5rem; text-decoration: none; color: var(--text); display: flex; align-items: center; gap: 0.5rem;" do %>
+      <span class="material-icons-outlined" style="color: #1976d2;">assessment</span>
+      <span style="font-weight: 600; font-size: 0.875rem;">Account Summary</span>
+    <% end %>
+    <%= link_to reports_index_path, class: "card", style: "padding: 1rem 1.5rem; text-decoration: none; color: var(--text); display: flex; align-items: center; gap: 0.5rem;" do %>
+      <span class="material-icons-outlined" style="color: #e65100;">bar_chart</span>
+      <span style="font-weight: 600; font-size: 0.875rem;">Reports</span>
+    <% end %>
+  </div>
+
+<% end %>

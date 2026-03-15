@@ -1,0 +1,65 @@
+<% @notes.each do |note| %>
+  <div class="card entry-card" <% if note["color"].present? %>style="border-left: 4px solid <%= note["color"] %>"<% end %>>
+    <div class="entry-card-header">
+      <span class="entry-date">
+        <input type="checkbox"
+               value="<%= note["id"] %>"
+               data-note-bulk-actions-target="checkbox"
+               data-action="note-bulk-actions#toggle"
+               class="bulk-checkbox">
+        <% if note["pinned"] %>
+          <span class="material-icons-outlined note-status-icon pinned-icon" title="Pinned">push_pin</span>
+        <% end %>
+        <% if note["favorited"] %>
+          <span class="material-icons-outlined note-status-icon favorited-icon" title="Favorited">star</span>
+        <% end %>
+        <%= link_to note["title"].presence || "Untitled", note_path(note["id"]) %>
+      </span>
+      <div class="note-actions-inline">
+        <% if note["pinned"] %>
+          <%= link_to unpin_note_path(note["id"]), data: { turbo_method: :post }, class: "btn-icon btn-icon-active", title: "Unpin" do %>
+            <span class="material-icons-outlined">push_pin</span>
+          <% end %>
+        <% else %>
+          <%= link_to pin_note_path(note["id"]), data: { turbo_method: :post }, class: "btn-icon", title: "Pin" do %>
+            <span class="material-icons-outlined">push_pin</span>
+          <% end %>
+        <% end %>
+        <% if note["favorited"] %>
+          <%= link_to unfavorite_note_path(note["id"]), data: { turbo_method: :post }, class: "btn-icon btn-icon-active", title: "Unfavorite" do %>
+            <span class="material-icons-outlined">star</span>
+          <% end %>
+        <% else %>
+          <%= link_to favorite_note_path(note["id"]), data: { turbo_method: :post }, class: "btn-icon", title: "Favorite" do %>
+            <span class="material-icons-outlined">star_outline</span>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+
+    <% if note["notebook"].present? %>
+      <span class="text-muted"><%= note.dig("notebook", "name") || note["notebook"] %></span>
+    <% end %>
+
+    <% if note["content_preview"].present? || note["content"].present? %>
+      <p class="text-muted"><%= truncate(note["content_preview"] || note["content"], length: 150) %></p>
+    <% end %>
+
+    <% if note["tags"].present? && note["tags"].any? %>
+      <div class="tag-list-horizontal">
+        <% note["tags"].each do |tag| %>
+          <span class="tag" <% if tag["color"].present? %>style="background-color: <%= tag["color"] %>"<% end %>><%= tag["name"] %></span>
+        <% end %>
+      </div>
+    <% end %>
+
+    <div class="entry-card-footer">
+      <span class="text-muted">
+        <% if note["updated_at"].present? %>
+          Updated <%= Time.parse(note["updated_at"]).strftime("%b %d, %Y %l:%M %p") %>
+        <% end %>
+      </span>
+      <%= link_to "View", note_path(note["id"]), class: "btn btn-sm" %>
+    </div>
+  </div>
+<% end %>

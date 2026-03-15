@@ -3,7 +3,7 @@
 </div>
 
 <div class="card">
-  <%= render "form", trade: @trade, tags: @tags,
+  <%= render "form", trade: @trade, tags: @tags, symbols: @symbols || [],
              form_url: trades_path, form_method: :post,
              submit_label: "Create Trade", cancel_path: trades_path %>
 </div>

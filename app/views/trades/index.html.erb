@@ -1,16 +1,19 @@
 <div class="page-header">
   <h1>Trades</h1>
   <div class="page-actions">
+    <%= link_to "Review", review_trades_path(params.permit(:symbol, :asset_class, :side, :tag_id, :start_date, :end_date).to_h.compact_blank), class: "btn", title: "Step through trades one by one" %>
+    <%= link_to "Export CSV", export_trades_path(params.permit(:symbol, :start_date, :end_date).to_h.compact_blank), class: "btn" %>
+    <%= link_to "Import CSV", import_wizard_trades_path, class: "btn" %>
     <%= link_to "New Trade", new_trade_path, class: "btn btn-primary" %>
   </div>
 </div>
 
-<div class="card">
+<div class="card" data-controller="filter-presets">
   <div class="card-header">
     <h2>Filters</h2>
   </div>
 
-  <%= form_with url: trades_path, method: :get, class: "filter-form" do |f| %>
+  <%= form_with url: trades_path, method: :get, class: "filter-form", data: { filter_presets_target: "form" } do |f| %>
     <div class="filter-row">
       <div class="form-group">
         <%= f.label :symbol, "Symbol" %>
@@ -65,29 +68,224 @@
       </div>
     </div>
   <% end %>
+
+  <div class="preset-bar">
+    <div class="preset-list" data-filter-presets-target="list"></div>
+    <div class="preset-save">
+      <input type="text" class="form-control form-control-sm" placeholder="Preset name..." data-filter-presets-target="nameInput" style="width: 140px;">
+      <button type="button" class="btn btn-sm" data-action="filter-presets#save">
+        <span class="material-icons-outlined" style="font-size: 14px; vertical-align: -2px;">bookmark_add</span> Save
+      </button>
+    </div>
+  </div>
 </div>
 
 <% if @trades.is_a?(Array) && @trades.any? %>
+  <%
+    heatmap_source = @heatmap_trades.present? ? @heatmap_trades : @trades
+    all_trades_json = heatmap_source.select { |t| t["status"] == "closed" && t["pnl"] }.map { |t|
+      { status: t["status"], pnl: t["pnl"], entry_time: t["entry_time"], symbol: t["symbol"] }
+    }.to_json
+  %>
+  <div class="card trade-activity-card" data-controller="toggle">
+    <div class="card-header" style="cursor: pointer;" data-action="click->toggle#toggle">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.25rem; vertical-align: -3px;">calendar_month</span>
+        Trading Activity
+      </h2>
+      <button class="btn btn-sm" type="button" style="pointer-events: none;">
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">expand_more</span>
+      </button>
+    </div>
+    <div class="hidden" data-toggle-target="content">
+      <div class="heatmap-container"
+           data-controller="trade-calendar"
+           data-trade-calendar-trades-value="<%= all_trades_json %>">
+        <div data-trade-calendar-target="grid"></div>
+        <div class="heatmap-tooltip" data-trade-calendar-target="tooltip"></div>
+      </div>
+      <div class="heatmap-legend">
+        <span class="heatmap-legend-label">Loss</span>
+        <div class="heatmap-cell heatmap-loss-4"></div>
+        <div class="heatmap-cell heatmap-loss-3"></div>
+        <div class="heatmap-cell heatmap-loss-2"></div>
+        <div class="heatmap-cell heatmap-loss-1"></div>
+        <div class="heatmap-cell heatmap-level-0"></div>
+        <div class="heatmap-cell heatmap-profit-1"></div>
+        <div class="heatmap-cell heatmap-profit-2"></div>
+        <div class="heatmap-cell heatmap-profit-3"></div>
+        <div class="heatmap-cell heatmap-profit-4"></div>
+        <span class="heatmap-legend-label">Profit</span>
+      </div>
+    </div>
+  </div>
+
+  <%
+    closed_trades = @trades.select { |t| t["status"] == "closed" && t["pnl"] }
+    if closed_trades.any?
+      cumulative = []
+      running = 0
+      closed_trades.reverse.each do |t|
+        running += t["pnl"].to_f
+        cumulative << { x: t["entry_time"]&.to_s&.slice(0, 10) || "", y: running.round(2) }
+      end
+      total_pnl = closed_trades.sum { |t| t["pnl"].to_f }
+      wins = closed_trades.count { |t| t["pnl"].to_f > 0 }
+      win_rate = (wins.to_f / closed_trades.count * 100).round(1)
+  %>
+    <%
+      avg_win_amt = closed_trades.select { |t| t["pnl"].to_f > 0 }.then { |w| w.any? ? (w.sum { |t| t["pnl"].to_f } / w.count).round(2) : 0 }
+      avg_loss_amt = closed_trades.select { |t| t["pnl"].to_f < 0 }.then { |l| l.any? ? (l.sum { |t| t["pnl"].to_f } / l.count).round(2) : 0 }
+      profit_factor = avg_loss_amt != 0 ? (avg_win_amt / avg_loss_amt.abs).round(2) : 0
+
+      # Current streak
+      streak = 0; streak_type = nil
+      closed_trades.each do |t|
+        pnl_val = t["pnl"].to_f
+        current_type = pnl_val >= 0 ? :win : :loss
+        if streak_type.nil? || streak_type == current_type
+          streak += 1
+          streak_type = current_type
+        else
+          break
+        end
+      end
+
+      # Symbol breakdown for this filtered set
+      symbol_pnls = {}
+      closed_trades.each do |t|
+        sym = t["symbol"] || "Unknown"
+        symbol_pnls[sym] ||= { pnl: 0, count: 0 }
+        symbol_pnls[sym][:pnl] += t["pnl"].to_f
+        symbol_pnls[sym][:count] += 1
+      end
+      sorted_symbols = symbol_pnls.sort_by { |_, v| -v[:pnl] }
+      max_symbol_pnl = sorted_symbols.map { |_, v| v[:pnl].abs }.max.to_f
+      max_symbol_pnl = 1 if max_symbol_pnl == 0
+    %>
+    <div class="card" style="padding: 1rem 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+        <div>
+          <span class="text-muted" style="font-size: 0.75rem;">Filtered P&L</span>
+          <p class="<%= pnl_class(total_pnl) %>" style="font-size: 1.25rem; font-weight: 600; margin: 0;"><%= number_to_currency(total_pnl) %></p>
+        </div>
+        <div>
+          <span class="text-muted" style="font-size: 0.75rem;">Win Rate</span>
+          <p style="font-size: 1.25rem; font-weight: 600; margin: 0;" class="<%= win_rate >= 50 ? 'positive' : 'negative' %>"><%= win_rate %>%</p>
+        </div>
+        <div>
+          <span class="text-muted" style="font-size: 0.75rem;">Trades</span>
+          <p style="font-size: 1.25rem; font-weight: 600; margin: 0;"><%= closed_trades.count %></p>
+        </div>
+        <div>
+          <span class="text-muted" style="font-size: 0.75rem;">Profit Factor</span>
+          <p style="font-size: 1.25rem; font-weight: 600; margin: 0;" class="<%= profit_factor >= 1.5 ? 'positive' : profit_factor >= 1 ? '' : 'negative' %>"><%= profit_factor %></p>
+        </div>
+        <% if streak > 0 %>
+          <div>
+            <span class="text-muted" style="font-size: 0.75rem;">Streak</span>
+            <p style="font-size: 1.25rem; font-weight: 600; margin: 0;" class="<%= streak_type == :win ? 'positive' : 'negative' %>">
+              <%= streak %><span style="font-size: 0.75rem;"> <%= streak_type == :win ? "W" : "L" %></span>
+            </p>
+          </div>
+        <% end %>
+        <% if cumulative.length >= 2 %>
+          <div style="flex: 1; min-width: 200px; max-height: 60px;" data-controller="chart" data-chart-type-value="line" data-chart-points-value="<%= cumulative.to_json %>">
+          </div>
+        <% end %>
+      </div>
+
+      <%# Mini symbol breakdown bars %>
+      <% if sorted_symbols.length >= 2 && sorted_symbols.length <= 10 %>
+        <div style="border-top: 1px solid var(--border); padding-top: 0.75rem;">
+          <div style="display: flex; gap: 4px; flex-wrap: wrap;">
+            <% sorted_symbols.each do |sym, data| %>
+              <% bar_width = [((data[:pnl].abs / max_symbol_pnl * 100)).round(0), 15].max %>
+              <div style="flex: <%= bar_width %> 1 0; min-width: 50px; padding: 0.25rem 0.5rem;
+                          background: <%= data[:pnl] >= 0 ? 'rgba(13,144,79,0.08)' : 'rgba(217,48,37,0.08)' %>;
+                          border-left: 3px solid <%= data[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;
+                          border-radius: 0 var(--radius) var(--radius) 0;"
+                   title="<%= sym %>: <%= number_to_currency(data[:pnl]) %> (<%= data[:count] %> trades)">
+                <div style="font-size: 0.6875rem; font-weight: 700;"><%= sym %></div>
+                <div style="font-size: 0.75rem;" class="<%= pnl_class(data[:pnl]) %>"><%= number_to_currency(data[:pnl]) %></div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if @period_stats %>
+    <div class="period-comparison-bar card">
+      <div class="period-comparison-inner">
+        <div class="period-stat">
+          <span class="period-label">This Week</span>
+          <span class="period-value <%= @period_stats[:this_week] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(@period_stats[:this_week]) %></span>
+          <span class="stat-delta <%= @period_stats[:week_delta] >= 0 ? 'positive' : 'negative' %>">
+            <%= @period_stats[:week_delta] >= 0 ? "\u25B2" : "\u25BC" %>
+            <%= number_to_currency(@period_stats[:week_delta].abs) %> vs last week
+          </span>
+        </div>
+        <div class="period-stat">
+          <span class="period-label">This Month</span>
+          <span class="period-value <%= @period_stats[:this_month] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(@period_stats[:this_month]) %></span>
+          <span class="stat-delta <%= @period_stats[:month_delta] >= 0 ? 'positive' : 'negative' %>">
+            <%= @period_stats[:month_delta] >= 0 ? "\u25B2" : "\u25BC" %>
+            <%= number_to_currency(@period_stats[:month_delta].abs) %> vs last month
+          </span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
   <div class="card"
-       data-controller="infinite-scroll"
+       data-controller="infinite-scroll bulk-actions"
        data-infinite-scroll-url-value="<%= trades_path(params.permit(:symbol, :asset_class, :status, :side, :tag_id, :start_date, :end_date).to_h.compact_blank) %>"
        data-infinite-scroll-page-value="<%= @meta["page"] || 1 %>"
-       data-infinite-scroll-total-pages-value="<%= @meta["total_pages"] || 1 %>">
-    <table class="table">
+       data-infinite-scroll-total-pages-value="<%= @meta["total_pages"] || 1 %>"
+       data-bulk-actions-compare-url-value="<%= comparison_path %>"
+       data-bulk-actions-bulk-tag-url-value="<%= bulk_tag_trades_path %>"
+       data-bulk-actions-bulk-delete-url-value="<%= bulk_delete_trades_path %>"
+       data-bulk-actions-csrf-token-value="<%= form_authenticity_token %>">
+    <div class="bulk-action-bar hidden" data-bulk-actions-target="bar">
+      <span class="bulk-count"><span data-bulk-actions-target="count">0</span> selected</span>
+      <div class="bulk-buttons">
+        <button class="btn btn-primary btn-sm" data-action="bulk-actions#compare">
+          <span class="material-icons-outlined" style="font-size: 16px; vertical-align: -3px;">compare_arrows</span> Compare
+        </button>
+        <% if @tags&.any? %>
+          <select class="form-control form-control-sm" data-bulk-actions-target="tagSelect" multiple style="max-width: 160px; height: 28px;">
+            <% @tags.each do |tag| %>
+              <option value="<%= tag["id"] %>"><%= tag["name"] %></option>
+            <% end %>
+          </select>
+          <button class="btn btn-sm" data-action="bulk-actions#bulkTag">
+            <span class="material-icons-outlined" style="font-size: 16px; vertical-align: -3px;">label</span> Tag
+          </button>
+        <% end %>
+        <button class="btn btn-sm btn-danger" data-action="bulk-actions#bulkDelete">
+          <span class="material-icons-outlined" style="font-size: 16px; vertical-align: -3px;">delete</span> Delete
+        </button>
+        <button class="btn btn-sm" data-action="bulk-actions#clear">Clear</button>
+      </div>
+    </div>
+    <table class="table" data-controller="sortable">
       <thead>
         <tr>
-          <th>Date</th>
-          <th>Symbol</th>
-          <th>Side</th>
-          <th>Asset Class</th>
-          <th>Entry</th>
-          <th>Exit</th>
-          <th>Qty</th>
-          <th>P&L</th>
-          <th>Status</th>
+          <th class="th-narrow"><input type="checkbox" title="Toggle all" data-action="bulk-actions#toggleAll"></th>
+          <th class="sortable-header" data-sortable-target="header" data-sort-column="entry_time" data-sort-type="date" data-action="click->sortable#sort">Date</th>
+          <th class="sortable-header" data-sortable-target="header" data-sort-column="symbol" data-sort-type="text" data-action="click->sortable#sort">Symbol</th>
+          <th class="sortable-header" data-sortable-target="header" data-sort-column="side" data-sort-type="text" data-action="click->sortable#sort">Side</th>
+          <th class="sortable-header" data-sortable-target="header" data-sort-column="asset_class" data-sort-type="text" data-action="click->sortable#sort">Asset Class</th>
+          <th class="sortable-header" data-sortable-target="header" data-sort-column="entry_price" data-sort-type="currency" data-action="click->sortable#sort">Entry</th>
+          <th class="sortable-header" data-sortable-target="header" data-sort-column="exit_price" data-sort-type="currency" data-action="click->sortable#sort">Exit</th>
+          <th class="sortable-header" data-sortable-target="header" data-sort-column="quantity" data-sort-type="number" data-action="click->sortable#sort">Qty</th>
+          <th class="sortable-header" data-sortable-target="header" data-sort-column="pnl" data-sort-type="currency" data-action="click->sortable#sort">P&L</th>
+          <th class="sortable-header" data-sortable-target="header" data-sort-column="status" data-sort-type="text" data-action="click->sortable#sort">Status</th>
         </tr>
       </thead>
-      <tbody data-infinite-scroll-target="entries">
+      <tbody data-infinite-scroll-target="entries" data-sortable-target="body">
         <%= render "trade_rows" %>
       </tbody>
     </table>

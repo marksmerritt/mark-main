@@ -1,0 +1,365 @@
+<% content_for(:title) { "What-If Simulator" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px;">science</span>
+    What-If Simulator
+  </h1>
+  <div class="page-actions">
+    <button class="btn" onclick="window.print()">
+      <span class="material-icons-outlined">print</span> Print
+    </button>
+  </div>
+</div>
+
+<div class="card">
+  <%= form_with url: reports_what_if_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :start_date, "Start Date" %>
+        <%= f.date_field :start_date, value: params[:start_date], class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :end_date, "End Date" %>
+        <%= f.date_field :end_date, value: params[:end_date], class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+        <%= link_to "Clear", reports_what_if_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @trade_count && @trade_count > 0 %>
+  <%# ---- Baseline Performance ---- %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: var(--primary);">analytics</span>
+        Baseline Performance
+      </h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @trade_count %> closed trades</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(@baseline[:total_pnl]) %>"><%= number_to_currency(@baseline[:total_pnl]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @baseline[:win_rate] %>%</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@baseline[:avg_win]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);">-<%= number_to_currency(@baseline[:avg_loss]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profit Factor</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @baseline[:profit_factor] %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Max Drawdown</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@baseline[:max_drawdown]) %></div>
+      </div>
+    </div>
+
+    <%# Baseline equity curve %>
+    <% curve = @baseline[:equity_curve] %>
+    <% if curve.any? %>
+      <%
+        values = curve.map { |p| p[:value] }
+        min_v = [values.min, 0].min
+        max_v = [values.max, 0].max
+        range = max_v - min_v
+        range = 1 if range == 0
+        w = 600
+        h = 120
+        padding = 20
+        points = curve.each_with_index.map { |p, i|
+          x = padding + (i.to_f / [curve.count - 1, 1].max * (w - 2 * padding))
+          y = padding + ((max_v - p[:value]) / range * (h - 2 * padding))
+          "#{x.round(1)},#{y.round(1)}"
+        }.join(" ")
+        zero_y = padding + ((max_v - 0) / range * (h - 2 * padding))
+      %>
+      <div style="padding: 0.75rem 1.25rem 1rem;">
+        <svg viewBox="0 0 <%= w %> <%= h %>" style="width: 100%; height: auto; max-height: 120px;">
+          <line x1="<%= padding %>" y1="<%= zero_y.round(1) %>" x2="<%= w - padding %>" y2="<%= zero_y.round(1) %>"
+                stroke="var(--border)" stroke-width="1" stroke-dasharray="4,3" />
+          <polyline points="<%= points %>" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linejoin="round" />
+        </svg>
+      </div>
+    <% end %>
+  </div>
+
+  <%# ---- Scenario Cards Grid ---- %>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+    <% @scenarios.each do |scenario| %>
+      <%
+        is_best = @best_scenario && scenario[:name] == @best_scenario[:name]
+        border_style = is_best ? "border: 2px solid #{scenario[:color]};" : ""
+      %>
+      <div class="card" style="<%= border_style %>">
+        <div class="card-header">
+          <h2>
+            <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: <%= scenario[:color] %>;"><%= scenario[:icon] %></span>
+            <%= scenario[:name] %>
+            <% if is_best %>
+              <span style="font-size: 0.625rem; background: <%= scenario[:color] %>; color: #fff; padding: 0.125rem 0.5rem; border-radius: 10px; margin-left: 0.5rem; vertical-align: 2px;">BEST</span>
+            <% end %>
+          </h2>
+        </div>
+        <div style="padding: 1rem 1.25rem;">
+          <p style="font-size: 0.8125rem; color: var(--text-secondary); margin: 0 0 1rem; line-height: 1.5;">
+            <%= scenario[:description] %>
+          </p>
+
+          <%# Key metrics row %>
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin-bottom: 1rem;">
+            <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+              <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">P&L</div>
+              <div style="font-size: 1rem; font-weight: 700;" class="<%= pnl_class(scenario[:total_pnl]) %>"><%= number_to_currency(scenario[:total_pnl]) %></div>
+            </div>
+            <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+              <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">vs Baseline</div>
+              <% diff = scenario[:pnl_diff] %>
+              <div style="font-size: 1rem; font-weight: 700;" class="<%= diff >= 0 ? 'positive' : 'negative' %>">
+                <%= diff >= 0 ? "+" : "" %><%= number_to_currency(diff) %>
+              </div>
+            </div>
+            <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+              <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+              <div style="font-size: 1rem; font-weight: 700;"><%= scenario[:win_rate] %>%</div>
+            </div>
+            <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+              <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">PF</div>
+              <div style="font-size: 1rem; font-weight: 700;"><%= scenario[:profit_factor] %></div>
+            </div>
+          </div>
+
+          <%# Difference bar %>
+          <%
+            max_diff = @scenarios.map { |s| s[:pnl_diff].abs }.max
+            max_diff = 1 if max_diff == 0
+            bar_pct = (scenario[:pnl_diff].abs / max_diff * 100).round(1)
+            bar_color = scenario[:pnl_diff] >= 0 ? "var(--positive)" : "var(--negative)"
+          %>
+          <div style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+              <span>Impact vs Baseline</span>
+              <span class="<%= scenario[:pnl_diff] >= 0 ? 'positive' : 'negative' %>"><%= scenario[:pnl_diff] >= 0 ? "+" : "" %><%= number_to_currency(scenario[:pnl_diff]) %></span>
+            </div>
+            <div style="height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden;">
+              <div style="height: 100%; width: <%= bar_pct %>%; background: <%= bar_color %>; border-radius: 4px; transition: width 0.3s;"></div>
+            </div>
+          </div>
+
+          <%# Mini equity curve comparing baseline vs scenario %>
+          <%
+            b_curve = @baseline[:equity_curve]
+            s_curve = scenario[:equity_curve]
+            all_values = b_curve.map { |p| p[:value] } + s_curve.map { |p| p[:value] }
+            ev_min = [all_values.min, 0].min
+            ev_max = [all_values.max, 0].max
+            ev_range = ev_max - ev_min
+            ev_range = 1 if ev_range == 0
+            svg_w = 400
+            svg_h = 80
+            svg_pad = 10
+
+            map_curve = ->(crv) {
+              crv.each_with_index.map { |p, i|
+                x = svg_pad + (i.to_f / [crv.count - 1, 1].max * (svg_w - 2 * svg_pad))
+                y = svg_pad + ((ev_max - p[:value]) / ev_range * (svg_h - 2 * svg_pad))
+                "#{x.round(1)},#{y.round(1)}"
+              }.join(" ")
+            }
+
+            baseline_points = map_curve.call(b_curve)
+            scenario_points = map_curve.call(s_curve)
+            svg_zero_y = svg_pad + ((ev_max - 0) / ev_range * (svg_h - 2 * svg_pad))
+          %>
+          <div style="margin-top: 0.25rem;">
+            <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.25rem;">
+              <span style="font-size: 0.625rem; color: var(--text-secondary);">
+                <span style="display: inline-block; width: 16px; height: 2px; background: var(--text-secondary); vertical-align: middle; opacity: 0.5; border-top: 1px dashed var(--text-secondary);"></span> Baseline
+              </span>
+              <span style="font-size: 0.625rem; color: <%= scenario[:color] %>;">
+                <span style="display: inline-block; width: 16px; height: 2px; background: <%= scenario[:color] %>; vertical-align: middle;"></span> Scenario
+              </span>
+            </div>
+            <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; height: auto; max-height: 80px;">
+              <line x1="<%= svg_pad %>" y1="<%= svg_zero_y.round(1) %>" x2="<%= svg_w - svg_pad %>" y2="<%= svg_zero_y.round(1) %>"
+                    stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3" />
+              <polyline points="<%= baseline_points %>" fill="none" stroke="var(--text-secondary)" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.5" stroke-linejoin="round" />
+              <polyline points="<%= scenario_points %>" fill="none" stroke="<%= scenario[:color] %>" stroke-width="2" stroke-linejoin="round" />
+            </svg>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <%# ---- Best Scenario Summary ---- %>
+  <% if @best_scenario %>
+    <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid <%= @best_scenario[:color] %>;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: <%= @best_scenario[:color] %>;">emoji_objects</span>
+          Highest-Impact Scenario
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: flex; align-items: flex-start; gap: 1.25rem; flex-wrap: wrap;">
+          <div style="flex-shrink: 0; width: 56px; height: 56px; border-radius: 50%; background: <%= @best_scenario[:color] %>15; display: flex; align-items: center; justify-content: center;">
+            <span class="material-icons-outlined" style="font-size: 1.75rem; color: <%= @best_scenario[:color] %>;"><%= @best_scenario[:icon] %></span>
+          </div>
+          <div style="flex: 1; min-width: 240px;">
+            <div style="font-size: 1.125rem; font-weight: 700; margin-bottom: 0.25rem;"><%= @best_scenario[:name] %></div>
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin: 0 0 0.75rem; line-height: 1.5;">
+              <%= @best_scenario[:description] %>
+            </p>
+            <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+              <div>
+                <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Additional P&L</div>
+                <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);">+<%= number_to_currency(@best_scenario[:pnl_diff]) %></div>
+              </div>
+              <div>
+                <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Scenario Total</div>
+                <div style="font-size: 1.25rem; font-weight: 700;" class="<%= pnl_class(@best_scenario[:total_pnl]) %>"><%= number_to_currency(@best_scenario[:total_pnl]) %></div>
+              </div>
+              <div>
+                <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Improvement</div>
+                <%
+                  improvement_pct = @baseline[:total_pnl] != 0 ? (@best_scenario[:pnl_diff] / @baseline[:total_pnl].abs * 100).round(1) : 0
+                %>
+                <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= improvement_pct %>%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <%# Actionable insight %>
+        <div style="margin-top: 1rem; padding: 0.75rem 1rem; border-radius: var(--radius); background: var(--bg); font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.6;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: <%= @best_scenario[:color] %>;">lightbulb</span>
+          <strong>Takeaway:</strong>
+          <% case @best_scenario[:name] %>
+          <% when "Cut Losses at 1R" %>
+            Your biggest edge improvement comes from tighter stop-loss discipline. Consider setting hard stops at 1R and not allowing losses to exceed your average win size.
+          <% when "Size Up Winners 1.5x" %>
+            You're leaving money on the table by not sizing up on high-conviction trades. Consider scaling into winners or increasing position size when your setup aligns perfectly.
+          <% when "Skip Worst 5 Trades" %>
+            A few outsized losses are dragging down your overall performance. Review those trades for common patterns (revenge trading, oversizing, ignoring stops) and create rules to avoid them.
+          <% when "Only Best Setup" %>
+            You have a clear edge in one setup that outperforms the rest. Consider focusing more capital and attention on this setup while reducing exposure to weaker ones.
+          <% when "Morning Only (Before 11 AM)" %>
+            Your morning trades significantly outperform the rest of the day. Consider concentrating your trading in the morning session and reducing afternoon activity.
+          <% else %>
+            Focus on implementing this change in your trading plan to capture the potential improvement shown above.
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ---- Scenario Comparison Table ---- %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: var(--primary);">table_chart</span>
+        Scenario Comparison
+      </h2>
+    </div>
+    <div style="overflow-x: auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Scenario</th>
+            <th style="text-align: right;">Trades</th>
+            <th style="text-align: right;">Total P&L</th>
+            <th style="text-align: right;">vs Baseline</th>
+            <th style="text-align: right;">Win Rate</th>
+            <th style="text-align: right;">Profit Factor</th>
+            <th style="text-align: right;">Max Drawdown</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background: var(--bg); font-weight: 600;">
+            <td>
+              <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--primary);">analytics</span>
+              Baseline (Actual)
+            </td>
+            <td style="text-align: right;"><%= @trade_count %></td>
+            <td style="text-align: right;" class="<%= pnl_class(@baseline[:total_pnl]) %>"><%= number_to_currency(@baseline[:total_pnl]) %></td>
+            <td style="text-align: right; color: var(--text-secondary);">--</td>
+            <td style="text-align: right;"><%= @baseline[:win_rate] %>%</td>
+            <td style="text-align: right;"><%= @baseline[:profit_factor] %></td>
+            <td style="text-align: right; color: var(--negative);"><%= number_to_currency(@baseline[:max_drawdown]) %></td>
+          </tr>
+          <% @scenarios.sort_by { |s| -s[:pnl_diff] }.each do |scenario| %>
+            <tr>
+              <td>
+                <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: <%= scenario[:color] %>;"><%= scenario[:icon] %></span>
+                <%= scenario[:name] %>
+              </td>
+              <td style="text-align: right;"><%= scenario[:trade_count] %></td>
+              <td style="text-align: right;" class="<%= pnl_class(scenario[:total_pnl]) %>"><%= number_to_currency(scenario[:total_pnl]) %></td>
+              <td style="text-align: right;" class="<%= scenario[:pnl_diff] >= 0 ? 'positive' : 'negative' %>">
+                <%= scenario[:pnl_diff] >= 0 ? "+" : "" %><%= number_to_currency(scenario[:pnl_diff]) %>
+              </td>
+              <td style="text-align: right;"><%= scenario[:win_rate] %>%</td>
+              <td style="text-align: right;"><%= scenario[:profit_factor] %></td>
+              <td style="text-align: right; color: var(--negative);"><%= number_to_currency(scenario[:max_drawdown]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# ---- Methodology Note ---- %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="padding: 1rem 1.25rem;">
+      <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+        <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--text-secondary); margin-top: 2px;">info</span>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.6;">
+          <strong>How this works:</strong> Each scenario retroactively modifies your closed trade history to answer "what if" questions.
+          Results are hypothetical and assume all other factors remain equal. Past performance, even modified,
+          does not guarantee future results. Use these insights to identify areas for improvement in your trading plan.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ---- Related Reports ---- %>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+    <%= link_to reports_risk_analysis_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">security</span> Risk Analysis
+    <% end %>
+    <%= link_to reports_setup_analysis_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">architecture</span> Setup Analysis
+    <% end %>
+    <%= link_to reports_by_time_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">schedule</span> By Time
+    <% end %>
+    <%= link_to reports_position_sizing_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">tune</span> Position Sizing
+    <% end %>
+    <%= link_to reports_monte_carlo_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">casino</span> Monte Carlo
+    <% end %>
+    <%= link_to reports_expectancy_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">functions</span> Expectancy
+    <% end %>
+  </div>
+
+<% else %>
+  <div class="card empty-state">
+    <p>No closed trades found. Add at least a few closed trades to run what-if scenario analysis.</p>
+  </div>
+<% end %>

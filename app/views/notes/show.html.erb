@@ -1,0 +1,387 @@
+<div class="page-header">
+  <h1><%= @note["title"].presence || "Untitled Note" %></h1>
+  <div class="page-actions">
+    <% if @note["pinned"] %>
+      <%= link_to unpin_note_path(@note["id"]), data: { turbo_method: :post }, class: "btn-icon btn-icon-active", title: "Unpin" do %>
+        <span class="material-icons-outlined">push_pin</span>
+      <% end %>
+    <% else %>
+      <%= link_to pin_note_path(@note["id"]), data: { turbo_method: :post }, class: "btn-icon", title: "Pin" do %>
+        <span class="material-icons-outlined">push_pin</span>
+      <% end %>
+    <% end %>
+    <% if @note["favorited"] %>
+      <%= link_to unfavorite_note_path(@note["id"]), data: { turbo_method: :post }, class: "btn-icon btn-icon-active", title: "Unfavorite" do %>
+        <span class="material-icons-outlined">star</span>
+      <% end %>
+    <% else %>
+      <%= link_to favorite_note_path(@note["id"]), data: { turbo_method: :post }, class: "btn-icon", title: "Favorite" do %>
+        <span class="material-icons-outlined">star_outline</span>
+      <% end %>
+    <% end %>
+    <% if @note["shared_token"].present? %>
+      <span class="badge">Shared</span>
+    <% end %>
+    <div class="nav-dropdown">
+      <span class="btn-icon" title="Export" style="cursor:pointer;">
+        <span class="material-icons-outlined">download</span>
+      </span>
+      <div class="nav-dropdown-content">
+        <%= link_to "Markdown", export_markdown_note_path(@note["id"]) %>
+        <%= link_to "HTML", export_html_note_path(@note["id"]) %>
+        <%= link_to "JSON", export_json_note_path(@note["id"]) %>
+      </div>
+    </div>
+    <%= link_to note_note_versions_path(@note["id"]), class: "btn-icon", title: "History" do %>
+      <span class="material-icons-outlined">history</span>
+    <% end %>
+    <%= link_to "Edit", edit_note_path(@note["id"]), class: "btn btn-primary" %>
+    <%= link_to "Duplicate", duplicate_note_path(@note["id"]), data: { turbo_method: :post }, class: "btn" %>
+    <% if @note["shared_token"].present? %>
+      <%= link_to unshare_note_path(@note["id"]), data: { turbo_method: :post, turbo_confirm: "Stop sharing this note?" }, class: "btn" do %>
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">link_off</span> Unshare
+      <% end %>
+    <% else %>
+      <div class="nav-dropdown">
+        <span class="btn" style="cursor:pointer;">
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">share</span> Share
+        </span>
+        <div class="nav-dropdown-content">
+          <%= link_to "Share (no expiry)", share_note_path(@note["id"]), data: { turbo_method: :post } %>
+          <%= link_to "Share (24 hours)", share_note_path(@note["id"], expires_in: "24h"), data: { turbo_method: :post } %>
+          <%= link_to "Share (7 days)", share_note_path(@note["id"], expires_in: "7d"), data: { turbo_method: :post } %>
+          <%= link_to "Share (30 days)", share_note_path(@note["id"], expires_in: "30d"), data: { turbo_method: :post } %>
+        </div>
+      </div>
+    <% end %>
+    <%= link_to "Delete", note_path(@note["id"]), data: { turbo_method: :delete, turbo_confirm: "Are you sure you want to delete this note?" }, class: "btn btn-danger" %>
+    <%= link_to "Back to Notes", notes_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Note metadata strip %>
+<%
+  n_word_count = @note["word_count"].to_i
+  n_reading_time = @note["reading_time"].to_i
+  n_created = Time.parse(@note["created_at"]) rescue nil
+  n_updated = Time.parse(@note["updated_at"]) rescue nil
+  n_tags = @note["tags"].is_a?(Array) ? @note["tags"] : []
+  n_links = @note["linked_notes"].is_a?(Array) ? @note["linked_notes"] : []
+  n_backlinks_inline = @note["backlinks"].is_a?(Array) ? @note["backlinks"] : []
+  n_backlinks_fetched = @backlinks.is_a?(Array) ? @backlinks : []
+  n_backlinks = (n_backlinks_inline + n_backlinks_fetched).uniq { |b| b["id"] }
+  n_attachments = @note["attachments"].is_a?(Array) ? @note["attachments"] : []
+  n_reminders = @note["reminders"].is_a?(Array) ? @note["reminders"] : []
+  n_similar_inline = @note["similar_notes"].is_a?(Array) ? @note["similar_notes"] : []
+  n_similar_fetched = @similar_notes.is_a?(Array) ? @similar_notes : []
+  n_similar = (n_similar_inline + n_similar_fetched).uniq { |s| s["id"] }
+  n_has_notebook = @note["notebook"].present?
+  n_notebook_name = @note.dig("notebook", "name") || @note["notebook"]
+  n_is_shared = @note["shared_token"].present?
+%>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1.25rem; flex-wrap: wrap; font-size: 0.8125rem; color: var(--text-secondary);">
+    <% if n_has_notebook %>
+      <div style="display: flex; align-items: center; gap: 0.25rem;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem;">folder</span>
+        <%= link_to n_notebook_name, note_notebook_path(@note.dig("notebook", "id") || @note["notebook_id"]) rescue n_notebook_name %>
+      </div>
+    <% end %>
+    <% if n_word_count > 0 %>
+      <div style="display: flex; align-items: center; gap: 0.25rem;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem;">notes</span>
+        <%= n_word_count.to_s.reverse.gsub(/(\d{3})(?=\d)/, '\\1,').reverse %> words
+      </div>
+    <% end %>
+    <% if n_reading_time > 0 %>
+      <div style="display: flex; align-items: center; gap: 0.25rem;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem;">schedule</span>
+        <%= n_reading_time %> min read
+      </div>
+    <% end %>
+    <% if n_updated && n_created && (n_updated - n_created) > 60 %>
+      <div style="display: flex; align-items: center; gap: 0.25rem;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem;">edit</span>
+        Updated <%= time_ago_in_words(n_updated) %> ago
+      </div>
+    <% end %>
+    <% if n_is_shared %>
+      <div style="display: flex; align-items: center; gap: 0.25rem;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--primary);">share</span>
+        <span style="color: var(--primary);">Shared</span>
+      </div>
+    <% end %>
+    <% if @note["pinned"] %>
+      <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--primary);" title="Pinned">push_pin</span>
+    <% end %>
+    <% if @note["favorited"] %>
+      <span class="material-icons-outlined" style="font-size: 0.875rem; color: #f59e0b;" title="Favorited">star</span>
+    <% end %>
+  </div>
+  <% if n_is_shared %>
+    <%
+      shared_url = "#{request.base_url}/shared/#{@note["shared_token"]}"
+    %>
+    <div style="padding: 0 1.25rem 0.75rem; display: flex; align-items: center; gap: 0.5rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem; color: var(--primary);">link</span>
+      <input type="text" value="<%= shared_url %>" readonly
+             id="shared-link-input"
+             style="flex: 1; font-size: 0.75rem; padding: 0.375rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); font-family: monospace;" />
+      <button onclick="navigator.clipboard.writeText(document.getElementById('shared-link-input').value).then(() => { this.innerHTML = '<span class=\'material-icons-outlined\' style=\'font-size: 1rem;\'>check</span> Copied'; setTimeout(() => { this.innerHTML = '<span class=\'material-icons-outlined\' style=\'font-size: 1rem;\'>content_copy</span> Copy'; }, 2000); })"
+              class="btn btn-sm" style="white-space: nowrap;">
+        <span class="material-icons-outlined" style="font-size: 1rem;">content_copy</span> Copy
+      </button>
+    </div>
+  <% end %>
+  <% if n_tags.any? %>
+    <div style="padding: 0 1.25rem 0.75rem; display: flex; flex-wrap: wrap; gap: 0.375rem;">
+      <% n_tags.each do |tag| %>
+        <span class="tag" <% if tag["color"].present? %>style="background-color: <%= tag["color"] %>"<% end %>><%= tag["name"] %></span>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+
+<div class="trade-detail-grid">
+  <div class="trade-detail-main">
+    <div class="card">
+      <div class="card-header">
+        <h2>Content</h2>
+        <% if n_has_notebook %>
+          <span class="badge"><%= n_notebook_name %></span>
+        <% end %>
+      </div>
+
+      <% if @note["content"].present? %>
+        <div class="text-content"><%= raw @note["content_html"].presence || simple_format(@note["content"]) %></div>
+      <% else %>
+        <p class="empty-state">No content.</p>
+      <% end %>
+    </div>
+
+    <% if n_attachments.any? %>
+      <div class="card">
+        <div class="card-header">
+          <h2>Attachments</h2>
+          <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= n_attachments.count %></span>
+        </div>
+        <% n_attachments.each do |attachment| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: var(--text-secondary);">attach_file</span>
+            <div style="flex: 1;">
+              <div style="font-size: 0.875rem; font-weight: 500;"><%= attachment["filename"] || attachment["name"] %></div>
+              <% if attachment["file_size"].to_i > 0 %>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= number_to_human_size(attachment["file_size"]) %></div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if n_reminders.any? %>
+      <div class="card">
+        <div class="card-header">
+          <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">notifications</span> Reminders</h2>
+        </div>
+        <% n_reminders.each do |reminder| %>
+          <%
+            r_time = Time.parse(reminder["remind_at"]) rescue nil
+            r_completed = reminder["completed"]
+            r_past = r_time && r_time < Time.current
+          %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= r_completed ? 'var(--positive)' : (r_past ? 'var(--negative)' : 'var(--primary)') %>;">
+              <%= r_completed ? "check_circle" : (r_past ? "alarm_on" : "alarm") %>
+            </span>
+            <div style="flex: 1;">
+              <div style="font-size: 0.875rem;">
+                <%= r_time&.strftime("%b %d, %Y %l:%M %p") || "—" %>
+              </div>
+            </div>
+            <% if r_completed %>
+              <span class="badge badge-success" style="font-size: 0.625rem;">Done</span>
+            <% elsif r_past %>
+              <span class="badge badge-danger" style="font-size: 0.625rem;">Overdue</span>
+            <% else %>
+              <span class="badge badge-primary" style="font-size: 0.625rem;">Pending</span>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <%# Knowledge graph: linked notes and backlinks %>
+    <% if n_links.any? || n_backlinks.any? %>
+      <div class="card">
+        <div class="card-header">
+          <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">hub</span> Knowledge Graph</h2>
+          <span style="font-size: 0.8125rem; color: var(--text-secondary);">
+            <%= n_links.count + n_backlinks.count %> connections
+          </span>
+        </div>
+        <% if n_links.any? %>
+          <div style="padding: 0.5rem 1.25rem 0;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">
+              <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px;">arrow_forward</span>
+              Links to (<%= n_links.count %>)
+            </div>
+          </div>
+          <% n_links.each do |linked| %>
+            <a href="<%= note_path(linked["id"]) %>" class="activity-item">
+              <span class="activity-icon" style="background: rgba(26,115,232,0.1); color: var(--primary);">
+                <span class="material-icons-outlined">description</span>
+              </span>
+              <div class="activity-content">
+                <span class="activity-title"><%= linked["title"].presence || "Untitled" %></span>
+              </div>
+            </a>
+          <% end %>
+        <% end %>
+        <% if n_backlinks.any? %>
+          <div style="padding: 0.5rem 1.25rem 0; <%= n_links.any? ? 'border-top: 1px solid var(--border);' : '' %>">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">
+              <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px;">arrow_back</span>
+              Referenced by (<%= n_backlinks.count %>)
+            </div>
+          </div>
+          <% n_backlinks.each do |backlink| %>
+            <a href="<%= note_path(backlink["id"]) %>" class="activity-item">
+              <span class="activity-icon" style="background: rgba(99,102,241,0.1); color: #6366f1;">
+                <span class="material-icons-outlined">description</span>
+              </span>
+              <div class="activity-content">
+                <span class="activity-title"><%= backlink["title"].presence || "Untitled" %></span>
+              </div>
+            </a>
+          <% end %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="trade-detail-sidebar">
+    <div class="card">
+      <div class="card-header"><h2>Details</h2></div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Created</span>
+          <span class="detail-value"><%= n_created&.strftime("%b %d, %Y %l:%M %p") || "—" %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Updated</span>
+          <span class="detail-value"><%= n_updated&.strftime("%b %d, %Y %l:%M %p") || "—" %></span>
+        </div>
+        <% if @note["color"].present? %>
+          <div class="detail-item">
+            <span class="detail-label">Color</span>
+            <span class="detail-value"><span style="display:inline-block;width:16px;height:16px;border-radius:3px;background-color:<%= @note["color"] %>;vertical-align:middle;"></span> <%= @note["color"] %></span>
+          </div>
+        <% end %>
+        <% if n_word_count > 0 %>
+          <div class="detail-item">
+            <span class="detail-label">Word Count</span>
+            <span class="detail-value"><%= n_word_count %></span>
+          </div>
+        <% end %>
+        <% if n_reading_time > 0 %>
+          <div class="detail-item">
+            <span class="detail-label">Reading Time</span>
+            <span class="detail-value"><%= n_reading_time %> min</span>
+          </div>
+        <% end %>
+        <% if @note["version_count"].to_i > 0 %>
+          <div class="detail-item">
+            <span class="detail-label">Versions</span>
+            <span class="detail-value">
+              <%= link_to "#{@note["version_count"]} versions", note_note_versions_path(@note["id"]) %>
+            </span>
+          </div>
+        <% end %>
+        <% if @note["shared"] && @note["share_expires_at"] %>
+          <div class="detail-item">
+            <span class="detail-label">Share Expires</span>
+            <span class="detail-value">
+              <% expires = Time.parse(@note["share_expires_at"]) rescue nil %>
+              <% if expires && expires > Time.current %>
+                <%= time_ago_in_words(expires) %>
+              <% elsif expires %>
+                <span style="color: var(--danger);">Expired</span>
+              <% end %>
+            </span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <% if n_similar.any? %>
+      <div class="card">
+        <div class="card-header">
+          <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">auto_awesome</span> Similar Notes</h2>
+        </div>
+        <% n_similar.each do |similar| %>
+          <a href="<%= note_path(similar["id"]) %>" class="activity-item">
+            <span class="activity-icon" style="background: rgba(99,102,241,0.1); color: #6366f1;">
+              <span class="material-icons-outlined">description</span>
+            </span>
+            <div class="activity-content">
+              <span class="activity-title"><%= similar["title"].presence || "Untitled" %></span>
+              <% if similar["similarity_score"] %>
+                <span class="activity-detail text-muted"><%= (similar["similarity_score"].to_f * 100).round(0) %>% similar</span>
+              <% end %>
+            </div>
+          </a>
+        <% end %>
+      </div>
+    <% end %>
+
+    <%# Quick actions %>
+    <div class="card">
+      <div class="card-header"><h2>Quick Actions</h2></div>
+      <div style="padding: 0.5rem 1.25rem; display: flex; flex-direction: column; gap: 0.375rem;">
+        <%= link_to edit_note_path(@note["id"]), class: "btn btn-sm", style: "justify-content: flex-start;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem;">edit</span> Edit Note
+        <% end %>
+        <%= link_to duplicate_note_path(@note["id"]), data: { turbo_method: :post }, class: "btn btn-sm", style: "justify-content: flex-start;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem;">content_copy</span> Duplicate
+        <% end %>
+        <%= link_to note_note_versions_path(@note["id"]), class: "btn btn-sm", style: "justify-content: flex-start;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem;">history</span> Version History
+        <% end %>
+        <div class="nav-dropdown" style="width: 100%;">
+          <div class="btn btn-sm" style="justify-content: flex-start; cursor: pointer; width: 100%;">
+            <span class="material-icons-outlined" style="font-size: 1rem;">download</span> Export
+          </div>
+          <div class="nav-dropdown-content" style="position: relative; width: 100%;">
+            <%= link_to "Markdown", export_markdown_note_path(@note["id"]) %>
+            <%= link_to "HTML", export_html_note_path(@note["id"]) %>
+            <%= link_to "JSON", export_json_note_path(@note["id"]) %>
+          </div>
+        </div>
+        <% if @notebooks.is_a?(Array) && @notebooks.count > 1 %>
+          <div class="nav-dropdown" style="width: 100%;">
+            <div class="btn btn-sm" style="justify-content: flex-start; cursor: pointer; width: 100%;">
+              <span class="material-icons-outlined" style="font-size: 1rem;">drive_file_move</span> Move to Notebook
+            </div>
+            <div class="nav-dropdown-content" style="position: relative; width: 100%;">
+              <% current_nb_id = @note.dig("notebook", "id") || @note["notebook_id"] %>
+              <% @notebooks.each do |nb| %>
+                <% next if nb["id"].to_s == current_nb_id.to_s %>
+                <%= link_to nb["name"], move_note_path(@note["id"], notebook_id: nb["id"]), data: { turbo_method: :post } %>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+        <% unless @note["shared_token"].present? %>
+          <%= link_to share_note_path(@note["id"]), data: { turbo_method: :post }, class: "btn btn-sm", style: "justify-content: flex-start;" do %>
+            <span class="material-icons-outlined" style="font-size: 1rem;">share</span> Share Note
+          <% end %>
+        <% else %>
+          <%= link_to unshare_note_path(@note["id"]), data: { turbo_method: :post, turbo_confirm: "Stop sharing?" }, class: "btn btn-sm", style: "justify-content: flex-start;" do %>
+            <span class="material-icons-outlined" style="font-size: 1rem;">link_off</span> Stop Sharing
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,48 @@
+<div class="page-header">
+  <h1>Add Recurring Bill</h1>
+  <div class="page-actions"><%= link_to "Back", budget_recurring_index_path, class: "btn" %></div>
+</div>
+
+<div class="card">
+  <% if @errors.present? %>
+    <div class="alert alert-danger" style="margin: 1rem 1.25rem 0;">
+      <ul style="margin: 0; padding-left: 1rem;">
+        <% @errors.each do |error| %><li><%= error %></li><% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <%= form_with url: budget_recurring_index_path, method: :post, class: "form-container" do |f| %>
+    <div class="form-group">
+      <%= f.label :name, "Name" %>
+      <%= f.text_field :name, value: @recurring["name"], class: "form-control", name: "recurring_transaction[name]", placeholder: "e.g. Netflix, Gym, Car Insurance", required: true %>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+      <div class="form-group">
+        <%= f.label :amount, "Amount" %>
+        <%= f.number_field :amount, value: @recurring["amount"], step: "0.01", class: "form-control", name: "recurring_transaction[amount]", required: true %>
+      </div>
+      <div class="form-group">
+        <%= f.label :frequency, "Frequency" %>
+        <%= f.select :frequency, [["Weekly", "weekly"], ["Bi-weekly", "biweekly"], ["Monthly", "monthly"], ["Quarterly", "quarterly"], ["Annually", "annually"]], { selected: @recurring["frequency"] || "monthly" }, class: "form-control", name: "recurring_transaction[frequency]" %>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+      <div class="form-group">
+        <%= f.label :merchant, "Merchant/Provider" %>
+        <%= f.text_field :merchant, value: @recurring["merchant"], class: "form-control", name: "recurring_transaction[merchant]" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :next_due, "Next Due Date" %>
+        <%= f.date_field :next_due, value: @recurring["next_due"], class: "form-control", name: "recurring_transaction[next_due]" %>
+      </div>
+    </div>
+    <div class="form-group">
+      <%= f.label :category_name, "Category" %>
+      <%= f.text_field :category_name, value: @recurring["category_name"], class: "form-control", name: "recurring_transaction[category_name]", placeholder: "e.g. Entertainment, Health, Transportation" %>
+    </div>
+    <div class="form-actions">
+      <%= f.submit "Add Recurring Bill", class: "btn btn-primary" %>
+    </div>
+  <% end %>
+</div>

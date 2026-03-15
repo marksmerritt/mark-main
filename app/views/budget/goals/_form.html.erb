@@ -1,0 +1,61 @@
+<% if @errors.present? %>
+  <div class="alert alert-danger" style="margin: 1rem 1.25rem 0;">
+    <ul style="margin: 0; padding-left: 1rem;">
+      <% @errors.each do |error| %><li><%= error %></li><% end %>
+    </ul>
+  </div>
+<% end %>
+
+<div class="form-group">
+  <%= f.label :name, "Goal Name" %>
+  <%= f.text_field :name, value: goal["name"], class: "form-control", name: "goal[name]", placeholder: "e.g. Emergency Fund, Pay Off Car, Vacation Savings", required: true %>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+  <div class="form-group">
+    <%= f.label :goal_type, "Goal Type" %>
+    <%= f.select :goal_type, options_for_select([["Savings", "savings"], ["Debt Payoff", "debt_payoff"], ["Purchase", "purchase"], ["Custom", "custom"]], goal["goal_type"]), {}, class: "form-control", name: "goal[goal_type]" %>
+  </div>
+  <div class="form-group">
+    <%= f.label :status, "Status" %>
+    <%= f.select :status, options_for_select([["Active", "active"], ["Achieved", "achieved"], ["Abandoned", "abandoned"]], goal["status"] || "active"), {}, class: "form-control", name: "goal[status]" %>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+  <div class="form-group">
+    <%= f.label :target_amount, "Target Amount" %>
+    <%= f.number_field :target_amount, value: goal["target_amount"], step: "0.01", class: "form-control", name: "goal[target_amount]", placeholder: "10000.00", required: true %>
+  </div>
+  <div class="form-group">
+    <%= f.label :current_amount, "Current Amount" %>
+    <%= f.number_field :current_amount, value: goal["current_amount"] || 0, step: "0.01", class: "form-control", name: "goal[current_amount]", placeholder: "0.00" %>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+  <div class="form-group">
+    <%= f.label :target_date, "Target Date" %>
+    <%= f.date_field :target_date, value: goal["target_date"], class: "form-control", name: "goal[target_date]" %>
+  </div>
+  <div class="form-group">
+    <%= f.label :icon, "Icon (emoji)" %>
+    <%= f.text_field :icon, value: goal["icon"], class: "form-control", name: "goal[icon]", placeholder: "e.g. shield, plane, car" %>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+  <div class="form-group">
+    <%= f.label :linked_fund_id, "Link to Sinking Fund (optional)" %>
+    <%= f.select :linked_fund_id, options_for_select([["None", ""]] + @funds.map { |fund| [fund["name"], fund["id"]] }, goal["linked_fund_id"]), {}, class: "form-control", name: "goal[linked_fund_id]" %>
+  </div>
+  <div class="form-group">
+    <%= f.label :linked_debt_id, "Link to Debt Account (optional)" %>
+    <%= f.select :linked_debt_id, options_for_select([["None", ""]] + @debts.map { |d| [d["name"], d["id"]] }, goal["linked_debt_id"]), {}, class: "form-control", name: "goal[linked_debt_id]" %>
+  </div>
+</div>
+
+<div class="form-group">
+  <%= f.label :notes, "Notes" %>
+  <%= f.text_area :notes, value: goal["notes"], class: "form-control", name: "goal[notes]", rows: 3 %>
+</div>

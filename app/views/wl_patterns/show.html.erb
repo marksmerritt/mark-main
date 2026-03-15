@@ -1,0 +1,574 @@
+<% content_for(:title) { "Win/Loss Patterns" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #7b1fa2;">casino</span>
+    Win/Loss Pattern Analyzer
+  </h1>
+</div>
+
+<% if @trades.blank? || @sequence.blank? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem; color: #7b1fa2;">casino</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Not enough trading data</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close at least 3 trades with P&amp;L to analyze win/loss patterns.</div>
+  </div>
+<% else %>
+
+  <%# ── Stats Strip ── %>
+  <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #7b1fa2;"><%= @total_trades %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Total Trades</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @p_win_after_win && @p_win_after_win >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @p_win_after_win ? "#{@p_win_after_win}%" : "--" %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Win-After-Win %</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @p_win_after_loss && @p_win_after_loss >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @p_win_after_loss ? "#{@p_win_after_loss}%" : "--" %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Win-After-Loss %</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @max_win_streak %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Max Win Streak</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= @max_loss_streak %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Max Loss Streak</div>
+    </div>
+  </div>
+
+  <%# ── Win/Loss Sequence Visualization ── %>
+  <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #7b1fa2;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7b1fa2;">linear_scale</span>
+        Win/Loss Sequence
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+        Recent sequence of trade outcomes (<span style="color: var(--positive); font-weight: 600;">W</span> = win, <span style="color: var(--negative); font-weight: 600;">L</span> = loss). Showing last <%= [@sequence.length, 100].min %> trades.
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center;">
+        <% @sequence.last(100).each_with_index do |result, i| %>
+          <div style="width: 14px; height: 14px; border-radius: 50%; background: <%= result == 'W' ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.85;" title="Trade #<%= @sequence.length - [@sequence.length, 100].min + i + 1 %>: <%= result == 'W' ? 'Win' : 'Loss' %>"></div>
+        <% end %>
+      </div>
+      <div style="display: flex; gap: 1.5rem; margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);">
+        <span><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--positive); vertical-align: -1px;"></span> Win (<%= @sequence.count("W") %>)</span>
+        <span><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--negative); vertical-align: -1px;"></span> Loss (<%= @sequence.count("L") %>)</span>
+        <span>Overall: <strong><%= @overall_win_rate %>%</strong> win rate</span>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Streak Distribution Chart ── %>
+  <% if @streak_distribution.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7b1fa2;">bar_chart</span>
+          Streak Distribution
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Distribution of consecutive win and loss streaks by length.
+          Avg win streak: <strong><%= @avg_win_streak %></strong> &middot; Avg loss streak: <strong><%= @avg_loss_streak %></strong>
+        </div>
+        <%
+          max_count = @streak_distribution.map { |d| [d[:win_count], d[:loss_count]].max }.max
+          max_count = [max_count, 1].max
+          chart_w = 500
+          chart_h = 180
+          bar_group_w = chart_w.to_f / @streak_distribution.length
+          bar_w = (bar_group_w * 0.35).round(1)
+        %>
+        <svg viewBox="0 0 <%= chart_w %> <%= chart_h + 30 %>" style="width: 100%; max-width: 600px; display: block; margin: 0 auto;">
+          <% @streak_distribution.each_with_index do |d, i| %>
+            <%
+              x = (i * bar_group_w + bar_group_w * 0.1).round(1)
+              win_h = (d[:win_count].to_f / max_count * chart_h).round(1)
+              loss_h = (d[:loss_count].to_f / max_count * chart_h).round(1)
+            %>
+            <rect x="<%= x %>" y="<%= chart_h - win_h %>" width="<%= bar_w %>" height="<%= win_h %>" rx="2" fill="var(--positive)" opacity="0.8"/>
+            <% if d[:win_count] > 0 %>
+              <text x="<%= x + bar_w / 2 %>" y="<%= chart_h - win_h - 4 %>" text-anchor="middle" font-size="9" fill="var(--positive)"><%= d[:win_count] %></text>
+            <% end %>
+            <rect x="<%= x + bar_w + 2 %>" y="<%= chart_h - loss_h %>" width="<%= bar_w %>" height="<%= loss_h %>" rx="2" fill="var(--negative)" opacity="0.8"/>
+            <% if d[:loss_count] > 0 %>
+              <text x="<%= x + bar_w + 2 + bar_w / 2 %>" y="<%= chart_h - loss_h - 4 %>" text-anchor="middle" font-size="9" fill="var(--negative)"><%= d[:loss_count] %></text>
+            <% end %>
+            <text x="<%= x + bar_w + 1 %>" y="<%= chart_h + 16 %>" text-anchor="middle" font-size="10" fill="var(--text-secondary)"><%= d[:length] %></text>
+          <% end %>
+          <line x1="0" y1="<%= chart_h %>" x2="<%= chart_w %>" y2="<%= chart_h %>" stroke="var(--border)" stroke-width="1"/>
+          <text x="<%= chart_w / 2 %>" y="<%= chart_h + 28 %>" text-anchor="middle" font-size="10" fill="var(--text-secondary)">Streak Length</text>
+          <%# Legend %>
+          <rect x="10" y="4" width="10" height="10" rx="2" fill="var(--positive)" opacity="0.8"/>
+          <text x="24" y="13" font-size="9" fill="var(--text-secondary)">Win Streaks</text>
+          <rect x="100" y="4" width="10" height="10" rx="2" fill="var(--negative)" opacity="0.8"/>
+          <text x="114" y="13" font-size="9" fill="var(--text-secondary)">Loss Streaks</text>
+        </svg>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Conditional Probabilities ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7b1fa2;">functions</span>
+        Conditional Probabilities
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        What is the probability of winning given the previous result(s)?
+        Baseline win rate: <strong><%= @overall_win_rate %>%</strong>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+        <%# P(W|W) %>
+        <div style="padding: 1rem; background: var(--bg); border-radius: 0.5rem; text-align: center; border-left: 4px solid <%= @p_win_after_win && @p_win_after_win > @overall_win_rate ? 'var(--positive)' : 'var(--negative)' %>;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">P(Win | Win)</div>
+          <div style="font-size: 1.75rem; font-weight: 700; color: <%= @p_win_after_win && @p_win_after_win > @overall_win_rate ? 'var(--positive)' : 'var(--text-primary)' %>; margin: 0.25rem 0;"><%= @p_win_after_win ? "#{@p_win_after_win}%" : "--" %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+            <% if @p_win_after_win %>
+              <% diff = (@p_win_after_win - @overall_win_rate).round(1) %>
+              <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px; color: <%= diff >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= diff >= 0 ? "arrow_upward" : "arrow_downward" %></span>
+              <%= diff >= 0 ? "+" : "" %><%= diff %>% vs baseline
+            <% end %>
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= @after_win_count %> samples</div>
+        </div>
+
+        <%# P(W|L) %>
+        <div style="padding: 1rem; background: var(--bg); border-radius: 0.5rem; text-align: center; border-left: 4px solid <%= @p_win_after_loss && @p_win_after_loss > @overall_win_rate ? 'var(--positive)' : 'var(--negative)' %>;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">P(Win | Loss)</div>
+          <div style="font-size: 1.75rem; font-weight: 700; color: <%= @p_win_after_loss && @p_win_after_loss > @overall_win_rate ? 'var(--positive)' : 'var(--text-primary)' %>; margin: 0.25rem 0;"><%= @p_win_after_loss ? "#{@p_win_after_loss}%" : "--" %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+            <% if @p_win_after_loss %>
+              <% diff = (@p_win_after_loss - @overall_win_rate).round(1) %>
+              <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px; color: <%= diff >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= diff >= 0 ? "arrow_upward" : "arrow_downward" %></span>
+              <%= diff >= 0 ? "+" : "" %><%= diff %>% vs baseline
+            <% end %>
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= @after_loss_count %> samples</div>
+        </div>
+
+        <%# Cluster assessment %>
+        <div style="padding: 1rem; background: var(--bg); border-radius: 0.5rem; text-align: center; border-left: 4px solid #7b1fa2;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Distribution</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: #7b1fa2; margin: 0.25rem 0;"><%= @clustering_label %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+            Z-score: <%= @runs_z_score %>
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= @observed_runs %> runs (expected: <%= @expected_runs %>)</div>
+        </div>
+      </div>
+
+      <%# Second row: deeper conditionals %>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
+        <%# P(W|WW) %>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: 0.5rem; text-align: center;">
+          <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">P(W | WW)</div>
+          <div style="font-size: 1.25rem; font-weight: 700; margin: 0.125rem 0;"><%= @p_win_after_ww ? "#{@p_win_after_ww}%" : "--" %></div>
+          <div style="font-size: 0.5625rem; color: var(--text-secondary);"><%= @after_ww_count %> samples</div>
+        </div>
+        <%# P(W|LL) %>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: 0.5rem; text-align: center;">
+          <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">P(W | LL)</div>
+          <div style="font-size: 1.25rem; font-weight: 700; margin: 0.125rem 0;"><%= @p_win_after_ll ? "#{@p_win_after_ll}%" : "--" %></div>
+          <div style="font-size: 0.5625rem; color: var(--text-secondary);"><%= @after_ll_count %> samples</div>
+        </div>
+        <%# P(W|WL) %>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: 0.5rem; text-align: center;">
+          <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">P(W | WL)</div>
+          <div style="font-size: 1.25rem; font-weight: 700; margin: 0.125rem 0;"><%= @p_win_after_wl ? "#{@p_win_after_wl}%" : "--" %></div>
+          <div style="font-size: 0.5625rem; color: var(--text-secondary);">after win-then-loss</div>
+        </div>
+        <%# P(W|LW) %>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: 0.5rem; text-align: center;">
+          <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">P(W | LW)</div>
+          <div style="font-size: 1.25rem; font-weight: 700; margin: 0.125rem 0;"><%= @p_win_after_lw ? "#{@p_win_after_lw}%" : "--" %></div>
+          <div style="font-size: 0.5625rem; color: var(--text-secondary);">after loss-then-win</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ── After-Result Analysis ── %>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <%# After a WIN %>
+    <div class="card" style="border-top: 4px solid var(--positive);">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">emoji_events</span>
+          After a Win
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Win Rate</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: <%= @after_win_win_rate >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @after_win_win_rate %>%</div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg P&amp;L</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: <%= @after_win_avg_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@after_win_avg_pnl) %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Best Trade</div>
+            <div style="font-size: 0.875rem; font-weight: 600; color: var(--positive);"><%= number_to_currency(@after_win_best) %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Worst Trade</div>
+            <div style="font-size: 0.875rem; font-weight: 600; color: var(--negative);"><%= number_to_currency(@after_win_worst) %></div>
+          </div>
+        </div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.75rem; text-align: center;"><%= @after_win_trade_count %> trades analyzed</div>
+      </div>
+    </div>
+
+    <%# After a LOSS %>
+    <div class="card" style="border-top: 4px solid var(--negative);">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">sentiment_dissatisfied</span>
+          After a Loss
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Win Rate</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: <%= @after_loss_win_rate >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @after_loss_win_rate %>%</div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg P&amp;L</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: <%= @after_loss_avg_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@after_loss_avg_pnl) %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Best Trade</div>
+            <div style="font-size: 0.875rem; font-weight: 600; color: var(--positive);"><%= number_to_currency(@after_loss_best) %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Worst Trade</div>
+            <div style="font-size: 0.875rem; font-weight: 600; color: var(--negative);"><%= number_to_currency(@after_loss_worst) %></div>
+          </div>
+        </div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.75rem; text-align: center;"><%= @after_loss_trade_count %> trades analyzed</div>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Pattern Detection ── %>
+  <% if @patterns.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7b1fa2;">pattern</span>
+          Pattern Detection
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Recurring W/L sequences compared to expected frequency under random chance. Ratio > 1.3 = above chance, < 0.7 = below chance.
+        </div>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border);">
+                <th style="text-align: left; padding: 0.5rem;">Pattern</th>
+                <th style="text-align: center; padding: 0.5rem;">Sequence</th>
+                <th style="text-align: right; padding: 0.5rem;">Observed</th>
+                <th style="text-align: right; padding: 0.5rem;">Expected</th>
+                <th style="text-align: right; padding: 0.5rem;">Ratio</th>
+                <th style="text-align: center; padding: 0.5rem;">Signal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @patterns.first(15).each do |p| %>
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 0.5rem; font-family: monospace; font-weight: 600;">
+                    <% p[:pattern].chars.each do |c| %>
+                      <span style="color: <%= c == 'W' ? 'var(--positive)' : 'var(--negative)' %>;"><%= c %></span>
+                    <% end %>
+                  </td>
+                  <td style="text-align: center; padding: 0.5rem;">
+                    <% p[:pattern].chars.each do |c| %>
+                      <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: <%= c == 'W' ? 'var(--positive)' : 'var(--negative)' %>; margin: 0 1px; vertical-align: middle;"></span>
+                    <% end %>
+                  </td>
+                  <td style="text-align: right; padding: 0.5rem; font-weight: 600;"><%= p[:count] %></td>
+                  <td style="text-align: right; padding: 0.5rem; color: var(--text-secondary);"><%= p[:expected] %></td>
+                  <td style="text-align: right; padding: 0.5rem; font-weight: 600; color: <%= p[:above_chance] ? 'var(--positive)' : (p[:below_chance] ? 'var(--negative)' : 'var(--text-primary)') %>;">
+                    <%= p[:ratio] %>x
+                  </td>
+                  <td style="text-align: center; padding: 0.5rem;">
+                    <% if p[:above_chance] %>
+                      <span class="material-icons-outlined" style="font-size: 1rem; color: var(--positive);" title="Occurs more than expected">trending_up</span>
+                    <% elsif p[:below_chance] %>
+                      <span class="material-icons-outlined" style="font-size: 1rem; color: var(--negative);" title="Occurs less than expected">trending_down</span>
+                    <% else %>
+                      <span class="material-icons-outlined" style="font-size: 1rem; color: var(--text-secondary);" title="Within expected range">trending_flat</span>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Size Change & Time Gap Analysis ── %>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <%# Size Change Analysis %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7b1fa2;">straighten</span>
+          Position Size After Results
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% if @avg_size_after_win && @avg_size_after_loss %>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 1.5rem; margin-bottom: 1rem;">
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">After Win</div>
+              <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@avg_size_after_win, precision: 0) %></div>
+              <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= @size_after_win_count %> trades</div>
+            </div>
+            <div style="text-align: center;">
+              <span class="material-icons-outlined" style="font-size: 1.5rem; color: #7b1fa2;">compare_arrows</span>
+              <% if @size_change_pct %>
+                <div style="font-size: 0.75rem; font-weight: 600; color: <%= @size_change_pct >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                  <%= @size_change_pct >= 0 ? "+" : "" %><%= @size_change_pct %>%
+                </div>
+              <% end %>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">After Loss</div>
+              <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@avg_size_after_loss, precision: 0) %></div>
+              <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= @size_after_loss_count %> trades</div>
+            </div>
+          </div>
+          <%# Visual bar comparison %>
+          <%
+            max_size = [@avg_size_after_win, @avg_size_after_loss].max
+            win_pct = max_size > 0 ? (@avg_size_after_win / max_size * 100).round(0) : 0
+            loss_pct = max_size > 0 ? (@avg_size_after_loss / max_size * 100).round(0) : 0
+          %>
+          <div style="margin-top: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem;">
+              <span style="font-size: 0.6875rem; width: 60px; color: var(--text-secondary);">After W</span>
+              <div style="flex: 1; background: var(--bg); border-radius: 4px; height: 16px; overflow: hidden;">
+                <div style="width: <%= win_pct %>%; height: 100%; background: var(--positive); border-radius: 4px; opacity: 0.7;"></div>
+              </div>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 0.6875rem; width: 60px; color: var(--text-secondary);">After L</span>
+              <div style="flex: 1; background: var(--bg); border-radius: 4px; height: 16px; overflow: hidden;">
+                <div style="width: <%= loss_pct %>%; height: 100%; background: var(--negative); border-radius: 4px; opacity: 0.7;"></div>
+              </div>
+            </div>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.75rem; text-align: center;">
+            <% if @size_change_pct && @size_change_pct > 10 %>
+              <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #e65100;">warning</span>
+              You tend to <strong>increase size</strong> after wins. Watch for overconfidence.
+            <% elsif @size_change_pct && @size_change_pct < -10 %>
+              <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #e65100;">warning</span>
+              You tend to <strong>decrease size</strong> after losses. Be careful not to undersize quality setups.
+            <% else %>
+              Position sizing remains <strong>consistent</strong> regardless of prior outcome.
+            <% end %>
+          </div>
+        <% else %>
+          <div style="text-align: center; padding: 1rem; color: var(--text-secondary); font-size: 0.8125rem;">
+            <span class="material-icons-outlined" style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">info</span>
+            Not enough position size data to analyze sizing behavior.
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Time Gap Analysis %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7b1fa2;">schedule</span>
+          Time Between Trades
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% if @avg_gap_after_win && @avg_gap_after_loss %>
+          <div style="display: flex; align-items: center; justify-content: center; gap: 1.5rem; margin-bottom: 1rem;">
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Gap After Win</div>
+              <div style="font-size: 1.25rem; font-weight: 700;">
+                <% if @avg_gap_after_win >= 24 %>
+                  <%= (@avg_gap_after_win / 24).round(1) %>d
+                <% else %>
+                  <%= @avg_gap_after_win %>h
+                <% end %>
+              </div>
+              <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= @gap_after_win_count %> gaps</div>
+            </div>
+            <div style="text-align: center;">
+              <span class="material-icons-outlined" style="font-size: 1.5rem; color: #7b1fa2;">compare_arrows</span>
+              <% if @gap_ratio %>
+                <div style="font-size: 0.75rem; font-weight: 600; color: #7b1fa2;"><%= @gap_ratio %>x</div>
+              <% end %>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Gap After Loss</div>
+              <div style="font-size: 1.25rem; font-weight: 700;">
+                <% if @avg_gap_after_loss >= 24 %>
+                  <%= (@avg_gap_after_loss / 24).round(1) %>d
+                <% else %>
+                  <%= @avg_gap_after_loss %>h
+                <% end %>
+              </div>
+              <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= @gap_after_loss_count %> gaps</div>
+            </div>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; text-align: center;">
+            <% if @gap_ratio && @gap_ratio > 1.3 %>
+              <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--positive);">check_circle</span>
+              You take <strong>longer breaks</strong> after losses &mdash; good cooling-off discipline.
+            <% elsif @gap_ratio && @gap_ratio < 0.7 %>
+              <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #e65100;">warning</span>
+              You jump back in <strong>faster after losses</strong> &mdash; possible revenge trading pattern.
+            <% else %>
+              Time between trades is <strong>similar</strong> regardless of prior outcome.
+            <% end %>
+          </div>
+        <% else %>
+          <div style="text-align: center; padding: 1rem; color: var(--text-secondary); font-size: 0.8125rem;">
+            <span class="material-icons-outlined" style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">info</span>
+            Not enough time data to analyze gaps between trades.
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Runs Test & Comeback Rate ── %>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <%# Runs Test %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7b1fa2;">analytics</span>
+          Runs Test for Randomness
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="text-align: center; margin-bottom: 1rem;">
+          <div style="font-size: 2rem; font-weight: 700; color: #7b1fa2;"><%= @observed_runs %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Observed Runs</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.8125rem;">
+          <div style="padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Expected</div>
+            <div style="font-weight: 600;"><%= @expected_runs %></div>
+          </div>
+          <div style="padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Z-Score</div>
+            <div style="font-weight: 600;"><%= @runs_z_score %></div>
+          </div>
+        </div>
+        <div style="margin-top: 1rem; padding: 0.75rem; border-radius: 0.375rem; text-align: center; font-size: 0.8125rem; font-weight: 500; background: <%= @runs_interpretation == 'random' ? 'rgba(46, 125, 50, 0.1)' : 'rgba(230, 81, 0, 0.1)' %>; color: <%= @runs_interpretation == 'random' ? 'var(--positive)' : '#e65100' %>;">
+          <% if @runs_interpretation == "random" %>
+            <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">check_circle</span>
+            Results appear <strong>randomly distributed</strong> (no significant clustering).
+          <% elsif @runs_interpretation == "clustered" %>
+            <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">warning</span>
+            Wins and losses are <strong>clustered</strong> &mdash; streaks happen more than chance predicts.
+          <% else %>
+            <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">info</span>
+            Wins and losses <strong>alternate</strong> more than expected &mdash; less streaky than random.
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <%# Comeback Rate %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7b1fa2;">replay</span>
+          Comeback Rate
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% if @comeback_rate %>
+          <div style="text-align: center; margin-bottom: 1rem;">
+            <div style="font-size: 2.5rem; font-weight: 700; color: <%= @comeback_rate >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @comeback_rate %>%</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">of sessions recovered from being down</div>
+          </div>
+          <%# Visual ring %>
+          <div style="display: flex; justify-content: center; margin-bottom: 1rem;">
+            <svg viewBox="0 0 100 100" style="width: 120px; height: 120px; transform: rotate(-90deg);">
+              <circle cx="50" cy="50" r="42" fill="none" stroke="var(--border)" stroke-width="8" opacity="0.3"/>
+              <circle cx="50" cy="50" r="42" fill="none" stroke="<%= @comeback_rate >= 50 ? 'var(--positive)' : 'var(--negative)' %>" stroke-width="8"
+                stroke-dasharray="<%= (2 * Math::PI * 42 * @comeback_rate / 100).round(1) %> <%= (2 * Math::PI * 42).round(1) %>"
+                stroke-linecap="round" opacity="0.8"/>
+            </svg>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; text-align: center; font-size: 0.8125rem;">
+            <div style="padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Sessions</div>
+              <div style="font-weight: 600;"><%= @session_count %></div>
+            </div>
+            <div style="padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Went Down</div>
+              <div style="font-weight: 600;"><%= @sessions_went_negative %></div>
+            </div>
+            <div style="padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Recovered</div>
+              <div style="font-weight: 600; color: var(--positive);"><%= @sessions_recovered %></div>
+            </div>
+          </div>
+        <% else %>
+          <div style="text-align: center; padding: 1rem; color: var(--text-secondary); font-size: 0.8125rem;">
+            <span class="material-icons-outlined" style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">info</span>
+            No sessions went negative, so comeback rate is not applicable.
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+<% end %>
+
+<%# ── Bottom Nav ── %>
+<div style="display: flex; justify-content: center; gap: 1rem; padding: 1rem 0;">
+  <%= link_to edge_finder_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">gps_fixed</span> Edge Finder
+  <% end %>
+  <%= link_to session_analyzer_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">view_timeline</span> Sessions
+  <% end %>
+  <%= link_to trading_mentor_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">psychology</span> Mentor
+  <% end %>
+</div>
+
+<style>
+  @media (max-width: 640px) {
+    div[style*="grid-template-columns: repeat(5"] { grid-template-columns: repeat(2, 1fr) !important; }
+    div[style*="grid-template-columns: repeat(4"] { grid-template-columns: repeat(2, 1fr) !important; }
+    div[style*="grid-template-columns: repeat(3"] { grid-template-columns: 1fr !important; }
+    div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+  }
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>

@@ -1,0 +1,357 @@
+<% content_for(:title) { "Impulse Tracker" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #ff8f00;">bolt</span>
+    Impulse Spending Tracker
+  </h1>
+</div>
+
+<% if @total_transactions > 0 %>
+
+<%# Impulse Score Gauge %>
+<div class="card" style="margin-bottom: 1.5rem; text-align: center; padding: 2rem 1.5rem;">
+  <%
+    score = @impulse_score
+    score_color = if score < 25 then "var(--positive)"
+                  elsif score < 50 then "#ff9800"
+                  elsif score < 75 then "#f57c00"
+                  else "var(--negative)"
+                  end
+    score_label = if score < 25 then "Disciplined"
+                  elsif score < 50 then "Moderate"
+                  elsif score < 75 then "Impulsive"
+                  else "Highly Impulsive"
+                  end
+    circumference = 2 * Math::PI * 70
+    offset = circumference - (score / 100.0 * circumference)
+  %>
+  <svg viewBox="0 0 200 200" style="max-width: 200px; width: 100%; margin: 0 auto; display: block;" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="100" cy="100" r="70" fill="none" stroke="var(--border)" stroke-width="12" opacity="0.3" />
+    <circle cx="100" cy="100" r="70" fill="none" stroke="<%= score_color %>" stroke-width="12"
+            stroke-dasharray="<%= circumference.round(1) %>"
+            stroke-dashoffset="<%= offset.round(1) %>"
+            stroke-linecap="round"
+            transform="rotate(-90 100 100)"
+            style="transition: stroke-dashoffset 1s ease;" />
+    <text x="100" y="92" text-anchor="middle" fill="var(--text)" style="font-size: 36px; font-weight: 700;"><%= score %></text>
+    <text x="100" y="115" text-anchor="middle" fill="var(--text-secondary)" style="font-size: 12px;"><%= score_label %></text>
+  </svg>
+  <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.75rem;">Impulse Score: 0 (disciplined) to 100 (highly impulsive)</div>
+</div>
+
+<%# Stats Strip %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <div class="card" style="text-align: center; padding: 1.25rem;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Impulse Score</div>
+    <div style="font-size: 1.75rem; font-weight: 700; color: <%= score_color %>;"><%= @impulse_score %><span style="font-size: 0.875rem; font-weight: 400;">/100</span></div>
+  </div>
+  <div class="card" style="text-align: center; padding: 1.25rem;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Est. Impulse Spending</div>
+    <div style="font-size: 1.75rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_impulse_spending) %></div>
+    <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @impulse_pct_of_total %>% of total</div>
+  </div>
+  <div class="card" style="text-align: center; padding: 1.25rem;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Late Night Purchases</div>
+    <div style="font-size: 1.75rem; font-weight: 700;"><%= @late_night_purchases.size %></div>
+    <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= number_to_currency(@late_night_purchases.sum { |t| t["amount"].to_f }) %></div>
+  </div>
+  <div class="card" style="text-align: center; padding: 1.25rem;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Potential Annual Savings</div>
+    <div style="font-size: 1.75rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@annual_savings_potential) %></div>
+  </div>
+</div>
+
+<%# Trigger Breakdown %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff8f00;">warning</span> Impulse Triggers</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+      <%# Late Night %>
+      <div style="padding: 1rem; background: var(--bg); border-radius: 8px; border-left: 3px solid #5c6bc0;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 1.1rem; color: #5c6bc0;">nightlight</span>
+          <span style="font-size: 0.8125rem; font-weight: 600;">Late Night Purchases</span>
+        </div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @late_night_purchases.size %> transactions</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">Total: <%= number_to_currency(@late_night_purchases.sum { |t| t["amount"].to_f }) %> (10pm - 6am)</div>
+      </div>
+
+      <%# Weekend Splurges %>
+      <div style="padding: 1rem; background: var(--bg); border-radius: 8px; border-left: 3px solid #ff7043;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 1.1rem; color: #ff7043;">weekend</span>
+          <span style="font-size: 0.8125rem; font-weight: 600;">Weekend Splurges</span>
+        </div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @weekend_premium > 0 ? "+#{@weekend_premium}%" : "#{@weekend_premium}%" %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">Weekend avg vs weekday avg per-transaction</div>
+      </div>
+
+      <%# Small Purchases %>
+      <div style="padding: 1rem; background: var(--bg); border-radius: 8px; border-left: 3px solid #26a69a;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 1.1rem; color: #26a69a;">shopping_basket</span>
+          <span style="font-size: 0.8125rem; font-weight: 600;">Small Purchase Accumulation</span>
+        </div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @small_purchase_count %> purchases</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">Under $20 each, totaling <%= number_to_currency(@small_purchase_total) %> (<%= @small_purchase_pct %>%)</div>
+      </div>
+
+      <%# Post-Payday %>
+      <div style="padding: 1rem; background: var(--bg); border-radius: 8px; border-left: 3px solid #42a5f5;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 1.1rem; color: #42a5f5;">account_balance_wallet</span>
+          <span style="font-size: 0.8125rem; font-weight: 600;">Post-Payday Spending</span>
+        </div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@post_payday_spending) %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @post_payday_count %> purchases within 3 days of income (<%= @post_payday_premium > 0 ? "+#{@post_payday_premium}%" : "#{@post_payday_premium}%" %> vs avg)</div>
+      </div>
+
+      <%# Category Outliers %>
+      <div style="padding: 1rem; background: var(--bg); border-radius: 8px; border-left: 3px solid #ab47bc;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 1.1rem; color: #ab47bc;">trending_up</span>
+          <span style="font-size: 0.8125rem; font-weight: 600;">Category Outliers</span>
+        </div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @category_outliers.size %> transactions</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">Significantly above category average</div>
+      </div>
+
+      <%# Emotional Spending %>
+      <div style="padding: 1rem; background: var(--bg); border-radius: 8px; border-left: 3px solid #ec407a;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 1.1rem; color: #ec407a;">psychology</span>
+          <span style="font-size: 0.8125rem; font-weight: 600;">Emotional Spending Clusters</span>
+        </div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @emotional_spending_days.size %> days</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">Days with 4+ purchase clusters</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Score Component Breakdown %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">tune</span> Score Breakdown</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% @score_components.each do |component| %>
+      <div style="margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.375rem;">
+          <span style="font-size: 0.8125rem; font-weight: 600;"><%= component[:name] %></span>
+          <span style="font-size: 0.8125rem; font-weight: 700; color: #ff8f00;"><%= component[:raw] %> / <%= component[:weight] %></span>
+        </div>
+        <div style="height: 0.5rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+          <% bar_pct = component[:weight] > 0 ? (component[:raw] / component[:weight].to_f * 100).round : 0 %>
+          <div style="height: 100%; width: <%= bar_pct %>%; background: #ff8f00; border-radius: 4px; transition: width 0.6s ease;"></div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Merchant Frequency Spikes %>
+<% if @merchant_spikes.any? %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ef6c00;">store</span> Frequent Impulse Merchants</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="text-align: left;">Merchant</th>
+            <th style="text-align: right;">Purchases</th>
+            <th style="text-align: right;">Total Spent</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @merchant_spikes.each do |m| %>
+            <tr>
+              <td><%= m[:merchant] %></td>
+              <td style="text-align: right;"><%= m[:count] %></td>
+              <td style="text-align: right; font-weight: 600;"><%= number_to_currency(m[:total]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<% end %>
+
+<%# Monthly Impulse Trend Chart %>
+<% if @monthly_trend.size >= 2 %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2>
+      <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span>
+      Monthly Impulse Trend
+      <% if @trend_direction == "improving" %>
+        <span style="font-size: 0.75rem; background: var(--positive); color: white; padding: 0.125rem 0.5rem; border-radius: 999px; margin-left: 0.5rem;">Improving</span>
+      <% elsif @trend_direction == "worsening" %>
+        <span style="font-size: 0.75rem; background: var(--negative); color: white; padding: 0.125rem 0.5rem; border-radius: 999px; margin-left: 0.5rem;">Worsening</span>
+      <% else %>
+        <span style="font-size: 0.75rem; background: var(--border); color: var(--text); padding: 0.125rem 0.5rem; border-radius: 999px; margin-left: 0.5rem;">Stable</span>
+      <% end %>
+    </h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <%
+      max_impulse = @monthly_trend.map { |m| m[:impulse] }.max
+      max_impulse = 1.0 if max_impulse.to_f <= 0
+      chart_height = 160
+      chart_width = 600
+      bar_gap = 8
+      bar_count = @monthly_trend.size
+      bar_width = [(chart_width - (bar_count + 1) * bar_gap) / bar_count, 60].min
+      total_used = bar_count * bar_width + (bar_count + 1) * bar_gap
+    %>
+    <div style="overflow-x: auto;">
+      <svg viewBox="0 0 <%= total_used %> <%= chart_height + 40 %>" style="width: 100%; max-width: <%= total_used %>px; min-width: 300px;" xmlns="http://www.w3.org/2000/svg">
+        <%# Bars %>
+        <% @monthly_trend.each_with_index do |m, i| %>
+          <%
+            x = bar_gap + i * (bar_width + bar_gap)
+            bar_h = (m[:impulse] / max_impulse * chart_height).round
+            bar_h = [bar_h, 2].max
+            y = chart_height - bar_h
+          %>
+          <rect x="<%= x %>" y="<%= y %>" width="<%= bar_width %>" height="<%= bar_h %>" rx="3" fill="#ff8f00" opacity="0.75" />
+          <text x="<%= x + bar_width / 2 %>" y="<%= y - 6 %>" text-anchor="middle" fill="var(--text-secondary)" style="font-size: 9px;"><%= number_to_currency(m[:impulse], precision: 0) %></text>
+          <text x="<%= x + bar_width / 2 %>" y="<%= chart_height + 16 %>" text-anchor="middle" fill="var(--text-secondary)" style="font-size: 9px;"><%= m[:month].to_s.slice(5, 2) %>/<%= m[:month].to_s.slice(2, 2) %></text>
+          <text x="<%= x + bar_width / 2 %>" y="<%= chart_height + 30 %>" text-anchor="middle" fill="var(--text-secondary)" style="font-size: 8px;"><%= m[:pct] %>%</text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+</div>
+<% end %>
+
+<%# Category Outliers %>
+<% if @category_outliers.any? %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ab47bc;">bolt</span> Category Outlier Transactions</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="text-align: left;">Date</th>
+            <th style="text-align: left;">Category</th>
+            <th style="text-align: left;">Description</th>
+            <th style="text-align: right;">Amount</th>
+            <th style="text-align: right;">Category Avg</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @category_outliers.each do |o| %>
+            <tr>
+              <td style="font-size: 0.8125rem;"><%= o[:transaction]["transaction_date"] %></td>
+              <td style="font-size: 0.8125rem;"><%= o[:category] %></td>
+              <td style="font-size: 0.8125rem;"><%= (o[:transaction]["merchant"] || o[:transaction]["description"] || "").truncate(30) %></td>
+              <td style="text-align: right; font-weight: 600; color: var(--negative);"><%= number_to_currency(o[:amount]) %></td>
+              <td style="text-align: right; font-size: 0.8125rem; color: var(--text-secondary);"><%= number_to_currency(o[:avg]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<% end %>
+
+<%# Worst Impulse Days %>
+<% if @worst_days.any? %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">event_busy</span> Worst Impulse Days</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% @worst_days.each do |day| %>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--bg); border-radius: 8px; margin-bottom: 0.5rem;">
+        <div>
+          <div style="font-size: 0.8125rem; font-weight: 600;"><%= day[:date].strftime("%A, %b %d, %Y") %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= day[:flagged_count] %> flagged of <%= day[:total_transactions] %> transactions</div>
+        </div>
+        <div style="font-size: 1rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(day[:flagged_total]) %></div>
+      </div>
+    <% end %>
+  </div>
+</div>
+<% end %>
+
+<%# Emotional Spending Days %>
+<% if @emotional_spending_days.any? %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ec407a;">psychology</span> Emotional Spending Days</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">Days with clusters of 4+ purchases, which may indicate stress or emotional spending.</div>
+    <% @emotional_spending_days.first(5).each do |day| %>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; background: var(--bg); border-radius: 8px; margin-bottom: 0.5rem;">
+        <div>
+          <div style="font-size: 0.8125rem; font-weight: 600;"><%= day[:date].strftime("%A, %b %d") %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= day[:count] %> purchases in one day</div>
+        </div>
+        <div style="font-size: 1rem; font-weight: 700;"><%= number_to_currency(day[:total]) %></div>
+      </div>
+    <% end %>
+  </div>
+</div>
+<% end %>
+
+<%# Tips to Curb Impulse Spending %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2196f3;">lightbulb</span> Tips to Curb Impulse Spending</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+      <% @tips.each_with_index do |tip, idx| %>
+        <div style="padding: 1rem; background: var(--bg); border-radius: 8px; border-left: 3px solid #ff8f00;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: #ff8f00;"><%= tip[:icon] %></span>
+            <span style="font-size: 0.8125rem; font-weight: 600;"><%= tip[:title] %></span>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5;"><%= tip[:description] %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<% else %>
+
+<div class="card" style="padding: 3rem; text-align: center;">
+  <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); display: block; margin-bottom: 1rem;">bolt</span>
+  <div style="font-size: 1.125rem; font-weight: 600;">Not Enough Data</div>
+  <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
+    Add more transactions to analyze your impulse spending patterns.
+  </div>
+</div>
+
+<% end %>
+
+<%# Bottom Navigation %>
+<div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem;">
+  <%= link_to budget_spending_personality_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #e91e63; display: block; margin-bottom: 0.25rem;">face</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Spending Personality</span>
+  <% end %>
+  <%= link_to budget_dashboard_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary); display: block; margin-bottom: 0.25rem;">dashboard</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Dashboard</span>
+  <% end %>
+  <%= link_to budget_reports_spending_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #2196f3; display: block; margin-bottom: 0.25rem;">receipt_long</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Spending Report</span>
+  <% end %>
+</div>

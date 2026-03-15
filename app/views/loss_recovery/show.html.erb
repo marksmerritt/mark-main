@@ -1,0 +1,531 @@
+<% content_for(:title) { "Loss Recovery" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #00796b;">healing</span>
+    Trading Loss Recovery Plan
+  </h1>
+</div>
+
+<% if @trades.blank? || @trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem; color: #00796b;">healing</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No closed trades yet</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades to generate a recovery plan and drawdown analysis.</div>
+  </div>
+<% else %>
+
+  <%# === Current Drawdown Hero Card === %>
+  <div class="card" style="margin-bottom: 1.5rem; text-align: center; padding: 2rem; border-top: 4px solid #00796b;">
+    <span class="material-icons-outlined" style="font-size: 2.5rem; color: <%= @in_drawdown ? 'var(--negative)' : 'var(--positive)' %>;">
+      <%= @in_drawdown ? 'trending_down' : 'check_circle' %>
+    </span>
+    <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-top: 0.5rem;">
+      Current Drawdown
+    </div>
+    <div style="font-size: 2.5rem; font-weight: 700; color: <%= @in_drawdown ? 'var(--negative)' : 'var(--positive)' %>; margin-top: 0.25rem;">
+      <%= @in_drawdown ? "-" : "" %><%= number_to_currency(@drawdown_amount) %>
+    </div>
+    <div style="font-size: 1.25rem; color: var(--text-secondary); font-weight: 500;">
+      <%= @drawdown_pct %>% below equity peak of <%= number_to_currency(@equity_peak) %>
+    </div>
+    <% unless @in_drawdown %>
+      <div style="margin-top: 0.75rem; font-size: 0.9375rem; color: var(--positive); font-weight: 600;">
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">celebration</span>
+        You are at or near your equity peak. No recovery needed!
+      </div>
+    <% end %>
+  </div>
+
+  <%# === Stats Strip === %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Drawdown Amount</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@drawdown_amount) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Recovery Needed</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: #00796b;">
+          <% if @recovery_pct_needed == Float::INFINITY %>
+            N/A
+          <% else %>
+            <%= @recovery_pct_needed %>%
+          <% end %>
+        </div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Est. Trades to Recover</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);"><%= @est_trades_to_recover || "N/A" %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Hist. Avg Recovery</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">
+          <% if @avg_recovery_trades %>
+            <%= @avg_recovery_trades %> trades
+          <% else %>
+            N/A
+          <% end %>
+        </div>
+        <% if @avg_recovery_days %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @avg_recovery_days %> days avg</div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <% if @in_drawdown %>
+
+    <%# === Recovery Needed Math Card === %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">calculate</span>
+          Recovery Math
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: center; gap: 1rem; text-align: center;">
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Lost</div>
+            <div style="font-size: 1.75rem; font-weight: 700; color: var(--negative);"><%= @drawdown_pct %>%</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= number_to_currency(@drawdown_amount) %></div>
+          </div>
+          <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--text-secondary);">arrow_forward</span>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Need to Gain</div>
+            <div style="font-size: 1.75rem; font-weight: 700; color: #00796b;">
+              <% if @recovery_pct_needed == Float::INFINITY %>
+                &infin;
+              <% else %>
+                <%= @recovery_pct_needed %>%
+              <% end %>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">on remaining equity</div>
+          </div>
+          <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--text-secondary);">arrow_forward</span>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Target Equity</div>
+            <div style="font-size: 1.75rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@equity_peak) %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">equity peak</div>
+          </div>
+        </div>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg); border-radius: 8px; font-size: 0.8125rem; color: var(--text-secondary);">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #00796b;">info</span>
+          <strong>Why the asymmetry?</strong> A 10% loss requires an 11.1% gain to recover. A 25% loss needs 33.3%. A 50% loss needs 100%. This is why protecting capital is more important than chasing profits.
+        </div>
+      </div>
+    </div>
+
+    <%# === Recovery Scenarios Table === %>
+    <% if @recovery_scenarios.any? %>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+          <h2>
+            <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">route</span>
+            Recovery Scenarios
+          </h2>
+        </div>
+        <div style="padding: 1.25rem;">
+          <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+              <thead>
+                <tr style="border-bottom: 2px solid var(--border);">
+                  <th style="padding: 0.5rem; text-align: left; font-weight: 600;">Scenario</th>
+                  <th style="padding: 0.5rem; text-align: right; font-weight: 600;">Avg P&L/Trade</th>
+                  <th style="padding: 0.5rem; text-align: right; font-weight: 600;">Trades Needed</th>
+                  <th style="padding: 0.5rem; text-align: right; font-weight: 600;">Est. Days</th>
+                </tr>
+              </thead>
+              <tbody>
+                <% @recovery_scenarios.each_with_index do |s, i| %>
+                  <tr style="border-bottom: 1px solid var(--border); <%= i == 0 ? 'background: rgba(0,121,107,0.05);' : '' %>">
+                    <td style="padding: 0.5rem; font-weight: <%= i == 0 ? '600' : '400' %>;">
+                      <% if i == 0 && @avg_pnl > 0 %>
+                        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #00796b;">arrow_right</span>
+                      <% end %>
+                      <%= s[:label] %>
+                    </td>
+                    <td style="padding: 0.5rem; text-align: right; color: var(--positive);"><%= number_to_currency(s[:avg_pnl]) %></td>
+                    <td style="padding: 0.5rem; text-align: right; font-weight: 600;"><%= s[:trades_needed] || "N/A" %></td>
+                    <td style="padding: 0.5rem; text-align: right; color: var(--text-secondary);">
+                      <% if s[:trades_needed] %>
+                        ~<%= (s[:trades_needed] / 3.0).ceil %> days
+                      <% else %>
+                        N/A
+                      <% end %>
+                    </td>
+                  </tr>
+                <% end %>
+              </tbody>
+            </table>
+          </div>
+          <div style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);">
+            Estimated days assume ~3 trades per day based on historical activity.
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <%# === Daily / Weekly Target Cards === %>
+    <% if @daily_target %>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+        <div class="card" style="padding: 1.25rem; border-left: 4px solid #00796b;">
+          <div style="font-size: 0.6875rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.25rem;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">today</span>
+            Aggressive Target (30 days)
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem;">
+            <div>
+              <div style="font-size: 1.25rem; font-weight: 700; color: #00796b;"><%= number_to_currency(@daily_target) %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">per day</div>
+            </div>
+            <div>
+              <div style="font-size: 1.25rem; font-weight: 700; color: #00796b;"><%= number_to_currency(@weekly_target) %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">per week</div>
+            </div>
+            <div>
+              <div style="font-size: 1.25rem; font-weight: 700; color: #00796b;"><%= number_to_currency(@monthly_target) %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">total</div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding: 1.25rem; border-left: 4px solid var(--primary);">
+          <div style="font-size: 0.6875rem; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.25rem;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">event</span>
+            Conservative Target (60 days)
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem;">
+            <div>
+              <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);"><%= number_to_currency(@daily_target_conservative) %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">per day</div>
+            </div>
+            <div>
+              <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);"><%= number_to_currency(@weekly_target_conservative) %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">per week</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <%# === Recovery Milestones Timeline === %>
+    <% if @milestones.any? %>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+          <h2>
+            <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">flag</span>
+            Recovery Milestones
+          </h2>
+        </div>
+        <div style="padding: 1.25rem;">
+          <div style="position: relative; padding-left: 2rem;">
+            <%# Timeline line %>
+            <div style="position: absolute; left: 0.75rem; top: 0; bottom: 0; width: 2px; background: linear-gradient(to bottom, var(--negative), #00796b, var(--positive));"></div>
+
+            <% @milestones.each_with_index do |m, i| %>
+              <%
+                dot_color = case m[:pct]
+                            when 25 then "var(--negative)"
+                            when 50 then "#fb8c00"
+                            when 75 then "#00796b"
+                            when 100 then "var(--positive)"
+                            else "var(--primary)"
+                            end
+              %>
+              <div style="position: relative; margin-bottom: <%= i < @milestones.length - 1 ? '1.5rem' : '0' %>;">
+                <%# Dot %>
+                <div style="position: absolute; left: -1.65rem; top: 0.25rem; width: 0.75rem; height: 0.75rem; border-radius: 50%; background: <%= dot_color %>; border: 2px solid var(--card-bg);"></div>
+                <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem;">
+                  <div>
+                    <div style="font-weight: 600; font-size: 0.9375rem;">
+                      <% if m[:pct] == 100 %>
+                        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--positive);">emoji_events</span>
+                      <% end %>
+                      <%= m[:label] %>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                      Recover <%= number_to_currency(m[:amount]) %> &rarr; Equity at <%= number_to_currency(m[:equity_target]) %>
+                    </div>
+                  </div>
+                  <div style="text-align: right;">
+                    <% if m[:trades_est] %>
+                      <span style="font-size: 0.8125rem; font-weight: 600; color: <%= dot_color %>;">~<%= m[:trades_est] %> trades</span>
+                    <% else %>
+                      <span style="font-size: 0.8125rem; color: var(--text-secondary);">N/A</span>
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <%# === Breakeven Analysis === %>
+    <% if @breakeven_rows.any? %>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header">
+          <h2>
+            <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">balance</span>
+            Breakeven Analysis
+          </h2>
+        </div>
+        <div style="padding: 1.25rem;">
+          <p style="font-size: 0.8125rem; color: var(--text-secondary); margin: 0 0 1rem 0;">
+            Trades needed to recover <strong><%= number_to_currency(@drawdown_amount) %></strong> at different average P&L per trade:
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.75rem;">
+            <% @breakeven_rows.each do |row| %>
+              <%
+                highlight = @avg_pnl > 0 && (row[:avg_pnl] - @avg_pnl).abs < 30
+              %>
+              <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 8px; <%= highlight ? 'border: 2px solid #00796b;' : '' %>">
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">$<%= row[:avg_pnl] %>/trade</div>
+                <div style="font-size: 1.25rem; font-weight: 700; color: <%= highlight ? '#00796b' : 'var(--primary)' %>;"><%= row[:trades_needed] %></div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">trades</div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+  <% end %>
+
+  <%# === Historical Drawdown Recovery Table === %>
+  <% if @historical_drawdowns.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">history</span>
+          Historical Drawdowns
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border);">
+                <th style="padding: 0.5rem; text-align: left; font-weight: 600;">Period</th>
+                <th style="padding: 0.5rem; text-align: right; font-weight: 600;">Depth</th>
+                <th style="padding: 0.5rem; text-align: right; font-weight: 600;">Depth %</th>
+                <th style="padding: 0.5rem; text-align: right; font-weight: 600;">Recovery Trades</th>
+                <th style="padding: 0.5rem; text-align: right; font-weight: 600;">Calendar Days</th>
+                <th style="padding: 0.5rem; text-align: center; font-weight: 600;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @historical_drawdowns.first(10).each do |dd| %>
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 0.5rem; font-size: 0.8125rem;">
+                    <%= dd[:start_date] || "N/A" %>
+                    <% if dd[:end_date] %>
+                      &rarr; <%= dd[:end_date] %>
+                    <% elsif !dd[:recovered] %>
+                      &rarr; <em>ongoing</em>
+                    <% end %>
+                  </td>
+                  <td style="padding: 0.5rem; text-align: right; color: var(--negative); font-weight: 600;"><%= number_to_currency(dd[:depth]) %></td>
+                  <td style="padding: 0.5rem; text-align: right; color: var(--negative);"><%= dd[:depth_pct] %>%</td>
+                  <td style="padding: 0.5rem; text-align: right;"><%= dd[:recovery_trades] %></td>
+                  <td style="padding: 0.5rem; text-align: right;"><%= dd[:calendar_days] || "N/A" %></td>
+                  <td style="padding: 0.5rem; text-align: center;">
+                    <% if dd[:recovered] %>
+                      <span style="display: inline-block; padding: 0.125rem 0.5rem; border-radius: 4px; background: var(--positive); color: #fff; font-size: 0.6875rem; font-weight: 600;">Recovered</span>
+                    <% else %>
+                      <span style="display: inline-block; padding: 0.125rem 0.5rem; border-radius: 4px; background: var(--negative); color: #fff; font-size: 0.6875rem; font-weight: 600;">Active</span>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# === Monte Carlo Recovery Probability === %>
+  <% if @mc_recovery_probs.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">casino</span>
+          Monte Carlo Recovery Probability
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <p style="font-size: 0.8125rem; color: var(--text-secondary); margin: 0 0 1rem 0;">
+          Based on <%= LossRecoveryController::MONTE_CARLO_SIMS %> simulations using your actual trade P&L distribution.
+          Probability of recovering <strong><%= number_to_currency(@drawdown_amount) %></strong> within N trades:
+        </p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem;">
+          <% @mc_recovery_probs.each do |mc| %>
+            <%
+              bar_color = case mc[:probability]
+                          when 75..100 then "var(--positive)"
+                          when 50..74.9 then "#00796b"
+                          when 25..49.9 then "#fb8c00"
+                          else "var(--negative)"
+                          end
+            %>
+            <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= mc[:trades] %> trades</div>
+              <div style="font-size: 1.5rem; font-weight: 700; color: <%= bar_color %>;"><%= mc[:probability] %>%</div>
+              <div style="height: 4px; background: var(--border); border-radius: 2px; margin-top: 0.5rem; overflow: hidden;">
+                <div style="height: 100%; width: <%= mc[:probability] %>%; background: <%= bar_color %>; border-radius: 2px;"></div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# === Recovery Rules / Guidelines === %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">gavel</span>
+        Recovery Rules &amp; Guidelines
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+        <% @recovery_rules.each do |rule| %>
+          <div style="display: flex; gap: 0.75rem; padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: #00796b; flex-shrink: 0; margin-top: 0.125rem;"><%= rule[:icon] %></span>
+            <div>
+              <div style="font-weight: 600; font-size: 0.875rem;"><%= rule[:title] %></div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= rule[:description] %></div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# === Recovery Path SVG Chart === %>
+  <% if @in_drawdown && @projection_points.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span>
+          Projected Recovery Path
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <%
+          # Combine historical equity curve (last 30 points) with projection
+          hist_tail = @equity_curve.last([30, @equity_curve.length].min)
+          all_pts = hist_tail + @projection_points
+          min_val = all_pts.min
+          max_val = all_pts.max
+          range = max_val - min_val
+          range = 1.0 if range == 0
+
+          svg_w = 800
+          svg_h = 260
+          pad_t = 25
+          pad_b = 35
+          pad_l = 65
+          pad_r = 20
+          chart_w = svg_w - pad_l - pad_r
+          chart_h = svg_h - pad_t - pad_b
+
+          # Historical line points
+          hist_points = hist_tail.each_with_index.map do |val, i|
+            x = pad_l + (i.to_f / [all_pts.length - 1, 1].max * chart_w)
+            y = pad_t + chart_h - ((val - min_val) / range * chart_h)
+            "#{x.round(1)},#{y.round(1)}"
+          end.join(" ")
+
+          # Projection line points
+          proj_offset = hist_tail.length - 1
+          proj_line_pts = @projection_points.each_with_index.map do |val, i|
+            x = pad_l + ((proj_offset + i).to_f / [all_pts.length - 1, 1].max * chart_w)
+            y = pad_t + chart_h - ((val - min_val) / range * chart_h)
+            "#{x.round(1)},#{y.round(1)}"
+          end
+
+          # Connect from last historical point
+          last_hist_x = pad_l + (proj_offset.to_f / [all_pts.length - 1, 1].max * chart_w)
+          last_hist_y = pad_t + chart_h - ((hist_tail.last - min_val) / range * chart_h)
+          proj_polyline = "#{last_hist_x.round(1)},#{last_hist_y.round(1)} #{proj_line_pts.join(' ')}"
+
+          # Peak line Y
+          peak_y = pad_t + chart_h - ((@equity_peak - min_val) / range * chart_h)
+
+          # Y-axis labels
+          y_steps = 5
+          y_labels = (0..y_steps).map do |s|
+            val = min_val + (range * s / y_steps)
+            y = pad_t + chart_h - (s.to_f / y_steps * chart_h)
+            [y.round(1), val.round(0)]
+          end
+        %>
+        <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+          <%# Grid lines %>
+          <% y_labels.each do |y, val| %>
+            <line x1="<%= pad_l %>" y1="<%= y %>" x2="<%= svg_w - pad_r %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4,4"/>
+            <text x="<%= pad_l - 8 %>" y="<%= y + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="10">$<%= number_with_delimiter(val) %></text>
+          <% end %>
+
+          <%# Peak reference line %>
+          <line x1="<%= pad_l %>" y1="<%= peak_y.round(1) %>" x2="<%= svg_w - pad_r %>" y2="<%= peak_y.round(1) %>" stroke="#00796b" stroke-width="1" stroke-dasharray="6,3" opacity="0.6"/>
+          <text x="<%= svg_w - pad_r - 4 %>" y="<%= peak_y.round(1) - 6 %>" text-anchor="end" fill="#00796b" font-size="9" font-weight="600">Peak: $<%= number_with_delimiter(@equity_peak.round(0)) %></text>
+
+          <%# Historical equity line %>
+          <polyline points="<%= hist_points %>" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linejoin="round"/>
+
+          <%# Projected recovery line (dashed) %>
+          <polyline points="<%= proj_polyline %>" fill="none" stroke="#00796b" stroke-width="2" stroke-dasharray="6,4" stroke-linejoin="round"/>
+
+          <%# Transition point dot %>
+          <circle cx="<%= last_hist_x.round(1) %>" cy="<%= last_hist_y.round(1) %>" r="4" fill="var(--primary)" stroke="var(--card-bg)" stroke-width="2"/>
+
+          <%# Labels %>
+          <text x="<%= pad_l + 4 %>" y="<%= svg_h - 8 %>" fill="var(--text-secondary)" font-size="9">Historical</text>
+          <%
+            label_x = pad_l + (proj_offset.to_f / [all_pts.length - 1, 1].max * chart_w) + 10
+          %>
+          <text x="<%= label_x.round(1) %>" y="<%= svg_h - 8 %>" fill="#00796b" font-size="9">Projected Recovery</text>
+        </svg>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+          Solid line = actual equity. Dashed line = projected recovery at current average P&L per trade.
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+<% end %>
+
+<%# === Bottom Navigation === %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to trading_mentor_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">psychology</span> Mentor
+  <% end %>
+  <%= link_to "Account Summary", account_summary_path, class: "btn" %>
+  <%= link_to "Challenges", trading_challenges_path, class: "btn" %>
+</div>
+
+<style>
+  @media (max-width: 640px) {
+    div[style*="grid-template-columns: repeat(auto-fit"] {
+      grid-template-columns: 1fr !important;
+    }
+    div[style*="grid-template-columns: 1fr auto 1fr auto 1fr"] {
+      grid-template-columns: 1fr !important;
+    }
+    div[style*="grid-template-columns: 1fr auto 1fr auto 1fr"] > span.material-icons-outlined {
+      display: none;
+    }
+  }
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>

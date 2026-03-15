@@ -1,0 +1,245 @@
+<% content_for(:title) { "Net Worth Forecast" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">account_balance</span>
+    Net Worth Forecast
+  </h1>
+</div>
+
+<%# Current Snapshot %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Current Net Worth</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @current_net_worth >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <%= number_to_currency(@current_net_worth) %>
+      </div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Assets</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@total_assets) %></div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Debt</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_debt) %></div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings Rate</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @savings_rate >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <%= @savings_rate %>%
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Projection Inputs %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+  <%= form_tag budget_net_worth_forecast_path, method: :get, style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; align-items: end;" do %>
+    <div>
+      <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Monthly Savings</label>
+      <input type="number" name="monthly_saving" value="<%= @monthly_contribution.round(0) %>" step="50" class="form-control" style="font-size: 0.875rem;">
+    </div>
+    <div>
+      <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Asset Growth %/yr</label>
+      <input type="number" name="asset_growth" value="<%= @asset_growth_rate %>" step="0.5" min="0" max="20" class="form-control" style="font-size: 0.875rem;">
+    </div>
+    <div>
+      <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Time Horizon</label>
+      <select name="years" class="form-control" style="font-size: 0.875rem;">
+        <% [1, 2, 3, 5, 7, 10, 15, 20, 25, 30].each do |y| %>
+          <option value="<%= y %>" <%= y == @years ? "selected" : "" %>><%= y %> yr<%= y > 1 ? "s" : "" %></option>
+        <% end %>
+      </select>
+    </div>
+    <div>
+      <button type="submit" class="btn btn-primary" style="width: 100%;">Forecast</button>
+    </div>
+  <% end %>
+</div>
+
+<%# Projected Result %>
+<div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--primary);">
+  <div style="padding: 1.25rem; display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+    <div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Projected Net Worth in <%= @years %> Years</div>
+      <div style="font-size: 2rem; font-weight: 700; color: <%= @projected_net_worth >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <%= number_to_currency(@projected_net_worth) %>
+      </div>
+    </div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary);">
+      <div>Assets: <strong style="color: var(--positive);"><%= number_to_currency(@projected_assets) %></strong></div>
+      <div>Debt: <strong style="color: var(--negative);"><%= number_to_currency(@projected_debt) %></strong></div>
+      <div>Growth: <strong><%= number_to_currency(@projected_net_worth - @current_net_worth) %></strong></div>
+    </div>
+  </div>
+</div>
+
+<%# Forecast Chart %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Net Worth Projection</h2>
+  </div>
+  <div style="padding: 1.25rem; overflow-x: auto;">
+    <%
+      chart_w = 680
+      chart_h = 280
+      all_vals = @projection.map { |p| [p[:assets], p[:net_worth], -p[:debt]].max }
+      chart_max = [all_vals.max.to_f, @projection.map { |p| p[:assets] }.max.to_f, 1].max
+      chart_min = [@projection.map { |p| p[:net_worth] }.min.to_f, 0].min
+      chart_range = [(chart_max - chart_min).abs, 1].max
+      total_months = @years * 12
+      x_scale = (chart_w - 10).to_f / [total_months, 1].max
+      step = [total_months / 80, 1].max
+    %>
+    <svg viewBox="0 0 <%= chart_w + 80 %> <%= chart_h + 40 %>" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+      <%# Grid %>
+      <% 5.times do |i| %>
+        <% val = chart_min + chart_range * i / 4.0 %>
+        <% y = chart_h - (val - chart_min) / chart_range * (chart_h - 20) %>
+        <line x1="55" y1="<%= y %>" x2="<%= chart_w + 60 %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5"/>
+        <text x="50" y="<%= y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="7">$<%= (val / 1000).round(0) %>k</text>
+      <% end %>
+
+      <%# Zero line %>
+      <% if chart_min < 0 %>
+        <% zero_y = chart_h - (0 - chart_min) / chart_range * (chart_h - 20) %>
+        <line x1="55" y1="<%= zero_y %>" x2="<%= chart_w + 60 %>" y2="<%= zero_y %>" stroke="var(--text-secondary)" stroke-width="1" stroke-dasharray="4"/>
+      <% end %>
+
+      <%# Asset area %>
+      <%
+        asset_points = @projection.each_with_index.select { |_, i| i % step == 0 || i == @projection.length - 1 }.map { |p, _|
+          x = 60 + p[:month] * x_scale
+          y = chart_h - (p[:assets] - chart_min) / chart_range * (chart_h - 20)
+          "#{x.round(1)},#{y.round(1)}"
+        }
+        first_x = 60
+        last_x = 60 + total_months * x_scale
+        baseline_y = chart_h - (0 - chart_min) / chart_range * (chart_h - 20)
+      %>
+      <polygon points="<%= first_x %>,<%= baseline_y.round(1) %> <%= asset_points.join(' ') %> <%= last_x.round(1) %>,<%= baseline_y.round(1) %>"
+               fill="var(--positive)" opacity="0.1"/>
+      <polyline points="<%= asset_points.join(' ') %>" fill="none" stroke="var(--positive)" stroke-width="2"/>
+
+      <%# Net worth line %>
+      <%
+        nw_points = @projection.each_with_index.select { |_, i| i % step == 0 || i == @projection.length - 1 }.map { |p, _|
+          x = 60 + p[:month] * x_scale
+          y = chart_h - (p[:net_worth] - chart_min) / chart_range * (chart_h - 20)
+          "#{x.round(1)},#{y.round(1)}"
+        }
+      %>
+      <polyline points="<%= nw_points.join(' ') %>" fill="none" stroke="var(--primary)" stroke-width="2.5"/>
+
+      <%# Debt line %>
+      <% if @total_debt > 0 %>
+        <%
+          debt_points = @projection.each_with_index.select { |_, i| i % step == 0 || i == @projection.length - 1 }.map { |p, _|
+            x = 60 + p[:month] * x_scale
+            y = chart_h - (p[:debt] - chart_min) / chart_range * (chart_h - 20)
+            "#{x.round(1)},#{y.round(1)}"
+          }
+        %>
+        <polyline points="<%= debt_points.join(' ') %>" fill="none" stroke="var(--negative)" stroke-width="1.5" stroke-dasharray="6"/>
+      <% end %>
+
+      <%# X labels %>
+      <% year_step = [@years / 10, 1].max %>
+      <% (0..@years).step(year_step).each do |yr| %>
+        <% x = 60 + yr * 12 * x_scale %>
+        <text x="<%= x %>" y="<%= chart_h + 16 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8">Yr <%= yr %></text>
+      <% end %>
+
+      <%# Legend %>
+      <line x1="60" y1="<%= chart_h + 32 %>" x2="75" y2="<%= chart_h + 32 %>" stroke="var(--primary)" stroke-width="2.5"/>
+      <text x="80" y="<%= chart_h + 35 %>" fill="var(--text-secondary)" font-size="7">Net Worth</text>
+      <line x1="160" y1="<%= chart_h + 32 %>" x2="175" y2="<%= chart_h + 32 %>" stroke="var(--positive)" stroke-width="2"/>
+      <text x="180" y="<%= chart_h + 35 %>" fill="var(--text-secondary)" font-size="7">Assets</text>
+      <% if @total_debt > 0 %>
+        <line x1="240" y1="<%= chart_h + 32 %>" x2="255" y2="<%= chart_h + 32 %>" stroke="var(--negative)" stroke-width="1.5" stroke-dasharray="6"/>
+        <text x="260" y="<%= chart_h + 35 %>" fill="var(--text-secondary)" font-size="7">Debt</text>
+      <% end %>
+    </svg>
+  </div>
+</div>
+
+<%# Scenario Comparison %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">compare_arrows</span> Scenario Comparison (<%= @years %> Years)</h2>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0;">
+    <% scenario_colors = ["var(--text-secondary)", "var(--primary)", "var(--positive)"] %>
+    <% @scenarios.each_with_index do |s, i| %>
+      <div style="padding: 1.25rem; text-align: center;<%= i < @scenarios.length - 1 ? ' border-right: 1px solid var(--border);' : '' %>">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;"><%= s[:name] %></div>
+        <div style="font-size: 1.375rem; font-weight: 700; color: <%= scenario_colors[i] %>;"><%= number_to_currency(s[:final_nw]) %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Assets: <%= number_to_currency(s[:final_assets]) %>
+        </div>
+        <% if s[:final_debt] > 0 %>
+          <div style="font-size: 0.75rem; color: var(--negative);">
+            Debt: <%= number_to_currency(s[:final_debt]) %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Debt-Free Date %>
+<% if @debt_free_date %>
+  <div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem; border-left: 4px solid var(--positive); display: flex; align-items: center; gap: 1rem;">
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--positive);">celebration</span>
+    <div>
+      <div style="font-weight: 600;">Debt-Free by <%= @debt_free_date.strftime("%B %Y") %></div>
+      <div style="font-size: 0.875rem; color: var(--text-secondary);">
+        At current minimum payments of <%= number_to_currency(@monthly_debt_payment) %>/mo, you'll be debt-free in
+        <strong><%= (@debt_free_months / 12.0).round(1) %> years</strong> (<%= @debt_free_months %> months).
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Net Worth Milestones %>
+<% if @nw_milestones.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">flag</span> Net Worth Milestones</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @nw_milestones.first(6).each_with_index do |m, i| %>
+        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: <%= i < @nw_milestones.length - 1 ? '0.75rem' : '0' %>;">
+          <div style="width: 2.5rem; height: 2.5rem; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; flex-shrink: 0; opacity: 0.8;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: white;">flag</span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 700;"><%= number_to_currency(m[:target], precision: 0) %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">In <%= m[:years] %> years · <%= m[:date].strftime("%b %Y") %></div>
+          </div>
+          <div style="flex: 2; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+            <div style="height: 100%; width: 100%; background: var(--primary); opacity: 0.5; border-radius: 3px;"></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Assumptions %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
+  <div style="font-size: 0.75rem; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">info</span>
+    <strong>Assumptions:</strong> Asset growth at <%= @asset_growth_rate %>%/yr compounded monthly. Debt reduction at current minimum payments.
+    Monthly savings of <%= number_to_currency(@monthly_contribution) %> based on your <%= @avg_income > 0 ? "average income of #{number_to_currency(@avg_income)}" : "transaction history" %>.
+    Projections are estimates and not guarantees.
+  </div>
+</div>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Net Worth Details", budget_reports_net_worth_details_path, class: "btn" %>
+  <%= link_to "Savings Projection", budget_savings_projection_path, class: "btn" %>
+  <%= link_to "Debt Freedom", budget_debt_freedom_path, class: "btn" %>
+  <%= link_to "Budget Dashboard", budget_dashboard_path, class: "btn" %>
+</div>

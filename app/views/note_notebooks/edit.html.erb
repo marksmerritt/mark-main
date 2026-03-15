@@ -1,0 +1,9 @@
+<div class="page-header">
+  <h1>Edit Notebook</h1>
+</div>
+
+<div class="card">
+  <%= render "form", notebook: @notebook,
+             form_url: note_notebook_path(@notebook["id"]), form_method: :patch,
+             submit_label: "Update Notebook", cancel_path: note_notebook_path(@notebook["id"]) %>
+</div>

@@ -1,0 +1,190 @@
+<% content_for(:title) { "Equity Simulator" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #6a1b9a;">tune</span>
+    Equity Simulator
+  </h1>
+  <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">Replay your trade history with different parameters and see how your equity curve would change</p>
+</div>
+
+<% if @trades.blank? || @trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem; color: #6a1b9a;">tune</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No trade data available</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades with P&amp;L to run equity simulations.</div>
+  </div>
+<% else %>
+  <div data-controller="equity-simulator"
+       data-equity-simulator-trades-value="<%= @trades_json %>"
+       data-equity-simulator-baseline-value="<%= @baseline.to_json %>">
+
+    <%# ── Controls Card ── %>
+    <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #6a1b9a;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #6a1b9a;">settings</span>
+          Simulation Parameters
+        </h2>
+        <button data-action="click->equity-simulator#resetParams" style="background: none; border: 1px solid var(--border); border-radius: 0.375rem; padding: 0.375rem 0.75rem; color: var(--text-secondary); cursor: pointer; font-size: 0.75rem; display: flex; align-items: center; gap: 0.25rem;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem;">restart_alt</span>
+          Reset
+        </button>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+
+          <%# Position Size Multiplier %>
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <label style="font-size: 0.8125rem; font-weight: 600; color: var(--text);">
+                <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #6a1b9a;">unfold_more</span>
+                Position Size Multiplier
+              </label>
+              <span data-equity-simulator-target="sizeLabel" style="font-size: 0.875rem; font-weight: 700; color: #6a1b9a;">1.0x</span>
+            </div>
+            <input type="range" min="0.5" max="3" step="0.1" value="1.0"
+                   data-equity-simulator-target="sizeSlider"
+                   data-action="input->equity-simulator#simulate"
+                   style="width: 100%; accent-color: #6a1b9a;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary);">
+              <span>0.5x</span><span>3.0x</span>
+            </div>
+          </div>
+
+          <%# Remove Worst N Trades %>
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <label style="font-size: 0.8125rem; font-weight: 600; color: var(--text);">
+                <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #c62828;">delete_sweep</span>
+                Remove Worst N Trades
+              </label>
+              <span data-equity-simulator-target="removeLabel" style="font-size: 0.875rem; font-weight: 700; color: #c62828;">0</span>
+            </div>
+            <input type="range" min="0" max="10" step="1" value="0"
+                   data-equity-simulator-target="removeSlider"
+                   data-action="input->equity-simulator#simulate"
+                   style="width: 100%; accent-color: #c62828;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary);">
+              <span>0</span><span>10</span>
+            </div>
+          </div>
+
+          <%# Stop-Loss Discipline %>
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <label style="font-size: 0.8125rem; font-weight: 600; color: var(--text);">
+                <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #e65100;">shield</span>
+                Apply Stop-Loss at X%
+              </label>
+              <span data-equity-simulator-target="stopLabel" style="font-size: 0.875rem; font-weight: 700; color: #e65100;">Off</span>
+            </div>
+            <input type="range" min="0" max="10" step="0.5" value="0"
+                   data-equity-simulator-target="stopSlider"
+                   data-action="input->equity-simulator#simulate"
+                   style="width: 100%; accent-color: #e65100;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary);">
+              <span>Off</span><span>10%</span>
+            </div>
+          </div>
+
+          <%# Only Winners Toggle %>
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <label style="font-size: 0.8125rem; font-weight: 600; color: var(--text);">
+                <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--positive);">emoji_events</span>
+                Only Winners
+              </label>
+              <span data-equity-simulator-target="winnersLabel" style="font-size: 0.875rem; font-weight: 700; color: var(--text-secondary);">Off</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem;">
+              <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.8125rem; color: var(--text);">
+                <input type="checkbox"
+                       data-equity-simulator-target="winnersToggle"
+                       data-action="change->equity-simulator#simulate"
+                       style="width: 1.25rem; height: 1.25rem; accent-color: var(--positive);">
+                Remove all losing trades from the simulation
+              </label>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <%# ── Equity Curve Chart ── %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #6a1b9a;">show_chart</span>
+          Equity Curve Comparison
+        </h2>
+        <div style="display: flex; gap: 1rem; font-size: 0.75rem; align-items: center;">
+          <span style="display: flex; align-items: center; gap: 0.25rem;">
+            <span style="display: inline-block; width: 16px; height: 3px; background: var(--primary); border-radius: 2px;"></span>
+            Original
+          </span>
+          <span style="display: flex; align-items: center; gap: 0.25rem;">
+            <span style="display: inline-block; width: 16px; height: 3px; background: #6a1b9a; border-radius: 2px;"></span>
+            Simulated
+          </span>
+        </div>
+      </div>
+      <div style="padding: 1.25rem;" data-equity-simulator-target="chart">
+        <div style="text-align: center; color: var(--text-secondary); padding: 2rem;">Loading chart...</div>
+      </div>
+    </div>
+
+    <%# ── Stats Comparison Table ── %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #6a1b9a;">compare_arrows</span>
+          Original vs Simulated
+        </h2>
+      </div>
+      <div style="padding: 0; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+              <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Metric</th>
+              <th style="padding: 0.75rem 0.5rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase; text-align: right;">Original</th>
+              <th style="padding: 0.75rem 0.5rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase; text-align: right;">Simulated</th>
+              <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase; text-align: right;">Difference</th>
+            </tr>
+          </thead>
+          <tbody data-equity-simulator-target="statsBody">
+            <tr>
+              <td colspan="4" style="padding: 1.5rem; text-align: center; color: var(--text-secondary);">Adjust parameters above to compare</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <%# ── Removed Trades Detail ── %>
+    <div class="card" style="margin-bottom: 1.5rem; display: none;" data-equity-simulator-target="removedCard">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #c62828;">playlist_remove</span>
+          Trades Removed from Simulation
+        </h2>
+      </div>
+      <div style="padding: 0; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border); text-align: left;">
+              <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">#</th>
+              <th style="padding: 0.75rem 0.5rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Symbol</th>
+              <th style="padding: 0.75rem 0.5rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Date</th>
+              <th style="padding: 0.75rem 1rem; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase; text-align: right;">P&amp;L</th>
+            </tr>
+          </thead>
+          <tbody data-equity-simulator-target="removedBody">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+<% end %>

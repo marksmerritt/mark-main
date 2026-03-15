@@ -1,0 +1,331 @@
+<% content_for(:title) { "Forecast Accuracy" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #1976d2;">fact_check</span>
+    Budget Forecast Accuracy
+  </h1>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Accuracy Score</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @overall_accuracy >= 80 ? 'var(--positive)' : @overall_accuracy >= 60 ? '#f9a825' : 'var(--negative)' %>;">
+        <%= @overall_accuracy %>%
+        <span style="font-size: 0.875rem; font-weight: 600; opacity: 0.8;"><%= @overall_grade %></span>
+      </div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Over-Budget</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @over_budget_categories.any? ? 'var(--negative)' : 'var(--text)' %>;"><%= @over_budget_categories.size %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Under-Budget</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @under_budget_categories.any? ? '#1976d2' : 'var(--text)' %>;"><%= @under_budget_categories.size %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Improving?</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @is_improving ? 'var(--positive)' : 'var(--negative)' %>;">
+        <span class="material-icons-outlined" style="font-size: 1.25rem; vertical-align: -2px;"><%= @is_improving ? 'trending_up' : 'trending_down' %></span>
+        <%= @is_improving ? "Yes" : "No" %>
+        <span style="font-size: 0.75rem; font-weight: 500; color: var(--text-secondary);">(<%= @improvement_delta > 0 ? "+" : "" %><%= @improvement_delta %>%)</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Monthly Accuracy Chart %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1976d2;">bar_chart</span> Monthly Budget vs Actual</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <svg viewBox="0 0 620 240" style="width: 100%; height: auto; overflow: visible;" xmlns="http://www.w3.org/2000/svg">
+      <%# Grid lines %>
+      <% 5.times do |i| %>
+        <% y = 190 - (i * 40) %>
+        <line x1="60" y1="<%= y %>" x2="600" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4,4" />
+        <text x="55" y="<%= y + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="10"><%= number_to_currency(@chart_max * i / 4.0, precision: 0) %></text>
+      <% end %>
+
+      <%# Paired bars: budget (blue) vs actual (green/red) %>
+      <% bar_width = 30 %>
+      <% pair_gap = 4 %>
+      <% group_gap = 30 %>
+      <% start_x = 80 %>
+      <% @chart_months.each_with_index do |m, i| %>
+        <% x = start_x + i * (bar_width * 2 + pair_gap + group_gap) %>
+
+        <%# Budget bar %>
+        <% budget_h = @chart_max > 0 ? (m[:budgeted] / @chart_max * 160).round(1) : 0 %>
+        <% budget_y = 190 - budget_h %>
+        <rect x="<%= x %>" y="<%= budget_y %>" width="<%= bar_width %>" height="<%= budget_h %>"
+              fill="rgba(25,118,210,0.25)" stroke="#1976d2" stroke-width="1" rx="3" />
+        <text x="<%= x + bar_width / 2 %>" y="<%= budget_y - 5 %>" text-anchor="middle" fill="#1976d2" font-size="9" font-weight="600">
+          <%= number_to_currency(m[:budgeted], precision: 0) %>
+        </text>
+
+        <%# Actual bar %>
+        <% actual_h = @chart_max > 0 ? (m[:actual] / @chart_max * 160).round(1) : 0 %>
+        <% actual_y = 190 - actual_h %>
+        <% actual_color = m[:deviation_pct] > 5 ? "var(--negative)" : m[:deviation_pct] < -5 ? "var(--positive)" : "#66bb6a" %>
+        <% actual_fill = m[:deviation_pct] > 5 ? "rgba(234,67,53,0.3)" : "rgba(102,187,106,0.3)" %>
+        <rect x="<%= x + bar_width + pair_gap %>" y="<%= actual_y %>" width="<%= bar_width %>" height="<%= actual_h %>"
+              fill="<%= actual_fill %>" stroke="<%= actual_color %>" stroke-width="1" rx="3" />
+        <text x="<%= x + bar_width + pair_gap + bar_width / 2 %>" y="<%= actual_y - 5 %>" text-anchor="middle" fill="<%= actual_color %>" font-size="9" font-weight="600">
+          <%= number_to_currency(m[:actual], precision: 0) %>
+        </text>
+
+        <%# Month label %>
+        <text x="<%= x + bar_width + pair_gap / 2 %>" y="208" text-anchor="middle" fill="var(--text-secondary)" font-size="10">
+          <%= m[:label] %>
+        </text>
+
+        <%# Accuracy label %>
+        <text x="<%= x + bar_width + pair_gap / 2 %>" y="222" text-anchor="middle" fill="var(--text-secondary)" font-size="8" font-weight="600">
+          <%= m[:accuracy] %>%
+        </text>
+      <% end %>
+    </svg>
+
+    <div style="display: flex; gap: 1.5rem; justify-content: center; margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+      <div style="display: flex; align-items: center; gap: 0.375rem;">
+        <span style="width: 14px; height: 10px; background: rgba(25,118,210,0.25); border: 1px solid #1976d2; border-radius: 2px; display: inline-block;"></span>
+        Budgeted
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.375rem;">
+        <span style="width: 14px; height: 10px; background: rgba(102,187,106,0.3); border: 1px solid #66bb6a; border-radius: 2px; display: inline-block;"></span>
+        Actual
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Category Accuracy Table %>
+<% if @category_accuracy.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1976d2;">category</span> Category Accuracy</h2>
+    </div>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">Category</th>
+            <th style="padding: 0.75rem 1rem; text-align: right; font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">Budgeted</th>
+            <th style="padding: 0.75rem 1rem; text-align: right; font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">Avg Actual</th>
+            <th style="padding: 0.75rem 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">Deviation</th>
+            <th style="padding: 0.75rem 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">Accuracy</th>
+            <th style="padding: 0.75rem 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">Grade</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @category_accuracy.each do |c| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.75rem 1rem; font-weight: 500;"><%= c[:category] %></td>
+              <td style="padding: 0.75rem 1rem; text-align: right;"><%= number_to_currency(c[:budgeted]) %></td>
+              <td style="padding: 0.75rem 1rem; text-align: right; font-weight: 600;"><%= number_to_currency(c[:avg_actual]) %></td>
+              <td style="padding: 0.75rem 1rem; text-align: center;">
+                <% dev_color = c[:deviation_pct] > 5 ? "var(--negative)" : c[:deviation_pct] < -5 ? "var(--positive)" : "var(--text-secondary)" %>
+                <span style="font-weight: 600; color: <%= dev_color %>;">
+                  <%= c[:deviation_pct] > 0 ? "+" : "" %><%= c[:deviation_pct] %>%
+                </span>
+              </td>
+              <td style="padding: 0.75rem 1rem; text-align: center;">
+                <span style="font-weight: 600; color: <%= c[:accuracy] >= 80 ? 'var(--positive)' : c[:accuracy] >= 60 ? '#f9a825' : 'var(--negative)' %>;">
+                  <%= c[:accuracy] %>%
+                </span>
+              </td>
+              <td style="padding: 0.75rem 1rem; text-align: center;">
+                <% grade_color = case c[:grade]
+                  when "A" then "var(--positive)"
+                  when "B" then "#66bb6a"
+                  when "C" then "#f9a825"
+                  when "D" then "#ff9800"
+                  else "var(--negative)"
+                end %>
+                <span style="display: inline-block; width: 2rem; height: 2rem; line-height: 2rem; border-radius: 50%; background: <%= grade_color %>; color: #fff; font-weight: 700; font-size: 0.8125rem; text-align: center;">
+                  <%= c[:grade] %>
+                </span>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Over-Budget / Under-Budget Highlight Cards %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <%# Over-Budget Card %>
+  <div class="card" style="border-left: 4px solid var(--negative);">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">trending_up</span> Consistently Over Budget</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% if @over_budget_categories.any? %>
+        <% @over_budget_categories.each do |c| %>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.625rem 0; border-bottom: 1px solid var(--border);">
+            <div>
+              <div style="font-weight: 600;"><%= c[:category] %></div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                Budget: <%= number_to_currency(c[:budgeted]) %> &rarr; Actual: <%= number_to_currency(c[:avg_actual]) %>
+              </div>
+            </div>
+            <span style="font-weight: 700; color: var(--negative); font-size: 0.875rem;">+<%= c[:deviation_pct] %>%</span>
+          </div>
+        <% end %>
+      <% else %>
+        <div style="text-align: center; color: var(--text-secondary); padding: 1rem; font-size: 0.875rem;">
+          <span class="material-icons-outlined" style="font-size: 1.5rem; display: block; margin-bottom: 0.375rem; color: var(--positive);">check_circle</span>
+          No categories consistently over budget
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Under-Budget Card %>
+  <div class="card" style="border-left: 4px solid #1976d2;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1976d2;">trending_down</span> Consistently Under Budget</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% if @under_budget_categories.any? %>
+        <% @under_budget_categories.each do |c| %>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.625rem 0; border-bottom: 1px solid var(--border);">
+            <div>
+              <div style="font-weight: 600;"><%= c[:category] %></div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                Budget: <%= number_to_currency(c[:budgeted]) %> &rarr; Actual: <%= number_to_currency(c[:avg_actual]) %>
+              </div>
+            </div>
+            <span style="font-weight: 700; color: #1976d2; font-size: 0.875rem;"><%= c[:deviation_pct] %>%</span>
+          </div>
+        <% end %>
+      <% else %>
+        <div style="text-align: center; color: var(--text-secondary); padding: 1rem; font-size: 0.875rem;">
+          <span class="material-icons-outlined" style="font-size: 1.5rem; display: block; margin-bottom: 0.375rem;">info</span>
+          No categories significantly under budget
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Budget Utilization Bars %>
+<% if @category_accuracy.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1976d2;">data_usage</span> Budget Utilization Rate</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @category_accuracy.sort_by { |c| -c[:utilization] }.each do |c| %>
+        <div style="margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+            <span style="font-size: 0.8125rem; font-weight: 500;"><%= c[:category] %></span>
+            <span style="font-size: 0.8125rem; font-weight: 600; color: <%= c[:utilization] > 100 ? 'var(--negative)' : c[:utilization] > 85 ? '#f9a825' : 'var(--positive)' %>;">
+              <%= c[:utilization] %>%
+            </span>
+          </div>
+          <div style="background: var(--bg); border-radius: 6px; height: 12px; overflow: hidden; position: relative;">
+            <% bar_pct = [c[:utilization], 120].min %>
+            <% bar_color = c[:utilization] > 100 ? "var(--negative)" : c[:utilization] > 85 ? "#f9a825" : "var(--positive)" %>
+            <div style="width: <%= bar_pct / 1.2 %>%; height: 100%; background: <%= bar_color %>; border-radius: 6px; transition: width 0.3s;"></div>
+            <%# 100% marker %>
+            <div style="position: absolute; left: <%= 100 / 1.2 %>%; top: 0; bottom: 0; width: 2px; background: var(--text-secondary); opacity: 0.5;"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;">
+            <span>Volatility: &plusmn;<%= c[:volatility_pct] %>%</span>
+            <span><%= number_to_currency(c[:avg_actual]) %> / <%= number_to_currency(c[:budgeted]) %></span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Surprise Expenses %>
+<% if @surprise_expenses.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff9800;">bolt</span> Surprise Expenses</h2>
+    </div>
+    <div style="padding: 0;">
+      <div style="padding: 0.75rem 1.25rem; font-size: 0.8125rem; color: var(--text-secondary); background: rgba(255,152,0,0.06); border-bottom: 1px solid var(--border);">
+        Large transactions from categories not in your budget
+      </div>
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+        <tbody>
+          <% @surprise_expenses.each do |s| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.625rem 1rem; font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap;"><%= s[:date] %></td>
+              <td style="padding: 0.625rem 0.5rem; font-weight: 500;"><%= s[:description] %></td>
+              <td style="padding: 0.625rem 0.5rem; font-size: 0.75rem; color: var(--text-secondary);"><%= s[:category] %></td>
+              <td style="padding: 0.625rem 1rem; text-align: right; font-weight: 700; color: var(--negative);"><%= number_to_currency(s[:amount]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Recommendations %>
+<% if @recommendations.any? %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid #1976d2;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1976d2;">lightbulb</span> Budget Adjustment Recommendations</h2>
+    </div>
+    <div style="padding: 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;">
+      <% @recommendations.each do |r| %>
+        <div style="background: var(--bg); border-radius: 8px; padding: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <% if r[:type] == :increase %>
+              <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--negative);">arrow_upward</span>
+            <% else %>
+              <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--positive);">arrow_downward</span>
+            <% end %>
+            <span style="font-weight: 600;"><%= r[:category] %></span>
+          </div>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+            <%= r[:message] %>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
+            <span style="color: var(--text-secondary);">Current: <%= number_to_currency(r[:current]) %></span>
+            <span style="font-weight: 600; color: #1976d2;">Suggested: <%= number_to_currency(r[:suggested]) %></span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Empty State %>
+<% if @category_accuracy.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 1rem;">fact_check</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No Budget Data Available</div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
+      Create a budget with category limits and add transactions to track your forecast accuracy.
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Navigation %>
+<div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem;">
+  <%= link_to budget_dashboard_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary); display: block; margin-bottom: 0.25rem;">dashboard</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Dashboard</span>
+  <% end %>
+  <%= link_to budget_expense_forecast_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #2196f3; display: block; margin-bottom: 0.25rem;">auto_graph</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Expense Forecast</span>
+  <% end %>
+  <%= link_to budget_reports_spending_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #1976d2; display: block; margin-bottom: 0.25rem;">pie_chart</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Spending Report</span>
+  <% end %>
+</div>

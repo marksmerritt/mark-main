@@ -1,0 +1,297 @@
+<%
+  filter_params = params.permit(:symbol, :asset_class, :side, :tag_id, :start_date, :end_date).to_h.compact_blank
+  prev_url = @current_idx > 0 ? review_trades_path(filter_params.merge(idx: @current_idx - 1)) : nil
+  next_url = @current_idx < @total - 1 ? review_trades_path(filter_params.merge(idx: @current_idx + 1)) : nil
+%>
+<div class="page-header">
+  <h1>Trade Review</h1>
+  <div class="page-actions">
+    <span class="text-muted" style="font-size: 0.8125rem;">Use <kbd>&larr;</kbd> <kbd>&rarr;</kbd> to navigate</span>
+    <%= link_to "Back to Trades", trades_path, class: "btn" %>
+  </div>
+</div>
+
+<% if @trade.present? && !@trade["error"] %>
+  <div class="review-nav"
+       data-controller="review-nav"
+       data-review-nav-prev-url-value="<%= prev_url %>"
+       data-review-nav-next-url-value="<%= next_url %>">
+    <% if prev_url %>
+      <%= link_to prev_url, class: "btn" do %>
+        <span class="material-icons-outlined">chevron_left</span> Previous
+      <% end %>
+    <% else %>
+      <span class="btn" style="opacity: 0.3; pointer-events: none;"><span class="material-icons-outlined">chevron_left</span> Previous</span>
+    <% end %>
+
+    <div class="review-progress">
+      <span class="review-counter">Trade <%= @current_idx + 1 %> of <%= @total %></span>
+      <div class="review-progress-bar">
+        <div class="review-progress-fill" style="width: <%= @total > 0 ? ((@current_idx + 1).to_f / @total * 100).round(1) : 0 %>%"></div>
+      </div>
+    </div>
+
+    <% if next_url %>
+      <%= link_to next_url, class: "btn btn-primary" do %>
+        Next <span class="material-icons-outlined">chevron_right</span>
+      <% end %>
+    <% else %>
+      <span class="btn btn-primary" style="opacity: 0.3; pointer-events: none;">Next <span class="material-icons-outlined">chevron_right</span></span>
+    <% end %>
+  </div>
+
+  <div class="review-card">
+    <div class="review-header">
+      <div>
+        <h2 class="review-symbol"><%= @trade["symbol"] %></h2>
+        <span class="text-muted">
+          <%= @trade["side"]&.capitalize %> &middot;
+          <%= @trade["asset_class"]&.capitalize %> &middot;
+          <%= badge_for(@trade["status"]) %>
+        </span>
+      </div>
+      <div class="review-pnl">
+        <span class="<%= pnl_class(@trade["pnl"]) %>" style="font-size: 1.5rem; font-weight: 700;">
+          <%= pnl_display(@trade["pnl"]) %>
+        </span>
+        <% if @trade["return_percentage"] %>
+          <span class="<%= pnl_class(@trade["return_percentage"]) %>" style="font-size: 0.875rem;">
+            (<%= @trade["return_percentage"] %>%)
+          </span>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Execution quality summary strip %>
+    <%
+      review_metrics = []
+      if @trade["trade_grade"].present?
+        grade_colors = { "A" => "var(--positive)", "B" => "#0d904f", "C" => "#f9ab00", "D" => "var(--negative)", "F" => "#d93025" }
+        review_metrics << { label: "Grade", value: @trade["trade_grade"], color: grade_colors[@trade["trade_grade"]] || "var(--text-secondary)" }
+      end
+      if @trade["emotional_state"].present?
+        calm_states = %w[calm focused confident]
+        review_metrics << { label: "Emotion", value: @trade["emotional_state"].capitalize, color: calm_states.include?(@trade["emotional_state"]) ? "var(--positive)" : "#f9ab00" }
+      end
+      if @trade["followed_plan"] == true
+        review_metrics << { label: "Plan", value: "Followed", color: "var(--positive)" }
+      elsif @trade["followed_plan"] == false
+        review_metrics << { label: "Plan", value: "Deviated", color: "var(--negative)" }
+      end
+      if @trade["mfe"].present? && @trade["mae"].present?
+        mfe = @trade["mfe"].to_f
+        mae = @trade["mae"].to_f.abs
+        if mfe > 0 && @trade["pnl"].to_f > 0
+          capture = (@trade["pnl"].to_f / mfe * 100).round(0)
+          review_metrics << { label: "MFE Capture", value: "#{capture}%", color: capture >= 70 ? "var(--positive)" : capture >= 40 ? "#f9ab00" : "var(--negative)" }
+        end
+      end
+      if @trade["duration_in_minutes"].present?
+        dur = @trade["duration_in_minutes"].to_i
+        dur_label = dur >= 1440 ? "#{(dur / 1440.0).round(1)}d" : dur >= 60 ? "#{(dur / 60.0).round(1)}h" : "#{dur}m"
+        review_metrics << { label: "Duration", value: dur_label, color: "var(--text-secondary)" }
+      end
+    %>
+    <% if review_metrics.any? %>
+      <div style="display: flex; gap: 1rem; padding: 0.625rem 0; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border); flex-wrap: wrap;">
+        <% review_metrics.each do |m| %>
+          <div style="display: flex; flex-direction: column; align-items: center; min-width: 3.5rem;">
+            <span style="font-size: 0.5625rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.03em;"><%= m[:label] %></span>
+            <span style="font-size: 0.875rem; font-weight: 700; color: <%= m[:color] %>;"><%= m[:value] %></span>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+
+    <div class="review-details">
+      <div class="review-detail-col">
+        <div class="detail-item">
+          <span class="detail-label">Entry</span>
+          <span class="detail-value">
+            <%= number_to_currency(@trade["entry_price"]) %>
+            <% if @trade["entry_time"] %>
+              <span class="text-muted" style="font-size: 0.8125rem;"><%= Time.parse(@trade["entry_time"]).strftime("%b %d %l:%M%P") %></span>
+            <% end %>
+          </span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Exit</span>
+          <span class="detail-value">
+            <%= @trade["exit_price"] ? number_to_currency(@trade["exit_price"]) : "&mdash;".html_safe %>
+            <% if @trade["exit_time"] %>
+              <span class="text-muted" style="font-size: 0.8125rem;"><%= Time.parse(@trade["exit_time"]).strftime("%b %d %l:%M%P") %></span>
+            <% end %>
+          </span>
+        </div>
+      </div>
+      <div class="review-detail-col">
+        <div class="detail-item">
+          <span class="detail-label">Quantity</span>
+          <span class="detail-value"><%= @trade["quantity"] %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Duration</span>
+          <span class="detail-value"><%= @trade["duration_in_minutes"] ? "#{@trade["duration_in_minutes"]} min" : "&mdash;".html_safe %></span>
+        </div>
+      </div>
+      <div class="review-detail-col">
+        <div class="detail-item">
+          <span class="detail-label">Commissions</span>
+          <span class="detail-value"><%= @trade["commissions"] ? number_to_currency(@trade["commissions"]) : "&mdash;".html_safe %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Fees</span>
+          <span class="detail-value"><%= @trade["fees"] ? number_to_currency(@trade["fees"]) : "&mdash;".html_safe %></span>
+        </div>
+      </div>
+    </div>
+
+    <% if @trade["tags"].present? && @trade["tags"].any? %>
+      <div class="review-section">
+        <div class="tag-list-horizontal">
+          <% @trade["tags"].each do |tag| %>
+            <span class="tag" <% if tag["color"].present? %>style="background-color: <%= tag["color"] %>"<% end %>><%= tag["name"] %></span>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @trade["setup"].present? %>
+      <div class="review-section">
+        <h3><span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">lightbulb</span> Setup</h3>
+        <div class="text-content"><%= simple_format(@trade["setup"]) %></div>
+      </div>
+    <% end %>
+
+    <% if @trade["notes"].present? %>
+      <div class="review-section">
+        <h3><span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">notes</span> Notes</h3>
+        <div class="text-content"><%= simple_format(@trade["notes"]) %></div>
+      </div>
+    <% end %>
+
+    <% if @trade["mistakes"].present? %>
+      <div class="review-section review-section-warning">
+        <h3><span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">warning</span> Mistakes</h3>
+        <div class="text-content"><%= simple_format(@trade["mistakes"]) %></div>
+      </div>
+    <% end %>
+
+    <% if @trade["lessons"].present? %>
+      <div class="review-section review-section-success">
+        <h3><span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">school</span> Lessons</h3>
+        <div class="text-content"><%= simple_format(@trade["lessons"]) %></div>
+      </div>
+    <% end %>
+
+    <% if @trade["stop_loss"] || @trade["take_profit"] %>
+      <div class="review-section">
+        <h3><span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">gps_fixed</span> Risk Management</h3>
+        <div style="display: flex; gap: 2rem;">
+          <% if @trade["stop_loss"] %>
+            <div>
+              <span class="detail-label">Stop Loss</span>
+              <span class="detail-value"><%= number_to_currency(@trade["stop_loss"]) %></span>
+              <% if @trade["stop_hit"] %>
+                <span class="badge badge-danger" style="margin-left: 0.25rem;">Hit</span>
+              <% end %>
+            </div>
+          <% end %>
+          <% if @trade["take_profit"] %>
+            <div>
+              <span class="detail-label">Take Profit</span>
+              <span class="detail-value"><%= number_to_currency(@trade["take_profit"]) %></span>
+              <% if @trade["target_hit"] %>
+                <span class="badge badge-success" style="margin-left: 0.25rem;">Hit</span>
+              <% end %>
+            </div>
+          <% end %>
+          <% if @trade["planned_rr_ratio"] %>
+            <div>
+              <span class="detail-label">R:R Ratio</span>
+              <span class="detail-value">1:<%= @trade["planned_rr_ratio"] %></span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <div class="review-section" style="background: var(--bg-secondary, #f8f9fa); border-radius: 0.5rem; padding: 1.25rem;">
+      <h3 style="margin-bottom: 1rem;">
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">rate_review</span>
+        Trade Review
+        <% if @trade["reviewed"] %>
+          <span class="badge badge-success" style="margin-left: 0.5rem;">Reviewed</span>
+        <% end %>
+      </h3>
+      <%= form_with url: submit_review_trade_path(@trade["id"]), method: :post, local: true do |f| %>
+        <input type="hidden" name="return_to" value="<%= request.fullpath %>">
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>Grade</label>
+            <div style="display: flex; gap: 0.5rem;">
+              <% %w[A B C D F].each do |grade| %>
+                <label style="cursor: pointer;">
+                  <input type="radio" name="trade_grade" value="<%= grade %>" style="display: none;"
+                         <%= "checked" if @trade["trade_grade"] == grade %>>
+                  <span class="preset-chip <%= 'preset-chip-active' if @trade["trade_grade"] == grade %>"><%= grade %></span>
+                </label>
+              <% end %>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>Emotional State</label>
+            <select name="emotional_state" class="form-control">
+              <option value="">Select...</option>
+              <% %w[calm focused confident anxious fearful greedy fomo revenge bored].each do |state| %>
+                <option value="<%= state %>" <%= "selected" if @trade["emotional_state"] == state %>><%= state.capitalize %></option>
+              <% end %>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>Followed Plan?</label>
+            <div style="display: flex; gap: 0.75rem; padding-top: 0.25rem;">
+              <label style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                <input type="radio" name="followed_plan" value="true" <%= "checked" if @trade["followed_plan"] == true %>> Yes
+              </label>
+              <label style="cursor: pointer; display: flex; align-items: center; gap: 0.25rem;">
+                <input type="radio" name="followed_plan" value="false" <%= "checked" if @trade["followed_plan"] == false %>> No
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>Mistakes</label>
+            <textarea name="mistakes" class="form-control" rows="2" placeholder="What went wrong?"><%= @trade["mistakes"] %></textarea>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label>Lessons</label>
+            <textarea name="lessons" class="form-control" rows="2" placeholder="What did you learn?"><%= @trade["lessons"] %></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Save Review</button>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="review-actions">
+      <%= link_to "Full Details", trade_path(@trade["id"]), class: "btn btn-sm" %>
+      <%= link_to "Edit", edit_trade_path(@trade["id"]), class: "btn btn-sm" %>
+    </div>
+  </div>
+<% elsif @total == 0 %>
+  <div class="card empty-state">
+    <p>No closed trades to review. <% if params.except(:controller, :action).any? %>Try clearing your filters.<% end %></p>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>Trade not found.</p>
+  </div>
+<% end %>

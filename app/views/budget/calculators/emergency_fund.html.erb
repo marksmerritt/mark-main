@@ -1,0 +1,347 @@
+<% content_for(:title) { "Emergency Fund Calculator" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">health_and_safety</span>
+    Emergency Fund Calculator
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Savings", budget_savings_path, class: "btn btn-sm" %>
+    <%= link_to "Sinking Funds", budget_funds_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<%# Target Selector %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
+  <%= form_with url: budget_emergency_fund_path, method: :get, style: "display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;" do |f| %>
+    <span style="font-size: 0.875rem; font-weight: 500;">Target coverage:</span>
+    <div style="display: flex; gap: 0.375rem;">
+      <% [3, 6, 9, 12].each do |m| %>
+        <%= link_to "#{m} months", budget_emergency_fund_path(months: m),
+          class: "btn btn-sm#{@target_months == m ? ' btn-primary' : ''}",
+          style: "font-size: 0.75rem; padding: 0.25rem 0.625rem;" %>
+      <% end %>
+    </div>
+    <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: auto;">Based on your last 6 months of spending</span>
+  <% end %>
+</div>
+
+<%# Coverage Hero %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 2rem; text-align: center;">
+  <%
+    coverage_color = if @months_covered >= @target_months
+      "var(--positive)"
+    elsif @months_covered >= @target_months * 0.5
+      "#f9ab00"
+    else
+      "var(--negative)"
+    end
+  %>
+  <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">Emergency Fund Coverage</div>
+  <div style="font-size: 3rem; font-weight: 700; color: <%= coverage_color %>;">
+    <%= @months_covered %> <span style="font-size: 1.5rem;">months</span>
+  </div>
+  <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+    of <%= @target_months %> month target
+  </div>
+
+  <%# Progress ring %>
+  <div style="margin: 1.5rem auto; width: 120px; height: 120px; position: relative;">
+    <svg viewBox="0 0 120 120" style="transform: rotate(-90deg);">
+      <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" stroke-width="8"/>
+      <circle cx="60" cy="60" r="52" fill="none" stroke="<%= coverage_color %>" stroke-width="8"
+              stroke-dasharray="<%= (326.7 * [@funded_pct / 100.0, 1].min).round(1) %> 326.7"
+              stroke-linecap="round"/>
+    </svg>
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= @funded_pct %>%</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">funded</div>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: center; gap: 2rem; font-size: 0.8125rem;">
+    <div>
+      <div style="color: var(--text-secondary);">Saved</div>
+      <div style="font-weight: 700; color: var(--positive);"><%= number_to_currency(@total_emergency_savings) %></div>
+    </div>
+    <div>
+      <div style="color: var(--text-secondary);">Target</div>
+      <div style="font-weight: 700;"><%= number_to_currency(@target_amount) %></div>
+    </div>
+    <% if @gap > 0 %>
+      <div>
+        <div style="color: var(--text-secondary);">Gap</div>
+        <div style="font-weight: 700; color: var(--negative);"><%= number_to_currency(@gap) %></div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Key Metrics Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Monthly Expenses</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@avg_monthly_expenses) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Essential Expenses</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@avg_essential) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Savings</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: <%= @monthly_savings >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@monthly_savings) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Bare-Bones Coverage</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= @bare_bones_months %> mo</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Time to Funded</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);">
+        <% if @months_to_funded == 0 %>
+          <span class="material-icons-outlined" style="font-size: 1.25rem; vertical-align: -2px; color: var(--positive);">check_circle</span> Done!
+        <% elsif @months_to_funded %>
+          <%= @months_to_funded %> mo
+        <% else %>
+          —
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Risk Assessment %>
+  <div class="card" style="padding: 1.25rem;">
+    <h3 style="font-size: 0.875rem; margin-bottom: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">shield</span>
+      Financial Risk Assessment
+    </h3>
+    <%
+      risk_label = if @risk_score < 25 then "Low Risk"
+                   elsif @risk_score < 50 then "Moderate"
+                   elsif @risk_score < 75 then "Elevated"
+                   else "High Risk"
+                   end
+      risk_color = if @risk_score < 25 then "var(--positive)"
+                   elsif @risk_score < 50 then "#f9ab00"
+                   elsif @risk_score < 75 then "#e65100"
+                   else "var(--negative)"
+                   end
+    %>
+    <div style="text-align: center; margin-bottom: 1rem;">
+      <div style="font-size: 2rem; font-weight: 700; color: <%= risk_color %>;"><%= risk_label %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Risk score: <%= @risk_score %>/100</div>
+    </div>
+
+    <%# Risk gauge %>
+    <div style="height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; margin-bottom: 1rem;">
+      <div style="height: 100%; width: <%= @risk_score %>%; background: <%= risk_color %>; border-radius: 4px; transition: width 0.3s;"></div>
+    </div>
+
+    <div style="font-size: 0.8125rem; line-height: 1.6;">
+      <% if @months_covered >= @target_months %>
+        <div style="color: var(--positive);">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">check</span>
+          Your emergency fund meets the <%= @target_months %>-month target.
+        </div>
+      <% elsif @months_covered >= 3 %>
+        <div style="color: #f9ab00;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">info</span>
+          You have basic coverage but should aim for <%= @target_months %> months.
+        </div>
+      <% else %>
+        <div style="color: var(--negative);">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">warning</span>
+          Your emergency fund is below the recommended minimum of 3 months.
+        </div>
+      <% end %>
+      <% if @monthly_savings <= 0 %>
+        <div style="color: var(--negative); margin-top: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">warning</span>
+          You're spending more than you earn. Consider reducing expenses.
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Expense Breakdown %>
+  <div class="card" style="padding: 1.25rem;">
+    <h3 style="font-size: 0.875rem; margin-bottom: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">pie_chart</span>
+      Monthly Expense Breakdown
+    </h3>
+    <% total_exp = @avg_essential + @avg_discretionary; total_exp = 1 if total_exp == 0 %>
+
+    <div style="display: flex; height: 1.5rem; border-radius: 6px; overflow: hidden; margin-bottom: 1rem;">
+      <div style="width: <%= (@avg_essential / total_exp * 100).round %>%; background: #e65100; opacity: 0.7;" title="Essential"></div>
+      <div style="width: <%= (@avg_discretionary / total_exp * 100).round %>%; background: #1a73e8; opacity: 0.7;" title="Discretionary"></div>
+    </div>
+
+    <div style="display: flex; justify-content: space-between; font-size: 0.8125rem; margin-bottom: 1.5rem;">
+      <div>
+        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #e65100; vertical-align: middle; margin-right: 0.25rem;"></span>
+        Essential: <strong><%= number_to_currency(@avg_essential) %></strong>/mo
+      </div>
+      <div>
+        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #1a73e8; vertical-align: middle; margin-right: 0.25rem;"></span>
+        Discretionary: <strong><%= number_to_currency(@avg_discretionary) %></strong>/mo
+      </div>
+    </div>
+
+    <div style="font-size: 0.8125rem; padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+      <div style="font-weight: 600; margin-bottom: 0.5rem;">In an emergency, you could:</div>
+      <div style="color: var(--text-secondary); line-height: 1.6;">
+        Cut discretionary spending of <strong><%= number_to_currency(@avg_discretionary) %>/mo</strong> to stretch your fund to
+        <strong style="color: var(--positive);"><%= @bare_bones_months %> months</strong> of bare-bones coverage.
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Monthly Trend Chart %>
+<% if @monthly_data.count >= 2 %>
+  <%
+    max_val = @monthly_data.map { |d| [d[:expenses], d[:income]].max }.max.to_f
+    max_val = 1 if max_val == 0
+    bar_w = 100.0 / @monthly_data.count
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Monthly Expenses vs Income</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <svg viewBox="0 0 500 200" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <%# Grid %>
+        <% 5.times do |i| %>
+          <% y = 10 + i * 40 %>
+          <line x1="50" y1="<%= y %>" x2="480" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3"/>
+          <text x="45" y="<%= y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="8">
+            $<%= ((max_val - i * max_val / 4.0) / 1000).round(1) %>k
+          </text>
+        <% end %>
+
+        <%# Bars %>
+        <% usable = 430.0 %>
+        <% group_w = usable / @monthly_data.count %>
+        <% @monthly_data.each_with_index do |d, i| %>
+          <% x_start = 50 + i * group_w + group_w * 0.1 %>
+          <% bw = group_w * 0.35 %>
+          <% income_h = d[:income] / max_val * 160 %>
+          <% expense_h = d[:expenses] / max_val * 160 %>
+
+          <%# Income bar %>
+          <rect x="<%= x_start %>" y="<%= 170 - income_h %>" width="<%= bw %>" height="<%= income_h %>"
+                fill="var(--positive)" opacity="0.6" rx="2"/>
+          <%# Expense bar %>
+          <rect x="<%= x_start + bw + 2 %>" y="<%= 170 - expense_h %>" width="<%= bw %>" height="<%= expense_h %>"
+                fill="var(--negative)" opacity="0.6" rx="2"/>
+
+          <%# Label %>
+          <text x="<%= x_start + bw %>" y="<%= 190 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8">
+            <%= d[:month].to_s.slice(5, 2) %>/<%= d[:month].to_s.slice(2, 2) %>
+          </text>
+        <% end %>
+
+        <%# Average line %>
+        <line x1="50" y1="<%= 170 - @avg_monthly_expenses / max_val * 160 %>"
+              x2="480" y2="<%= 170 - @avg_monthly_expenses / max_val * 160 %>"
+              stroke="var(--text-secondary)" stroke-width="1" stroke-dasharray="4"/>
+        <text x="482" y="<%= 170 - @avg_monthly_expenses / max_val * 160 + 3 %>" fill="var(--text-secondary)" font-size="7">avg</text>
+      </svg>
+      <div style="display: flex; justify-content: center; gap: 1.5rem; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+        <span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--positive); opacity: 0.6; vertical-align: middle; margin-right: 0.25rem;"></span> Income</span>
+        <span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--negative); opacity: 0.6; vertical-align: middle; margin-right: 0.25rem;"></span> Expenses</span>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Savings Milestones %>
+<% if @gap > 0 && @monthly_savings > 0 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">flag</span> Savings Milestones</h2>
+    </div>
+    <%
+      milestones = [1, 3, 6, 9, 12].select { |m| m <= @target_months }.map { |m|
+        target = @avg_monthly_expenses * m
+        remaining = [target - @total_emergency_savings, 0].max
+        months_away = remaining > 0 ? (remaining / @monthly_savings).ceil : 0
+        { months: m, target: target, remaining: remaining, months_away: months_away, reached: remaining <= 0 }
+      }
+    %>
+    <% milestones.each do |ms| %>
+      <div style="display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);">
+        <% if ms[:reached] %>
+          <span class="material-icons-outlined" style="font-size: 1.25rem; color: var(--positive);">check_circle</span>
+        <% else %>
+          <span class="material-icons-outlined" style="font-size: 1.25rem; color: var(--text-secondary);">radio_button_unchecked</span>
+        <% end %>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 0.875rem;"><%= ms[:months] %> month<%= ms[:months] == 1 ? '' : 's' %> of expenses</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= number_to_currency(ms[:target]) %></div>
+        </div>
+        <div style="text-align: right; font-size: 0.8125rem;">
+          <% if ms[:reached] %>
+            <span style="color: var(--positive); font-weight: 600;">Reached!</span>
+          <% else %>
+            <span style="color: var(--text-secondary);"><%= ms[:months_away] %> months away</span>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= (Date.current >> ms[:months_away]).strftime("%b %Y") %></div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# Action Items %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">lightbulb</span> Recommendations</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; gap: 0.75rem;">
+      <% if @gap > 0 && @monthly_savings > 0 %>
+        <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+          <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--primary); margin-top: 2px;">savings</span>
+          <div style="font-size: 0.8125rem;">
+            <strong>Save <%= number_to_currency(@gap / @target_months) %>/month</strong> to reach your <%= @target_months %>-month target by
+            <strong><%= (Date.current >> (@gap / (@gap / @target_months)).ceil).strftime("%B %Y") %></strong>.
+          </div>
+        </div>
+      <% end %>
+      <% if @avg_discretionary > @avg_essential * 0.5 %>
+        <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+          <span class="material-icons-outlined" style="font-size: 1.125rem; color: #f9ab00; margin-top: 2px;">restaurant</span>
+          <div style="font-size: 0.8125rem;">
+            Discretionary spending is <strong><%= (@avg_discretionary / [@avg_essential, 1].max * 100).round %>%</strong> of essentials.
+            Reducing by 10% would free up <strong><%= number_to_currency(@avg_discretionary * 0.1) %>/month</strong>.
+          </div>
+        </div>
+      <% end %>
+      <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+        <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--positive); margin-top: 2px;">account_balance</span>
+        <div style="font-size: 0.8125rem;">
+          Keep your emergency fund in a <strong>high-yield savings account</strong> for easy access while earning interest.
+          Even at 4% APY, <%= number_to_currency(@total_emergency_savings) %> earns ~<%= number_to_currency(@total_emergency_savings * 0.04 / 12) %>/month.
+        </div>
+      </div>
+      <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+        <span class="material-icons-outlined" style="font-size: 1.125rem; color: #9c27b0; margin-top: 2px;">auto_fix_high</span>
+        <div style="font-size: 0.8125rem;">
+          Automate your emergency fund contributions. Set up a <strong>recurring transfer</strong> on payday to ensure consistent savings.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Savings Dashboard", budget_savings_path, class: "btn" %>
+  <%= link_to "Sinking Funds", budget_funds_path, class: "btn" %>
+  <%= link_to "Goals", budget_goals_path, class: "btn" %>
+  <%= link_to "Debt Freedom", budget_debt_freedom_path, class: "btn" %>
+</div>

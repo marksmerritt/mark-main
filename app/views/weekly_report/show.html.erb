@@ -1,0 +1,471 @@
+<% content_for(:title) { "Weekly Report" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #3f51b5;">summarize</span>
+    Weekly Report
+  </h1>
+  <div class="page-actions">
+    <button class="btn btn-sm" onclick="window.print()" title="Print">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">print</span> Print
+    </button>
+  </div>
+</div>
+
+<%# ===== Week Navigation ===== %>
+<div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 1.5rem;">
+  <%= link_to weekly_report_path(week: @week_offset + 1), class: "btn btn-sm", title: "Previous week" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">chevron_left</span> Prev
+  <% end %>
+  <div style="text-align: center;">
+    <div style="font-size: 1.25rem; font-weight: 700;"><%= @week_start.strftime("%b %d") %> &ndash; <%= @week_end.strftime("%b %d, %Y") %></div>
+    <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @is_current_week ? "Current Week" : "#{@week_offset} week#{'s' if @week_offset != 1} ago" %></div>
+  </div>
+  <% if @week_offset > 0 %>
+    <%= link_to weekly_report_path(week: @week_offset - 1), class: "btn btn-sm", title: "Next week" do %>
+      Next <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">chevron_right</span>
+    <% end %>
+  <% else %>
+    <span class="btn btn-sm" style="opacity: 0.3; pointer-events: none;">Next</span>
+  <% end %>
+</div>
+
+<%# ===== Week Score Card ===== %>
+<div class="card" style="margin-bottom: 1.5rem; text-align: center; border-top: 3px solid #3f51b5; padding: 1.5rem;">
+  <%
+    score_color = if @week_score >= 80
+      "var(--positive)"
+    elsif @week_score >= 60
+      "#3f51b5"
+    elsif @week_score >= 40
+      "#f9ab00"
+    else
+      "var(--negative)"
+    end
+  %>
+  <div style="display: inline-block; position: relative; width: 120px; height: 120px; margin-bottom: 0.5rem;">
+    <svg viewBox="0 0 36 36" style="transform: rotate(-90deg); width: 100%; height: 100%;">
+      <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" stroke-width="2.5" />
+      <circle cx="18" cy="18" r="15.9" fill="none" stroke="<%= score_color %>"
+              stroke-width="2.5" stroke-dasharray="<%= @week_score %> 100" stroke-linecap="round" />
+    </svg>
+    <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <div style="font-size: 1.75rem; font-weight: 700; color: <%= score_color %>;"><%= @week_score %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">/ 100</div>
+    </div>
+  </div>
+  <div style="font-size: 1.5rem; font-weight: 700; color: <%= score_color %>;">Grade: <%= @week_grade %></div>
+  <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+    Week Score &mdash;
+    <% parts = [] %>
+    <% parts << "#{@trade_count} trades" if @trade_count > 0 %>
+    <% parts << "#{@transaction_count} transactions" if @transaction_count > 0 %>
+    <% parts << "#{@notes_count} notes" if @notes_count > 0 %>
+    <%= parts.any? ? parts.join(" &middot; ").html_safe : "No activity" %>
+  </div>
+</div>
+
+<%# ===== Three-Column Summary ===== %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Trading Summary %>
+  <div class="card">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);">show_chart</span>
+        Trading
+      </h2>
+    </div>
+    <% if @trade_count > 0 %>
+      <div style="text-align: center; padding: 1.25rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net P&L</div>
+        <div style="font-size: 2rem; font-weight: 700; color: <%= @trade_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @trade_pnl >= 0 ? '+' : '' %><%= number_to_currency(@trade_pnl) %>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; border-top: 1px solid var(--border);">
+        <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Trades</div>
+          <div style="font-weight: 700;"><%= @trade_count %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><span style="color: var(--positive);"><%= @trade_wins %>W</span> / <span style="color: var(--negative);"><%= @trade_losses %>L</span></div>
+        </div>
+        <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Win Rate</div>
+          <div style="font-weight: 700; color: <%= @trade_win_rate >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @trade_win_rate %>%</div>
+        </div>
+        <div style="padding: 0.75rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Streak</div>
+          <div style="font-weight: 700; color: <%= @streak_type == 'win' ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= @streak %><%= @streak_type == 'win' ? 'W' : 'L' %>
+          </div>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-top: 1px solid var(--border);">
+        <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Days</div>
+          <div style="font-weight: 700;"><span style="color: var(--positive);"><%= @green_days %></span>/<span style="color: var(--negative);"><%= @red_days %></span></div>
+        </div>
+        <div style="padding: 0.75rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Fees</div>
+          <div style="font-weight: 700;"><%= number_to_currency(@trade_fees) %></div>
+        </div>
+      </div>
+      <% if @best_trade %>
+        <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border); font-size: 0.8125rem;">
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-secondary);">Best</span>
+            <span><%= @best_trade["symbol"] %> <span style="color: var(--positive);"><%= number_to_currency(@best_trade["pnl"]) %></span></span>
+          </div>
+          <% if @worst_trade && @worst_trade != @best_trade %>
+            <div style="display: flex; justify-content: space-between; margin-top: 0.25rem;">
+              <span style="color: var(--text-secondary);">Worst</span>
+              <span><%= @worst_trade["symbol"] %> <span style="color: var(--negative);"><%= number_to_currency(@worst_trade["pnl"]) %></span></span>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    <% else %>
+      <div style="padding: 2rem; text-align: center; color: var(--text-secondary); font-size: 0.875rem;">
+        <span class="material-icons-outlined" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4;">show_chart</span>
+        No trades this week
+      </div>
+    <% end %>
+  </div>
+
+  <%# Budget Summary %>
+  <div class="card">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #0d904f;">account_balance_wallet</span>
+        Budget
+      </h2>
+    </div>
+    <% if @transaction_count > 0 %>
+      <div style="text-align: center; padding: 1.25rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net Savings</div>
+        <div style="font-size: 2rem; font-weight: 700; color: <%= @budget_savings >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @budget_savings >= 0 ? '+' : '' %><%= number_to_currency(@budget_savings) %>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0; border-top: 1px solid var(--border);">
+        <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Income</div>
+          <div style="font-weight: 700; color: var(--positive);"><%= number_to_currency(@budget_income) %></div>
+        </div>
+        <div style="padding: 0.75rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Spending</div>
+          <div style="font-weight: 700;"><%= number_to_currency(@budget_spending) %></div>
+        </div>
+      </div>
+      <% if @budgeted > 0 %>
+        <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; font-size: 0.8125rem; margin-bottom: 0.25rem;">
+            <span style="color: var(--text-secondary);">Monthly Budget Used</span>
+            <span style="color: <%= @budget_utilization <= 100 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @budget_utilization %>%</span>
+          </div>
+          <div style="height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+            <div style="height: 100%; width: <%= [@budget_utilization, 100].min %>%; background: <%= @budget_utilization <= 100 ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.7; border-radius: 3px;"></div>
+          </div>
+        </div>
+      <% end %>
+      <% if @top_categories.any? %>
+        <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border); font-size: 0.8125rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.375rem;">Top Categories</div>
+          <% @top_categories.first(4).each do |cat, amount| %>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+              <span style="color: var(--text-secondary);"><%= cat %></span>
+              <span><%= number_to_currency(amount) %></span>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    <% else %>
+      <div style="padding: 2rem; text-align: center; color: var(--text-secondary); font-size: 0.875rem;">
+        <span class="material-icons-outlined" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4;">account_balance_wallet</span>
+        No transactions this week
+      </div>
+    <% end %>
+  </div>
+
+  <%# Notes Summary %>
+  <div class="card">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #9c27b0;">edit_note</span>
+        Notes
+      </h2>
+    </div>
+    <% if @notes_count > 0 %>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; text-align: center;">
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Notes</div>
+            <div style="font-size: 1.5rem; font-weight: 700;"><%= @notes_count %></div>
+          </div>
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Words</div>
+            <div style="font-size: 1.5rem; font-weight: 700;"><%= number_with_delimiter(@notes_words) %></div>
+          </div>
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Notebooks</div>
+            <div style="font-size: 1.5rem; font-weight: 700;"><%= @notes_notebooks_count %></div>
+          </div>
+        </div>
+        <% if @writing_days > 0 %>
+          <div style="text-align: center; margin-top: 0.75rem; font-size: 0.8125rem; color: var(--text-secondary);">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">calendar_today</span>
+            Wrote on <%= @writing_days %> of <%= (@week_end - @week_start).to_i + 1 %> days
+          </div>
+        <% end %>
+        <% if @notes_notebooks.any? %>
+          <div style="margin-top: 0.75rem; display: flex; gap: 0.375rem; flex-wrap: wrap; justify-content: center;">
+            <% @notes_notebooks.first(5).each do |nb| %>
+              <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--bg); border: 1px solid var(--border);"><%= nb %></span>
+            <% end %>
+          </div>
+        <% end %>
+        <% if @journal_entries.any? %>
+          <div style="text-align: center; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.8125rem; color: var(--text-secondary);">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">auto_stories</span>
+            <%= @journal_entries.count %> journal entr<%= @journal_entries.count == 1 ? 'y' : 'ies' %>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div style="padding: 2rem; text-align: center; color: var(--text-secondary); font-size: 0.875rem;">
+        <span class="material-icons-outlined" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.4;">edit_note</span>
+        No notes this week
+        <% if @journal_entries.any? %>
+          <div style="margin-top: 0.5rem; font-size: 0.8125rem;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">auto_stories</span>
+            <%= @journal_entries.count %> journal entr<%= @journal_entries.count == 1 ? 'y' : 'ies' %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# ===== Highlights ===== %>
+<% if @highlights.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">emoji_events</span>
+        Highlights
+      </h2>
+    </div>
+    <div style="padding: 0.75rem 1.25rem;">
+      <% @highlights.each do |h| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+          <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= h[:color] %>;"><%= h[:icon] %></span>
+          <div>
+            <div style="font-size: 0.8125rem; font-weight: 600;"><%= h[:label] %></div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);"><%= h[:text] %></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# ===== Concerns ===== %>
+<% if @concerns.any? %>
+  <div class="card" style="margin-bottom: 1.5rem; border-top: 3px solid var(--negative);">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">flag</span>
+        Needs Attention
+      </h2>
+    </div>
+    <div style="padding: 0.75rem 1.25rem;">
+      <% @concerns.each do |c| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+          <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= c[:color] %>;"><%= c[:icon] %></span>
+          <div>
+            <div style="font-size: 0.8125rem; font-weight: 600;"><%= c[:label] %></div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);"><%= c[:text] %></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# ===== Week Comparison ===== %>
+<% if @comparison.any? { |c| c[:current] != 0 || c[:previous] != 0 } %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #3f51b5;">compare_arrows</span>
+        This Week vs Last Week
+      </h2>
+    </div>
+    <table class="table" style="font-size: 0.875rem;">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th style="text-align: right;">This Week</th>
+          <th style="text-align: right;">Last Week</th>
+          <th style="text-align: right;">Change</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @comparison.each do |c| %>
+          <% next if c[:current] == 0 && c[:previous] == 0 %>
+          <%
+            delta = c[:current] - c[:previous]
+            # For spending, lower is better
+            is_better = c[:invert] ? delta < 0 : delta > 0
+            delta_color = delta == 0 ? "var(--text-secondary)" : (is_better ? "var(--positive)" : "var(--negative)")
+            arrow = delta > 0 ? "arrow_upward" : (delta < 0 ? "arrow_downward" : "remove")
+
+            case c[:format]
+            when :currency
+              current_display = number_to_currency(c[:current])
+              previous_display = number_to_currency(c[:previous])
+              delta_display = (delta >= 0 ? "+" : "") + number_to_currency(delta)
+            when :percent
+              current_display = "#{c[:current]}%"
+              previous_display = "#{c[:previous]}%"
+              delta_display = (delta >= 0 ? "+" : "") + "#{delta.round(1)}%"
+            else
+              current_display = number_with_delimiter(c[:current].to_i)
+              previous_display = number_with_delimiter(c[:previous].to_i)
+              delta_display = (delta >= 0 ? "+" : "") + number_with_delimiter(delta.to_i)
+            end
+          %>
+          <tr>
+            <td><%= c[:label] %></td>
+            <td style="text-align: right; font-weight: 600;"><%= current_display %></td>
+            <td style="text-align: right; color: var(--text-secondary);"><%= previous_display %></td>
+            <td style="text-align: right; color: <%= delta_color %>; font-weight: 500;">
+              <% if delta != 0 %>
+                <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;"><%= arrow %></span>
+              <% end %>
+              <%= delta_display %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<%# ===== Daily Breakdown ===== %>
+<% if @daily_breakdown.any? { |d| d[:trades] > 0 || d[:transactions] > 0 || d[:notes] > 0 || d[:journals] > 0 } %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #3f51b5;">view_week</span>
+        Daily Breakdown
+      </h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+      <% @daily_breakdown.each do |day| %>
+        <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); <%= 'opacity: 0.4;' if day[:is_future] %> <%= 'background: color-mix(in srgb, #3f51b5 5%, transparent);' if day[:is_today] %>">
+          <div style="font-size: 0.75rem; font-weight: 700; color: <%= day[:is_today] ? '#3f51b5' : 'var(--text-secondary)' %>; text-transform: uppercase;">
+            <%= day[:day_name] %>
+          </div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+            <%= day[:date].strftime("%b %d") %>
+          </div>
+          <% if day[:is_future] %>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">--</div>
+          <% else %>
+            <% if day[:trades] > 0 %>
+              <div style="font-size: 0.6875rem; margin-bottom: 0.125rem;">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px; color: var(--primary);">show_chart</span>
+                <%= day[:trades] %> trade<%= 's' if day[:trades] != 1 %>
+                <span style="color: <%= day[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= number_to_currency(day[:pnl]) %></span>
+              </div>
+            <% end %>
+            <% if day[:transactions] > 0 %>
+              <div style="font-size: 0.6875rem; margin-bottom: 0.125rem;">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px; color: #0d904f;">payments</span>
+                <%= number_to_currency(day[:spending]) %>
+              </div>
+            <% end %>
+            <% if day[:notes] > 0 %>
+              <div style="font-size: 0.6875rem; margin-bottom: 0.125rem;">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px; color: #9c27b0;">edit_note</span>
+                <%= day[:notes] %> note<%= 's' if day[:notes] != 1 %>
+              </div>
+            <% end %>
+            <% if day[:journals] > 0 %>
+              <div style="font-size: 0.6875rem;">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px; color: #ff8f00;">auto_stories</span>
+                Journaled
+              </div>
+            <% end %>
+            <% if day[:trades] == 0 && day[:transactions] == 0 && day[:notes] == 0 && day[:journals] == 0 %>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">No activity</div>
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# ===== Top Symbols ===== %>
+<% if @top_symbols.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">label</span>
+        Top Symbols
+      </h2>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 0;">
+      <% @top_symbols.each do |sym, data| %>
+        <div style="flex: 1; min-width: 100px; padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-weight: 700;"><%= sym %></div>
+          <div style="font-size: 1rem; font-weight: 700; color: <%= data[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= number_to_currency(data[:pnl]) %>
+          </div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= data[:count] %> trade<%= 's' if data[:count] != 1 %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# ===== Empty State ===== %>
+<% if @trade_count == 0 && @transaction_count == 0 && @notes_count == 0 && @journal_entries.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; display: block; margin-bottom: 0.75rem; opacity: 0.3;">summarize</span>
+    <div style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem;">No Activity This Week</div>
+    <div style="font-size: 0.875rem;">Start trading, budgeting, or writing notes to see your weekly report.</div>
+  </div>
+<% end %>
+
+<%# ===== Bottom Navigation ===== %>
+<div style="text-align: center; margin-top: 2rem;">
+  <%= link_to root_path, class: "btn" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">dashboard</span> Dashboard
+  <% end %>
+  <%= link_to financial_pulse_path, class: "btn" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">monitor_heart</span> Financial Pulse
+  <% end %>
+  <%= link_to digest_path, class: "btn" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">summarize</span> Weekly Digest
+  <% end %>
+  <%= link_to monthly_report_path, class: "btn" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">calendar_month</span> Monthly Report
+  <% end %>
+</div>
+
+<%# ===== Print Styles ===== %>
+<style>
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container,
+    .cmd-overlay, .shortcuts-overlay { display: none !important; }
+    .main-content { padding: 0 !important; max-width: 100% !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+    .btn { display: none !important; }
+    a { color: inherit !important; text-decoration: none !important; }
+    body { font-size: 11pt; }
+    .page-header h1 { font-size: 18pt; }
+  }
+</style>

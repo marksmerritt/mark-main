@@ -1,0 +1,82 @@
+<%= render "shared/errors", errors: local_assigns[:errors] || @errors %>
+
+<%= form_with url: form_url, method: form_method, class: "trade-plan-form" do %>
+  <fieldset>
+    <legend>Trade Setup</legend>
+
+    <div class="form-row">
+      <div class="form-group">
+        <%= label_tag "trade_plan[symbol]", "Symbol" %>
+        <%= text_field_tag "trade_plan[symbol]", trade_plan["symbol"], class: "form-control", placeholder: "e.g. AAPL", autofocus: true %>
+      </div>
+
+      <div class="form-group">
+        <%= label_tag "trade_plan[side]", "Side" %>
+        <%= select_tag "trade_plan[side]",
+              options_for_select([["Long", "long"], ["Short", "short"]], trade_plan["side"]),
+              include_blank: "Select side", class: "form-control" %>
+      </div>
+
+      <div class="form-group">
+        <%= label_tag "trade_plan[asset_class]", "Asset Class" %>
+        <%= select_tag "trade_plan[asset_class]",
+              options_for_select([["Stocks", "stocks"], ["Options", "options"], ["Futures", "futures"], ["Forex", "forex"], ["Crypto", "crypto"]], trade_plan["asset_class"]),
+              include_blank: "Select asset class", class: "form-control" %>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Strategy</legend>
+
+    <div class="form-group">
+      <%= label_tag "trade_plan[entry_trigger]", "Entry Trigger" %>
+      <%= text_area_tag "trade_plan[entry_trigger]", trade_plan["entry_trigger"], class: "form-control", rows: 3, placeholder: "Describe the conditions that trigger entry..." %>
+    </div>
+
+    <div class="form-group">
+      <%= label_tag "trade_plan[exit_strategy]", "Exit Strategy" %>
+      <%= text_area_tag "trade_plan[exit_strategy]", trade_plan["exit_strategy"], class: "form-control", rows: 3, placeholder: "Describe the exit conditions..." %>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Risk</legend>
+
+    <div class="form-row">
+      <div class="form-group">
+        <%= label_tag "trade_plan[target_entry]", "Target Entry" %>
+        <%= number_field_tag "trade_plan[target_entry]", trade_plan["target_entry"], class: "form-control", step: "any", min: 0, placeholder: "Planned entry price" %>
+      </div>
+
+      <div class="form-group">
+        <%= label_tag "trade_plan[stop_loss]", "Stop Loss" %>
+        <%= number_field_tag "trade_plan[stop_loss]", trade_plan["stop_loss"], class: "form-control", step: "any", min: 0 %>
+      </div>
+
+      <div class="form-group">
+        <%= label_tag "trade_plan[take_profit]", "Take Profit" %>
+        <%= number_field_tag "trade_plan[take_profit]", trade_plan["take_profit"], class: "form-control", step: "any", min: 0 %>
+      </div>
+
+      <div class="form-group">
+        <%= label_tag "trade_plan[position_size]", "Position Size" %>
+        <%= number_field_tag "trade_plan[position_size]", trade_plan["position_size"], class: "form-control", step: "any", min: 0 %>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Notes</legend>
+
+    <div class="form-group">
+      <%= label_tag "trade_plan[notes]", "Notes" %>
+      <%= text_area_tag "trade_plan[notes]", trade_plan["notes"], class: "form-control", rows: 4, placeholder: "Additional notes about this trade plan..." %>
+    </div>
+  </fieldset>
+
+  <div class="form-actions">
+    <%= submit_tag submit_label, class: "btn btn-primary" %>
+    <%= link_to "Cancel", cancel_path, class: "btn" %>
+  </div>
+<% end %>

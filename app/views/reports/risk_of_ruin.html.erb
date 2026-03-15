@@ -1,0 +1,336 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--negative);">warning</span>
+    Risk of Ruin Calculator
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Risk Analysis", reports_risk_analysis_path, class: "btn" %>
+    <%= link_to "Reports", reports_overview_path, class: "btn" %>
+  </div>
+</div>
+
+<% if @total_trades < 10 %>
+  <div class="card"><p class="empty-state">Need at least 10 closed trades for risk of ruin analysis. Currently: <%= @total_trades %> trades.</p></div>
+<% else %>
+
+  <%# Parameters form %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Account Parameters</h2></div>
+    <%= form_with url: reports_risk_of_ruin_path, method: :get, class: "filter-form" do |f| %>
+      <div class="filter-row">
+        <div class="form-group">
+          <%= f.label :account_size, "Account Size ($)" %>
+          <%= f.number_field :account_size, value: @account_size, min: 1000, step: 1000, class: "form-control" %>
+        </div>
+        <div class="form-group">
+          <%= f.label :risk_per_trade, "Risk Per Trade (%)" %>
+          <%= f.number_field :risk_per_trade, value: @risk_per_trade, min: 0.1, max: 25, step: 0.1, class: "form-control" %>
+        </div>
+        <div class="form-group">
+          <%= f.label :ruin_threshold, "Ruin Threshold (%)" %>
+          <%= f.number_field :ruin_threshold, value: @ruin_threshold, min: 10, max: 100, step: 5, class: "form-control" %>
+        </div>
+        <div class="form-group form-actions-inline">
+          <%= f.submit "Calculate", class: "btn btn-primary" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Risk gauge %>
+  <%
+    gauge_color = if @risk_of_ruin <= 1
+                    "var(--positive)"
+                  elsif @risk_of_ruin <= 5
+                    "#f9ab00"
+                  elsif @risk_of_ruin <= 20
+                    "#e8710a"
+                  else
+                    "var(--negative)"
+                  end
+    gauge_label = if @risk_of_ruin <= 1
+                    "Very Low Risk"
+                  elsif @risk_of_ruin <= 5
+                    "Low Risk"
+                  elsif @risk_of_ruin <= 20
+                    "Moderate Risk"
+                  elsif @risk_of_ruin <= 50
+                    "High Risk"
+                  else
+                    "Critical Risk"
+                  end
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="padding: 2rem; text-align: center;">
+      <svg viewBox="0 0 200 120" style="width: 240px; margin: 0 auto; display: block;">
+        <%# Background arc %>
+        <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="var(--border)" stroke-width="12" stroke-linecap="round" />
+        <%# Filled arc %>
+        <%
+          ruin_pct = [@risk_of_ruin, 100].min / 100.0
+          angle = Math::PI * ruin_pct
+          end_x = 100 - 80 * Math.cos(angle)
+          end_y = 100 - 80 * Math.sin(angle)
+          large_arc = ruin_pct > 0.5 ? 1 : 0
+        %>
+        <% if ruin_pct > 0.001 %>
+          <path d="M 20 100 A 80 80 0 <%= large_arc %> 1 <%= end_x.round(1) %> <%= end_y.round(1) %>"
+                fill="none" stroke="<%= gauge_color %>" stroke-width="12" stroke-linecap="round" />
+        <% end %>
+        <text x="100" y="85" text-anchor="middle" fill="<%= gauge_color %>" font-size="28" font-weight="700"><%= @risk_of_ruin %>%</text>
+        <text x="100" y="105" text-anchor="middle" fill="var(--text-secondary)" font-size="10">Risk of Ruin</text>
+      </svg>
+      <div style="font-size: 1rem; font-weight: 700; color: <%= gauge_color %>; margin-top: 0.5rem;"><%= gauge_label %></div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+        Probability of losing <%= @ruin_threshold %>% of your $<%= number_with_delimiter(@account_size.to_i) %> account
+      </div>
+    </div>
+  </div>
+
+  <%# Key metrics strip %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @win_rate %>%</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@avg_win) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@avg_loss) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Payoff Ratio</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @payoff_ratio %>x</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Edge / Trade</div>
+        <div style="font-size: 1.25rem; font-weight: 700;" class="<%= @edge >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(@edge) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Kelly %</div>
+        <div style="font-size: 1.25rem; font-weight: 700;" class="<%= @kelly > 0 ? 'positive' : 'negative' %>"><%= @kelly %>%</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+    <%# Monte Carlo Survival %>
+    <div class="card">
+      <div class="card-header"><h2>Monte Carlo Simulation</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: flex; gap: 1.5rem; margin-bottom: 1rem;">
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Survival Rate</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= @mc_survival_rate %>%</div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Ruin Rate</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= @mc_ruin_rate %>%</div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg Max Drawdown</div>
+            <div style="font-size: 1.25rem; font-weight: 700;"><%= @mc_avg_max_dd %>%</div>
+          </div>
+        </div>
+
+        <%# MC Path visualization %>
+        <% if @mc_simulations.any? %>
+          <%
+            all_vals = @mc_simulations.flatten
+            mc_min = all_vals.min.to_f
+            mc_max = all_vals.max.to_f
+            mc_range = mc_max - mc_min; mc_range = 1 if mc_range == 0
+            mc_w = 400; mc_h = 160
+            ruin_level = @account_size * (1 - @ruin_threshold / 100)
+            ruin_y = (mc_h - (ruin_level - mc_min) / mc_range * mc_h).round(1)
+            path_colors = ["#1a73e8", "#0d904f", "#d93025", "#e8710a", "#9334e6"]
+          %>
+          <svg viewBox="0 0 <%= mc_w %> <%= mc_h + 20 %>" style="width: 100%;">
+            <%# Ruin threshold line %>
+            <line x1="0" y1="<%= ruin_y %>" x2="<%= mc_w %>" y2="<%= ruin_y %>" stroke="var(--negative)" stroke-width="1" stroke-dasharray="4,3" opacity="0.5" />
+            <text x="<%= mc_w - 2 %>" y="<%= ruin_y - 3 %>" text-anchor="end" fill="var(--negative)" font-size="7" opacity="0.7">Ruin: <%= number_to_currency(ruin_level) %></text>
+
+            <%# Account start line %>
+            <% start_y = (mc_h - (@account_size - mc_min) / mc_range * mc_h).round(1) %>
+            <line x1="0" y1="<%= start_y %>" x2="<%= mc_w %>" y2="<%= start_y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="2,2" />
+
+            <%# Simulation paths %>
+            <% @mc_simulations.each_with_index do |path, idx| %>
+              <% next unless path.is_a?(Array) && path.length >= 2 %>
+              <%
+                step_w = mc_w.to_f / (path.length - 1)
+                points = path.each_with_index.map { |v, i|
+                  x = (i * step_w).round(1)
+                  y = (mc_h - (v - mc_min) / mc_range * mc_h).round(1)
+                  "#{x},#{y}"
+                }.join(" ")
+                final_val = path.last
+                is_ruin = final_val <= ruin_level
+              %>
+              <polyline points="<%= points %>" fill="none" stroke="<%= is_ruin ? 'var(--negative)' : path_colors[idx % path_colors.length] %>"
+                        stroke-width="1.5" opacity="0.6" />
+            <% end %>
+          </svg>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            <%= @mc_paths %> sample paths over <%= @mc_length %> trades (1,000 total simulations)
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Drawdown history %>
+    <div class="card">
+      <div class="card-header"><h2>Historical Drawdown</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: flex; gap: 1.5rem; margin-bottom: 1rem;">
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Max Drawdown</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= @max_drawdown %>%</div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Max Consec. Losses</div>
+            <div style="font-size: 1.25rem; font-weight: 700;"><%= @max_consecutive_losses %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Streak Impact</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@consecutive_loss_impact) %></div>
+          </div>
+        </div>
+
+        <%# Drawdown chart %>
+        <% if @drawdown_history.length >= 5 %>
+          <%
+            dd_max = @drawdown_history.map { |d| d[:drawdown] }.max.to_f
+            dd_max = 1 if dd_max == 0
+            dd_w = 400; dd_h = 120
+            dd_step = dd_w.to_f / (@drawdown_history.length - 1)
+          %>
+          <svg viewBox="0 0 <%= dd_w %> <%= dd_h + 10 %>" style="width: 100%;">
+            <%
+              dd_points = @drawdown_history.each_with_index.map { |d, i|
+                x = (i * dd_step).round(1)
+                y = (d[:drawdown] / dd_max * dd_h).round(1)
+                "#{x},#{y}"
+              }.join(" ")
+            %>
+            <polyline points="<%= dd_points %>" fill="none" stroke="var(--negative)" stroke-width="1.5" opacity="0.7" />
+            <%# Fill area %>
+            <polygon points="0,0 <%= dd_points %> <%= dd_w %>,0" fill="var(--negative)" opacity="0.08" />
+            <text x="<%= dd_w - 2 %>" y="<%= dd_h + 8 %>" text-anchor="end" fill="var(--text-secondary)" font-size="7"><%= @drawdown_history.length %> trades</text>
+          </svg>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            Drawdown % from peak equity over time (lower is riskier)
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Kelly Criterion & Position Sizing %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Position Sizing Recommendations</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+        <div style="padding: 1rem; background: var(--bg); border-radius: var(--radius); border-left: 3px solid <%= @kelly > 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <div style="font-size: 0.8125rem; font-weight: 600;">Full Kelly</div>
+          <div style="font-size: 1.375rem; font-weight: 700; margin: 0.25rem 0;"><%= @kelly %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">
+            $<%= number_with_delimiter((@account_size * @kelly / 100).round(0)) %> per trade
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            Maximum growth rate but high volatility
+          </div>
+        </div>
+        <div style="padding: 1rem; background: var(--bg); border-radius: var(--radius); border-left: 3px solid var(--primary);">
+          <div style="font-size: 0.8125rem; font-weight: 600;">Half Kelly (Recommended)</div>
+          <div style="font-size: 1.375rem; font-weight: 700; margin: 0.25rem 0;"><%= @half_kelly %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">
+            $<%= number_with_delimiter((@account_size * @half_kelly / 100).round(0)) %> per trade
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            ~75% of max growth, much smoother equity curve
+          </div>
+        </div>
+        <div style="padding: 1rem; background: var(--bg); border-radius: var(--radius); border-left: 3px solid var(--text-secondary);">
+          <div style="font-size: 0.8125rem; font-weight: 600;">Conservative (1%)</div>
+          <div style="font-size: 1.375rem; font-weight: 700; margin: 0.25rem 0;">1.0%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">
+            $<%= number_with_delimiter((@account_size * 0.01).round(0)) %> per trade
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            Standard risk management, slow but steady
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Risk scenarios table %>
+  <div class="card">
+    <div class="card-header"><h2>Consecutive Loss Scenarios</h2></div>
+    <div style="overflow-x: auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Consecutive Losses</th>
+            <th style="text-align: right;">$ Impact (<%= @risk_per_trade %>% risk)</th>
+            <th style="text-align: right;">% of Account</th>
+            <th style="text-align: right;">Remaining</th>
+            <th>Probability</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% risk_amount = @account_size * @risk_per_trade / 100 %>
+          <% (1..15).each do |n| %>
+            <%
+              impact = risk_amount * n
+              pct_lost = (impact / @account_size * 100).round(1)
+              remaining = @account_size - impact
+              prob = ((@loss_rate / 100) ** n * 100).round(4)
+              severity = if pct_lost >= @ruin_threshold
+                           "var(--negative)"
+                         elsif pct_lost >= @ruin_threshold * 0.5
+                           "#e8710a"
+                         elsif pct_lost >= 10
+                           "#f9ab00"
+                         else
+                           "var(--text)"
+                         end
+            %>
+            <tr style="<%= remaining <= 0 ? 'opacity: 0.4;' : '' %>">
+              <td style="font-weight: 600;"><%= n %> in a row</td>
+              <td style="text-align: right; color: var(--negative);"><%= number_to_currency(impact) %></td>
+              <td style="text-align: right; font-weight: 600; color: <%= severity %>;">
+                <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                  <div style="width: 50px; height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden;">
+                    <div style="height: 100%; width: <%= [pct_lost, 100].min %>%; background: <%= severity %>; border-radius: 2px;"></div>
+                  </div>
+                  <%= pct_lost %>%
+                </div>
+              </td>
+              <td style="text-align: right;"><%= remaining > 0 ? number_to_currency(remaining) : "$0" %></td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <div style="width: 60px; height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden;">
+                    <div style="height: 100%; width: <%= [prob, 100].min.round(1) %>%; background: var(--primary); border-radius: 2px;"></div>
+                  </div>
+                  <span style="font-size: 0.8125rem;"><%= prob < 0.01 ? "<0.01" : prob %>%</span>
+                </div>
+              </td>
+            </tr>
+            <% break if remaining <= 0 %>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+    <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border); font-size: 0.6875rem; color: var(--text-secondary);">
+      Based on your <%= @loss_rate %>% loss rate and <%= @risk_per_trade %>% risk per trade.
+      Your worst historical streak was <strong><%= @max_consecutive_losses %></strong> consecutive losses.
+    </div>
+  </div>
+<% end %>

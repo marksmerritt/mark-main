@@ -1,0 +1,194 @@
+<% content_for(:title) { "Quick Search" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #455a64;">search</span>
+    Quick Search
+  </h1>
+  <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem;">
+    Find any page or feature instantly
+  </p>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="padding: 1rem 1.25rem;">
+    <div class="search-input-wrapper">
+      <span class="material-icons-outlined search-input-icon">search</span>
+      <input type="text" id="qs-input" class="form-control search-input" placeholder="Type to search pages, reports, tools..." autofocus autocomplete="off" spellcheck="false">
+      <kbd style="padding: 0.125rem 0.5rem; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); font-size: 0.6875rem; color: var(--text-secondary); white-space: nowrap;">Cmd+K</kbd>
+    </div>
+  </div>
+  <div style="display: flex; gap: 0; border-top: 1px solid var(--border); overflow-x: auto;" id="qs-tabs">
+    <button type="button" class="qs-tab active" data-category="all">
+      All <span class="qs-tab-count"><%= @pages.size %></span>
+    </button>
+    <% @categories.each do |cat| %>
+      <% count = @pages.count { |p| p[:category] == cat } %>
+      <button type="button" class="qs-tab" data-category="<%= cat %>">
+        <%= cat %> <span class="qs-tab-count"><%= count %></span>
+      </button>
+    <% end %>
+  </div>
+</div>
+
+<div id="qs-results-count" style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+  Showing all <span id="qs-count"><%= @pages.size %></span> pages
+</div>
+
+<div id="qs-results" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
+  <% @pages.each do |page| %>
+    <%= link_to page[:path], class: "qs-card", data: { name: page[:name].downcase, keywords: page[:keywords], category: page[:category], description: page[:description].downcase }, style: "text-decoration: none; color: inherit;" do %>
+      <div class="card" style="padding: 1rem 1.25rem; height: 100%; transition: box-shadow 0.15s, transform 0.15s; cursor: pointer;">
+        <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+          <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary); flex-shrink: 0; margin-top: 2px;"><%= page[:icon] %></span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+              <span style="font-weight: 600; font-size: 0.9375rem;"><%= page[:name] %></span>
+              <span class="qs-badge qs-badge-<%= page[:category].downcase %>"><%= page[:category] %></span>
+            </div>
+            <p style="font-size: 0.8125rem; color: var(--text-secondary); margin: 0; line-height: 1.4;">
+              <%= page[:description] %>
+            </p>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+</div>
+
+<div id="qs-empty" style="display: none; text-align: center; padding: 3rem 1rem;">
+  <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); opacity: 0.4;">search_off</span>
+  <h3 style="margin-top: 1rem; color: var(--text-secondary);">No pages match your search</h3>
+  <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">Try a different search term or category.</p>
+</div>
+
+<div style="margin-top: 2rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">
+  <p style="margin-bottom: 0.5rem;">
+    Tip: Press <kbd style="padding: 0.125rem 0.375rem; border-radius: 3px; background: var(--bg); border: 1px solid var(--border); font-size: 0.6875rem;">Cmd+K</kbd> from any page to jump here quickly
+  </p>
+  <p>
+    Or use <kbd style="padding: 0.125rem 0.375rem; border-radius: 3px; background: var(--bg); border: 1px solid var(--border); font-size: 0.6875rem;">&#x2318;K</kbd> to open the command palette
+  </p>
+</div>
+
+<%= javascript_tag nonce: true do %>
+(function() {
+  var input = document.getElementById("qs-input");
+  var resultsContainer = document.getElementById("qs-results");
+  var emptyState = document.getElementById("qs-empty");
+  var countEl = document.getElementById("qs-count");
+  var countWrapper = document.getElementById("qs-results-count");
+  var tabs = document.querySelectorAll(".qs-tab");
+  var cards = resultsContainer.querySelectorAll(".qs-card");
+  var activeCategory = "all";
+
+  function filterCards() {
+    var query = (input.value || "").toLowerCase().trim();
+    var visible = 0;
+
+    cards.forEach(function(card) {
+      var name = card.dataset.name || "";
+      var keywords = card.dataset.keywords || "";
+      var category = card.dataset.category || "";
+      var description = card.dataset.description || "";
+
+      var matchesCategory = (activeCategory === "all" || category === activeCategory);
+      var matchesQuery = !query || name.indexOf(query) !== -1 || keywords.indexOf(query) !== -1 || description.indexOf(query) !== -1;
+
+      if (matchesCategory && matchesQuery) {
+        card.style.display = "";
+        visible++;
+      } else {
+        card.style.display = "none";
+      }
+    });
+
+    countEl.textContent = visible;
+    emptyState.style.display = visible === 0 ? "" : "none";
+    resultsContainer.style.display = visible === 0 ? "none" : "";
+    countWrapper.style.display = visible === 0 ? "none" : "";
+  }
+
+  input.addEventListener("input", filterCards);
+
+  tabs.forEach(function(tab) {
+    tab.addEventListener("click", function() {
+      tabs.forEach(function(t) { t.classList.remove("active"); });
+      tab.classList.add("active");
+      activeCategory = tab.dataset.category;
+      filterCards();
+    });
+  });
+
+  // Focus input on / key
+  document.addEventListener("keydown", function(e) {
+    if (e.key === "/" && document.activeElement !== input && document.activeElement.tagName !== "INPUT" && document.activeElement.tagName !== "TEXTAREA") {
+      e.preventDefault();
+      input.focus();
+    }
+  });
+})();
+<% end %>
+
+<style>
+  .qs-tab {
+    padding: 0.625rem 1rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .qs-tab:hover {
+    color: var(--text);
+    background: var(--bg);
+  }
+  .qs-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+  }
+  .qs-tab-count {
+    font-size: 0.6875rem;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 9999px;
+    background: var(--bg);
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+  .qs-tab.active .qs-tab-count {
+    background: var(--primary);
+    color: white;
+  }
+  .qs-card:hover .card {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transform: translateY(-1px);
+  }
+  .qs-badge {
+    font-size: 0.625rem;
+    font-weight: 600;
+    padding: 0.125rem 0.5rem;
+    border-radius: 9999px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .qs-badge-trading { background: #e3f2fd; color: #1565c0; }
+  .qs-badge-reports { background: #f3e5f5; color: #7b1fa2; }
+  .qs-badge-notes { background: #e8f5e9; color: #2e7d32; }
+  .qs-badge-budget { background: #fff3e0; color: #e65100; }
+  .qs-badge-tools { background: #eceff1; color: #455a64; }
+
+  [data-theme="dark"] .qs-badge-trading { background: #1e3a5f; color: #90caf9; }
+  [data-theme="dark"] .qs-badge-reports { background: #3e1f47; color: #ce93d8; }
+  [data-theme="dark"] .qs-badge-notes { background: #1b3a20; color: #a5d6a7; }
+  [data-theme="dark"] .qs-badge-budget { background: #3e2a10; color: #ffb74d; }
+  [data-theme="dark"] .qs-badge-tools { background: #263238; color: #b0bec5; }
+</style>

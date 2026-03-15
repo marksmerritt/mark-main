@@ -1,40 +1,116 @@
 <%= render "shared/errors", errors: local_assigns[:errors] || @errors %>
 
 <%= form_with url: form_url, method: form_method do %>
-  <div class="form-group">
-    <%= label_tag "journal_entry[date]", "Date" %>
-    <%= date_field_tag "journal_entry[date]", entry["date"], class: "form-control" %>
-  </div>
+  <% ctx = @smart_context || {} %>
+  <div data-controller="journal-prompts journal-templates"
+       data-journal-prompts-today-trades-value="<%= ctx[:today_trades] || 0 %>"
+       data-journal-prompts-today-pnl-value="<%= ctx[:today_pnl] || 0 %>"
+       data-journal-prompts-today-wins-value="<%= ctx[:today_wins] || 0 %>"
+       data-journal-prompts-today-losses-value="<%= ctx[:today_losses] || 0 %>"
+       data-journal-prompts-today-symbols-value="<%= (ctx[:today_symbols] || []).to_json %>"
+       data-journal-prompts-win-rate-value="<%= ctx[:win_rate] || 0 %>"
+       data-journal-prompts-current-streak-value="<%= ctx[:current_streak] || 0 %>"
+       data-journal-prompts-streak-type-value="<%= ctx[:streak_type] || '' %>"
+       data-journal-prompts-best-symbol-value="<%= ctx.dig(:today_best, 'symbol') || '' %>"
+       data-journal-prompts-best-pnl-value="<%= ctx.dig(:today_best, 'pnl').to_f %>"
+       data-journal-prompts-worst-symbol-value="<%= ctx.dig(:today_worst, 'symbol') || '' %>"
+       data-journal-prompts-worst-pnl-value="<%= ctx.dig(:today_worst, 'pnl').to_f %>"
+  >
+    <div data-journal-prompts-target="contextBar"></div>
 
-  <div class="form-group">
-    <%= label_tag "journal_entry[mood]", "Mood" %>
-    <%= select_tag "journal_entry[mood]",
-          options_for_select(["Confident", "Neutral", "Anxious", "Frustrated", "Excited", "Disciplined", "Fearful"], entry["mood"]),
-          include_blank: "Select mood...", class: "form-control" %>
-  </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <div class="form-group" style="margin-bottom: 0; flex: 1;">
+        <%= label_tag "journal_entry[date]", "Date" %>
+        <%= date_field_tag "journal_entry[date]", entry["date"] || Date.today.to_s, class: "form-control", style: "max-width: 200px;" %>
+      </div>
+      <div style="position: relative;">
+        <button type="button" class="btn btn-sm" data-action="journal-templates#toggleMenu">
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">content_paste</span> Template
+        </button>
+        <div class="template-menu hidden" data-journal-templates-target="menu">
+          <button type="button" class="template-menu-item" data-action="journal-templates#apply" data-template="Pre-Market">
+            <span class="material-icons-outlined">wb_sunny</span> Pre-Market
+          </button>
+          <button type="button" class="template-menu-item" data-action="journal-templates#apply" data-template="End of Day">
+            <span class="material-icons-outlined">nightlight</span> End of Day
+          </button>
+          <button type="button" class="template-menu-item" data-action="journal-templates#apply" data-template="Weekly Review">
+            <span class="material-icons-outlined">date_range</span> Weekly Review
+          </button>
+          <button type="button" class="template-menu-item" data-action="journal-templates#apply" data-template="Trade Breakdown">
+            <span class="material-icons-outlined">analytics</span> Trade Breakdown
+          </button>
+        </div>
+      </div>
+    </div>
 
-  <div class="form-group">
-    <%= label_tag "journal_entry[content]", "Content" %>
-    <%= text_area_tag "journal_entry[content]", entry["content"], class: "form-control", rows: 6, placeholder: "What happened today? How did you feel about your trading?" %>
-  </div>
+    <div class="form-group">
+      <%= label_tag "journal_entry[mood]", "Mood" %>
+      <div class="mood-selector">
+        <% [
+          ["Confident", "sentiment_very_satisfied"],
+          ["Disciplined", "verified"],
+          ["Excited", "mood"],
+          ["Neutral", "sentiment_neutral"],
+          ["Anxious", "psychology"],
+          ["Frustrated", "sentiment_dissatisfied"],
+          ["Fearful", "warning"]
+        ].each do |mood, icon| %>
+          <label class="mood-option">
+            <%= radio_button_tag "journal_entry[mood]", mood, entry["mood"] == mood, class: "mood-radio" %>
+            <span class="mood-label">
+              <span class="material-icons-outlined"><%= icon %></span>
+              <%= mood %>
+            </span>
+          </label>
+        <% end %>
+      </div>
+    </div>
 
-  <div class="form-group">
-    <%= label_tag "journal_entry[market_conditions]", "Market Conditions" %>
-    <%= text_area_tag "journal_entry[market_conditions]", entry["market_conditions"], class: "form-control", rows: 4, placeholder: "Describe overall market conditions, trends, volatility..." %>
-  </div>
+    <div class="form-group" data-controller="md-toolbar markdown-preview">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <%= label_tag "journal_entry[content]", "Content" %>
+        <button type="button" class="btn btn-sm" data-markdown-preview-target="toggle" data-action="markdown-preview#toggle">Preview</button>
+      </div>
+      <p class="form-hint" data-journal-prompts-target="prompt" data-field="content"></p>
+      <div class="md-toolbar">
+        <button type="button" class="md-toolbar-btn" data-action="md-toolbar#bold" title="Bold"><strong>B</strong></button>
+        <button type="button" class="md-toolbar-btn" data-action="md-toolbar#italic" title="Italic"><em>I</em></button>
+        <button type="button" class="md-toolbar-btn" data-action="md-toolbar#strikethrough" title="Strikethrough"><s>S</s></button>
+        <span class="md-toolbar-sep"></span>
+        <button type="button" class="md-toolbar-btn" data-action="md-toolbar#heading" title="Heading"><span class="material-icons-outlined" style="font-size: 1rem;">title</span></button>
+        <button type="button" class="md-toolbar-btn" data-action="md-toolbar#bullet" title="Bullet List"><span class="material-icons-outlined" style="font-size: 1rem;">format_list_bulleted</span></button>
+        <button type="button" class="md-toolbar-btn" data-action="md-toolbar#numbered" title="Numbered List"><span class="material-icons-outlined" style="font-size: 1rem;">format_list_numbered</span></button>
+        <button type="button" class="md-toolbar-btn" data-action="md-toolbar#quote" title="Quote"><span class="material-icons-outlined" style="font-size: 1rem;">format_quote</span></button>
+        <button type="button" class="md-toolbar-btn" data-action="md-toolbar#code" title="Code"><span class="material-icons-outlined" style="font-size: 1rem;">code</span></button>
+        <button type="button" class="md-toolbar-btn" data-action="md-toolbar#hr" title="Horizontal Rule"><span class="material-icons-outlined" style="font-size: 1rem;">horizontal_rule</span></button>
+      </div>
+      <%= text_area_tag "journal_entry[content]", entry["content"], class: "form-control", rows: 6, placeholder: "What happened today? How did you feel about your trading?", data: { journal_templates_target: "content", md_toolbar_target: "textarea", markdown_preview_target: "input" } %>
+      <div class="md-preview hidden" data-markdown-preview-target="preview"></div>
+    </div>
 
-  <div class="form-group">
-    <%= label_tag "journal_entry[plan]", "Plan" %>
-    <%= text_area_tag "journal_entry[plan]", entry["plan"], class: "form-control", rows: 4, placeholder: "What was your trading plan for the day?" %>
-  </div>
+    <div class="form-group">
+      <%= label_tag "journal_entry[market_conditions]", "Market Conditions" %>
+      <p class="form-hint" data-journal-prompts-target="prompt" data-field="market_conditions"></p>
+      <%= text_area_tag "journal_entry[market_conditions]", entry["market_conditions"], class: "form-control", rows: 4, placeholder: "Describe overall market conditions, trends, volatility...", data: { journal_templates_target: "marketConditions" } %>
+    </div>
 
-  <div class="form-group">
-    <%= label_tag "journal_entry[review]", "Review" %>
-    <%= text_area_tag "journal_entry[review]", entry["review"], class: "form-control", rows: 4, placeholder: "End-of-day review: Did you follow your plan? What can you improve?" %>
-  </div>
+    <div class="form-group">
+      <%= label_tag "journal_entry[plan]", "Plan" %>
+      <p class="form-hint" data-journal-prompts-target="prompt" data-field="plan"></p>
+      <%= text_area_tag "journal_entry[plan]", entry["plan"], class: "form-control", rows: 4, placeholder: "What was your trading plan for the day?", data: { journal_templates_target: "plan" } %>
+    </div>
 
-  <div class="form-actions">
-    <%= submit_tag submit_label, class: "btn btn-primary" %>
-    <%= link_to "Cancel", cancel_path, class: "btn" %>
+    <div class="form-group">
+      <%= label_tag "journal_entry[review]", "Review" %>
+      <p class="form-hint" data-journal-prompts-target="prompt" data-field="review"></p>
+      <%= text_area_tag "journal_entry[review]", entry["review"], class: "form-control", rows: 4, placeholder: "End-of-day review: Did you follow your plan? What can you improve?", data: { journal_templates_target: "review" } %>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" class="btn" data-action="journal-prompts#refresh">New Prompts</button>
+      <%= submit_tag submit_label, class: "btn btn-primary" %>
+      <%= link_to "Cancel", cancel_path, class: "btn" %>
+    </div>
   </div>
 <% end %>

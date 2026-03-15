@@ -1,0 +1,180 @@
+<% content_for(:title) { "Bill Splitter" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #4caf50;">group</span>
+    Bill Splitter Calculator
+  </h1>
+</div>
+
+<%# Stats Strip %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <div class="card" style="padding: 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Shareable</div>
+    <div style="font-size: 1.5rem; font-weight: 700; color: #4caf50;"><%= number_to_currency(@total_shared_monthly) %></div>
+    <div style="font-size: 0.75rem; color: var(--text-secondary);">per month</div>
+  </div>
+  <div class="card" style="padding: 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Personal</div>
+    <div style="font-size: 1.5rem; font-weight: 700; color: var(--text);"><%= number_to_currency(@total_personal_monthly) %></div>
+    <div style="font-size: 0.75rem; color: var(--text-secondary);">non-splittable</div>
+  </div>
+  <div class="card" style="padding: 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Potential Savings</div>
+    <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@split_scenarios.first&.dig(:savings) || 0) %></div>
+    <div style="font-size: 0.75rem; color: var(--text-secondary);">with 2-way split</div>
+  </div>
+  <div class="card" style="padding: 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Categories</div>
+    <div style="font-size: 1.5rem; font-weight: 700; color: #2196f3;"><%= @shareable_categories_count %></div>
+    <div style="font-size: 0.75rem; color: var(--text-secondary);">shareable</div>
+  </div>
+</div>
+
+<%# Split Scenario Cards %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <% @split_scenarios.each do |scenario| %>
+    <div class="card" style="<%= scenario[:people] == 2 ? 'border: 2px solid #4caf50;' : '' %>">
+      <div style="padding: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <h3 style="font-size: 1.125rem; font-weight: 700;">
+            <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #4caf50;">group</span>
+            <%= scenario[:people] %>-Way Split
+          </h3>
+          <% if scenario[:people] == 2 %>
+            <span style="font-size: 0.625rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #4caf50; color: white; font-weight: 600;">MOST COMMON</span>
+          <% end %>
+        </div>
+        <div style="text-align: center; margin-bottom: 0.75rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Your Share of Shared Bills</div>
+          <div style="font-size: 2rem; font-weight: 700; color: #4caf50;"><%= number_to_currency(scenario[:per_person]) %></div>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary);">per month</div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8125rem;">
+          <div style="padding: 0.5rem; background: var(--bg); border-radius: 6px; text-align: center;">
+            <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">Total w/ Personal</div>
+            <div style="font-weight: 600;"><%= number_to_currency(scenario[:total_with_personal]) %></div>
+          </div>
+          <div style="padding: 0.5rem; background: var(--bg); border-radius: 6px; text-align: center;">
+            <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase;">You Save</div>
+            <div style="font-weight: 600; color: var(--positive);"><%= number_to_currency(scenario[:savings]) %></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Shareable Expenses Table %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">receipt_long</span> Shareable Expenses Breakdown</h2>
+  </div>
+  <div style="overflow-x: auto;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+      <thead>
+        <tr style="border-bottom: 2px solid var(--border);">
+          <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Category</th>
+          <th style="padding: 0.75rem 1rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Total</th>
+          <th style="padding: 0.75rem 1rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">2-Way Split</th>
+          <th style="padding: 0.75rem 1rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">3-Way Split</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @category_splits.each do |cs| %>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.75rem 1rem; font-weight: 500;"><%= cs[:category] %></td>
+            <td style="padding: 0.75rem 1rem; text-align: right; font-weight: 600;"><%= number_to_currency(cs[:monthly]) %></td>
+            <td style="padding: 0.75rem 1rem; text-align: right; color: #4caf50;"><%= number_to_currency(cs[:split_2]) %></td>
+            <td style="padding: 0.75rem 1rem; text-align: right; color: #2196f3;"><%= number_to_currency(cs[:split_3]) %></td>
+          </tr>
+        <% end %>
+        <% if @category_splits.empty? %>
+          <tr>
+            <td colspan="4" style="padding: 2rem; text-align: center; color: var(--text-secondary);">No shareable expenses identified from recent transactions.</td>
+          </tr>
+        <% end %>
+        <% if @category_splits.any? %>
+          <tr style="border-top: 2px solid var(--border); font-weight: 700;">
+            <td style="padding: 0.75rem 1rem;">Total</td>
+            <td style="padding: 0.75rem 1rem; text-align: right;"><%= number_to_currency(@total_shared_monthly) %></td>
+            <td style="padding: 0.75rem 1rem; text-align: right; color: #4caf50;"><%= number_to_currency((@total_shared_monthly / 2.0).round(2)) %></td>
+            <td style="padding: 0.75rem 1rem; text-align: right; color: #2196f3;"><%= number_to_currency((@total_shared_monthly / 3.0).round(2)) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%# Personal vs Shared Visualization %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">donut_large</span> Personal vs Shared Expenses</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: flex; gap: 2rem; align-items: center; margin-bottom: 1rem;">
+      <div style="flex: 1;">
+        <div style="height: 2rem; border-radius: 8px; overflow: hidden; display: flex;">
+          <div style="width: <%= @shared_pct %>%; background: #4caf50; transition: width 0.3s;" title="Shared: <%= @shared_pct %>%"></div>
+          <div style="width: <%= @personal_pct %>%; background: #ff9800; transition: width 0.3s;" title="Personal: <%= @personal_pct %>%"></div>
+        </div>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: center; gap: 2rem; font-size: 0.8125rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #4caf50;"></span>
+        <span>Shared (<%= @shared_pct %>%) &mdash; <%= number_to_currency(@total_shared_monthly) %>/mo</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span style="display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #ff9800;"></span>
+        <span>Personal (<%= @personal_pct %>%) &mdash; <%= number_to_currency(@total_personal_monthly) %>/mo</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Income-Proportional Split %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">balance</span> Income-Proportional Split Example</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+      Instead of splitting evenly, consider splitting bills proportional to income. Here's an example 60/40 split based on income ratio:
+    </p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+      <% @income_split_ratios.each do |ratio| %>
+        <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;"><%= ratio[:label] %></div>
+          <div style="font-size: 1.75rem; font-weight: 700; color: #4caf50;"><%= number_to_currency(ratio[:amount]) %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">per month</div>
+          <div style="margin-top: 0.5rem; height: 0.5rem; background: var(--border); border-radius: 3px; overflow: hidden;">
+            <div style="height: 100%; width: <%= ratio[:pct] %>%; background: #4caf50; border-radius: 3px;"></div>
+          </div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= ratio[:pct] %>% of shared bills</div>
+        </div>
+      <% end %>
+    </div>
+    <div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg); border-radius: 8px; font-size: 0.75rem; color: var(--text-secondary);">
+      <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">info</span>
+      Tip: Adjust the ratio to match your actual income difference. Common splits include 50/50, 60/40, and 70/30.
+    </div>
+  </div>
+</div>
+
+<%# Navigation %>
+<div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 2rem;">
+  <%= link_to budget_dashboard_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">dashboard</span> Dashboard
+  <% end %>
+  <%= link_to budget_income_allocator_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">pie_chart</span> Income Allocator
+  <% end %>
+  <%= link_to budget_recurring_analyzer_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">autorenew</span> Recurring Analyzer
+  <% end %>
+  <%= link_to budget_savings_projection_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">trending_up</span> Savings Projection
+  <% end %>
+</div>

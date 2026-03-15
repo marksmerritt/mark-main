@@ -1,0 +1,236 @@
+<div class="page-header">
+  <h1>Spending Analysis</h1>
+</div>
+
+<div class="card" style="margin-bottom: 1rem;">
+  <%= form_with url: budget_spending_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :month, "Month" %>
+        <%= f.select :month, (1..12).map { |m| [Date::MONTHNAMES[m], m] },
+            { selected: @month }, class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :year, "Year" %>
+        <%= f.number_field :year, value: @year, class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @overview.present? && !@overview["error"] %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Income</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@overview["budget_income"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Spent</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(@overview["total_spent"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Remaining</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @overview["remaining_budget"].to_f >= 0 ? 'positive' : 'negative' %>">
+          <%= number_to_currency(@overview["remaining_budget"]) %>
+        </div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @overview["savings_rate"] %>%</div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div class="content-grid">
+  <% if @categories.is_a?(Array) && @categories.any? %>
+    <div class="card">
+      <div class="card-header"><h2>By Category</h2></div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th style="text-align: right;">Planned</th>
+            <th style="text-align: right;">Actual</th>
+            <th style="text-align: right;">Remaining</th>
+            <th style="text-align: right;">% Used</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @categories.each do |cat| %>
+            <tr>
+              <td><strong><%= cat["name"] %></strong></td>
+              <td style="text-align: right;"><%= number_to_currency(cat["planned"]) %></td>
+              <td style="text-align: right;"><%= number_to_currency(cat["actual"]) %></td>
+              <td style="text-align: right;" class="<%= cat["remaining"].to_f < 0 ? 'negative' : 'positive' %>">
+                <%= number_to_currency(cat["remaining"]) %>
+              </td>
+              <td style="text-align: right;">
+                <span class="<%= budget_progress_class(cat["percentage"]) %>" style="padding: 0.125rem 0.5rem; border-radius: 4px; color: white; font-size: 0.8rem;">
+                  <%= cat["percentage"] %>%
+                </span>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+        <tfoot>
+          <tr style="font-weight: 600;">
+            <td>Total</td>
+            <td style="text-align: right;"><%= number_to_currency(@categories.sum { |c| c["planned"].to_f }) %></td>
+            <td style="text-align: right;"><%= number_to_currency(@categories.sum { |c| c["actual"].to_f }) %></td>
+            <td style="text-align: right;"><%= number_to_currency(@categories.sum { |c| c["remaining"].to_f }) %></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Spending Breakdown</h2></div>
+      <div style="padding: 1rem;">
+        <% total_spent = @categories.sum { |c| c["actual"].to_f } %>
+        <% @categories.select { |c| c["actual"].to_f > 0 }.sort_by { |c| -c["actual"].to_f }.each do |cat| %>
+          <div style="margin-bottom: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+              <span style="font-size: 0.875rem; font-weight: 500;"><%= cat["name"] %></span>
+              <span style="font-size: 0.875rem;"><%= number_to_currency(cat["actual"]) %> (<%= total_spent > 0 ? ((cat["actual"].to_f / total_spent) * 100).round(1) : 0 %>%)</span>
+            </div>
+            <div class="budget-progress-bar">
+              <div class="budget-progress-fill <%= budget_progress_class(cat["percentage"]) %>"
+                   style="width: <%= total_spent > 0 ? [(cat["actual"].to_f / total_spent) * 100, 100].min : 0 %>%"></div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Budget vs Actual bars %>
+<% if @categories.is_a?(Array) && @categories.count >= 2 %>
+  <%
+    active_cats = @categories.select { |c| c["planned"].to_f > 0 || c["actual"].to_f > 0 }.sort_by { |c| -c["actual"].to_f }
+    bar_max = active_cats.map { |c| [c["planned"].to_f, c["actual"].to_f].max }.max.to_f
+    bar_max = 1 if bar_max == 0
+    over_budget = active_cats.count { |c| c["percentage"].to_f > 100 }
+    under_budget = active_cats.count { |c| c["percentage"].to_f <= 100 && c["actual"].to_f > 0 }
+  %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+      <h2>Budget vs Actual</h2>
+      <span class="text-muted">
+        <span class="positive"><%= under_budget %> on track</span>,
+        <span class="negative"><%= over_budget %> over</span>
+      </span>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <% active_cats.first(10).each do |cat| %>
+        <div style="margin-bottom: 0.875rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+            <span style="font-size: 0.8125rem; font-weight: 600;"><%= cat["name"] %></span>
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">
+              <%= number_to_currency(cat["actual"]) %> / <%= number_to_currency(cat["planned"]) %>
+            </span>
+          </div>
+          <div style="display: flex; gap: 2px;">
+            <%# Planned bar (ghost) %>
+            <div style="flex: 1; height: 14px; position: relative; background: var(--bg); border-radius: 4px; overflow: hidden;">
+              <% planned_w = cat["planned"].to_f > 0 ? (cat["planned"].to_f / bar_max * 100).round(1) : 0 %>
+              <% actual_w = (cat["actual"].to_f / bar_max * 100).round(1) %>
+              <%# Planned outline %>
+              <div style="position: absolute; left: 0; top: 0; height: 100%; width: <%= planned_w %>%;
+                          border: 1.5px dashed var(--border); border-radius: 4px; box-sizing: border-box;"></div>
+              <%# Actual fill %>
+              <div style="height: 100%; width: <%= actual_w %>%; border-radius: 4px;
+                          background: <%= cat["percentage"].to_f > 100 ? 'var(--negative)' : cat["percentage"].to_f > 80 ? '#f9ab00' : 'var(--positive)' %>;
+                          opacity: 0.5;"></div>
+            </div>
+            <span style="width: 40px; text-align: right; font-size: 0.75rem; font-weight: 600;
+                         color: <%= cat["percentage"].to_f > 100 ? 'var(--negative)' : 'var(--text-secondary)' %>;">
+              <%= cat["percentage"] %>%
+            </span>
+          </div>
+        </div>
+      <% end %>
+      <div style="display: flex; gap: 1rem; margin-top: 0.75rem; font-size: 0.6875rem; color: var(--text-secondary);">
+        <span style="display: flex; align-items: center; gap: 4px;">
+          <div style="width: 12px; height: 8px; background: var(--positive); opacity: 0.5; border-radius: 2px;"></div> Actual (on track)
+        </span>
+        <span style="display: flex; align-items: center; gap: 4px;">
+          <div style="width: 12px; height: 8px; background: var(--negative); opacity: 0.5; border-radius: 2px;"></div> Actual (over budget)
+        </span>
+        <span style="display: flex; align-items: center; gap: 4px;">
+          <div style="width: 12px; height: 8px; border: 1.5px dashed var(--border); border-radius: 2px;"></div> Planned
+        </span>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<% if @trends.is_a?(Array) && @trends.length > 1 %>
+  <%
+    trend_max = @trends.map { |t| [t["income"].to_f, t["expenses"].to_f].max }.max.to_f
+    trend_max = 1 if trend_max == 0
+  %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header"><h2>6-Month Trend</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <%# Visual trend bars %>
+      <% @trends.each do |t| %>
+        <div style="margin-bottom: 0.875rem;">
+          <div style="font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;"><%= t["label"] %></div>
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.125rem;">
+            <span style="width: 55px; font-size: 0.625rem; color: var(--text-secondary);">Income</span>
+            <div style="flex: 1; height: 10px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+              <div style="height: 100%; width: <%= (t["income"].to_f / trend_max * 100).round(1) %>%; background: var(--positive); opacity: 0.5; border-radius: 3px;"></div>
+            </div>
+            <span style="width: 65px; text-align: right; font-size: 0.6875rem;"><%= number_to_currency(t["income"]) %></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="width: 55px; font-size: 0.625rem; color: var(--text-secondary);">Expenses</span>
+            <div style="flex: 1; height: 10px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+              <div style="height: 100%; width: <%= (t["expenses"].to_f / trend_max * 100).round(1) %>%; background: var(--negative); opacity: 0.5; border-radius: 3px;"></div>
+            </div>
+            <span style="width: 65px; text-align: right; font-size: 0.6875rem;"><%= number_to_currency(t["expenses"]) %></span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th style="text-align: right;">Income</th>
+          <th style="text-align: right;">Expenses</th>
+          <th style="text-align: right;">Net</th>
+          <th style="text-align: right;">Savings Rate</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @trends.each do |t| %>
+          <%
+            income = t["income"].to_f
+            expenses = t["expenses"].to_f
+            net = t["net"].to_f
+            savings_rate = income > 0 ? ((income - expenses) / income * 100).round(1) : 0
+          %>
+          <tr>
+            <td><%= t["label"] %></td>
+            <td style="text-align: right;" class="positive"><%= number_to_currency(income) %></td>
+            <td style="text-align: right;" class="negative"><%= number_to_currency(expenses) %></td>
+            <td style="text-align: right;" class="<%= net >= 0 ? 'positive' : 'negative' %>">
+              <%= number_to_currency(net) %>
+            </td>
+            <td style="text-align: right;">
+              <span class="<%= savings_rate >= 20 ? 'positive' : savings_rate >= 0 ? '' : 'negative' %>"><%= savings_rate %>%</span>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

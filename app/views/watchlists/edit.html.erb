@@ -1,0 +1,9 @@
+<div class="page-header">
+  <h1>Edit Watchlist Item</h1>
+</div>
+
+<div class="card">
+  <%= render "form", watchlist: @watchlist,
+             form_url: watchlist_path(@watchlist["id"]), form_method: :patch,
+             submit_label: "Update", cancel_path: watchlist_path(@watchlist["id"]) %>
+</div>

@@ -1,0 +1,371 @@
+<% content_for(:title) { "Lifestyle Inflation" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #c62828;">trending_up</span>
+    Lifestyle Inflation Tracker
+  </h1>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Trend</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @spending_trend_pct > 0 ? 'var(--negative)' : 'var(--positive)' %>;">
+        <%= @spending_trend_pct > 0 ? '+' : '' %><%= @spending_trend_pct %>%
+      </div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Lifestyle Score</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @lifestyle_score > 10 ? 'var(--negative)' : (@lifestyle_score > 0 ? '#fb8c00' : 'var(--positive)') %>;">
+        <%= @lifestyle_score > 0 ? '+' : '' %><%= @lifestyle_score %>%
+      </div>
+      <div style="font-size: 0.625rem; color: var(--text-secondary);">above inflation</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Cost/Day</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@avg_cost_per_day) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Categories Creeping</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @categories_creeping_count > 0 ? 'var(--negative)' : 'var(--positive)' %>;"><%= @categories_creeping_count %></div>
+    </div>
+  </div>
+</div>
+
+<%# Monthly Spending Trend Chart %>
+<% if @monthly_data.size >= 2 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #c62828;">show_chart</span> Monthly Spending Over Time</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        chart_w = [(@monthly_data.size * 60 + 80), 400].max
+        max_val = @monthly_data.map { |d| d[:expenses] }.max.to_f
+        max_val = 1 if max_val == 0
+        chart_h = 180
+        plot_h = 130
+        plot_y_start = 20
+        plot_x_start = 50
+        point_gap = (@monthly_data.size > 1 ? (chart_w - plot_x_start - 30).to_f / (@monthly_data.size - 1) : 0)
+
+        points = @monthly_data.each_with_index.map { |d, i|
+          x = plot_x_start + i * point_gap
+          y = plot_y_start + plot_h - (d[:expenses] / max_val * plot_h)
+          [x, y, d]
+        }
+        polyline = points.map { |x, y, _| "#{x.round(1)},#{y.round(1)}" }.join(" ")
+
+        # Simple linear trend
+        n = points.size.to_f
+        sum_x = points.each_with_index.sum { |_, i| i }
+        sum_y = points.sum { |_, y, _| y }
+        sum_xy = points.each_with_index.sum { |(_, y, _), i| i * y }
+        sum_x2 = points.each_with_index.sum { |_, i| i * i }
+        denom = n * sum_x2 - sum_x * sum_x
+        if denom != 0
+          slope = (n * sum_xy - sum_x * sum_y) / denom
+          intercept = (sum_y - slope * sum_x) / n
+          trend_y1 = intercept
+          trend_y2 = slope * (n - 1) + intercept
+        else
+          trend_y1 = sum_y / n
+          trend_y2 = trend_y1
+        end
+        trend_x1 = plot_x_start
+        trend_x2 = plot_x_start + (n - 1) * point_gap
+      %>
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h %>" style="width: 100%; height: auto; max-width: 100%; font-family: Inter, sans-serif;">
+        <%# Y-axis labels %>
+        <% 5.times do |i| %>
+          <% y_val = max_val * (4 - i) / 4.0 %>
+          <% y_pos = plot_y_start + plot_h * i / 4.0 %>
+          <line x1="<%= plot_x_start %>" y1="<%= y_pos %>" x2="<%= chart_w - 10 %>" y2="<%= y_pos %>" stroke="var(--border)" stroke-width="0.5"/>
+          <text x="<%= plot_x_start - 5 %>" y="<%= y_pos + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="7">$<%= (y_val / 1000).round(1) %>k</text>
+        <% end %>
+
+        <%# Trend line %>
+        <line x1="<%= trend_x1.round(1) %>" y1="<%= trend_y1.round(1) %>" x2="<%= trend_x2.round(1) %>" y2="<%= trend_y2.round(1) %>"
+              stroke="#c62828" stroke-width="1.5" stroke-dasharray="6,3" opacity="0.6"/>
+
+        <%# Data line %>
+        <polyline points="<%= polyline %>" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linejoin="round"/>
+
+        <%# Data points and labels %>
+        <% points.each_with_index do |(x, y, d), i| %>
+          <circle cx="<%= x.round(1) %>" cy="<%= y.round(1) %>" r="3" fill="var(--primary)"/>
+          <% if i % [(@monthly_data.size / 6.0).ceil, 1].max == 0 || i == @monthly_data.size - 1 %>
+            <text x="<%= x.round(1) %>" y="<%= chart_h - 2 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="6"><%= d[:month].slice(2, 5) %></text>
+          <% end %>
+        <% end %>
+      </svg>
+      <div style="display: flex; gap: 1.5rem; justify-content: center; margin-top: 0.5rem; font-size: 0.6875rem; color: var(--text-secondary);">
+        <span><span style="display: inline-block; width: 12px; height: 2px; background: var(--primary); vertical-align: middle; margin-right: 4px;"></span> Monthly Spending</span>
+        <span><span style="display: inline-block; width: 12px; height: 2px; background: #c62828; border-top: 1px dashed #c62828; vertical-align: middle; margin-right: 4px;"></span> Trend Line</span>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Category Creep Table %>
+<% creeping = @category_creep.select { |c| c[:change_pct].abs > 5 }.first(12) %>
+<% if creeping.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #fb8c00;">category</span> Category Creep</h2>
+    </div>
+    <div style="padding: 0; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.625rem 1rem;">Category</th>
+            <th style="text-align: right; padding: 0.625rem 1rem;">Earlier Avg</th>
+            <th style="text-align: right; padding: 0.625rem 1rem;">Recent Avg</th>
+            <th style="text-align: right; padding: 0.625rem 1rem;">Change</th>
+            <th style="text-align: center; padding: 0.625rem 1rem;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% creeping.each do |c| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem 1rem; font-weight: 600;"><%= c[:category] %></td>
+              <td style="text-align: right; padding: 0.5rem 1rem; color: var(--text-secondary);"><%= number_to_currency(c[:early_avg]) %>/mo</td>
+              <td style="text-align: right; padding: 0.5rem 1rem; font-weight: 600;"><%= number_to_currency(c[:recent_avg]) %>/mo</td>
+              <td style="text-align: right; padding: 0.5rem 1rem; font-weight: 700; color: <%= c[:change_pct] > 0 ? 'var(--negative)' : 'var(--positive)' %>;">
+                <%= c[:change_pct] > 0 ? '+' : '' %><%= c[:change_pct] %>%
+              </td>
+              <td style="text-align: center; padding: 0.5rem 1rem;">
+                <span class="material-icons-outlined" style="font-size: 1rem; color: <%= c[:direction] == :up ? 'var(--negative)' : 'var(--positive)' %>;">
+                  <%= c[:direction] == :up ? 'arrow_upward' : (c[:direction] == :down ? 'arrow_downward' : 'remove') %>
+                </span>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Upgrade Detection Cards %>
+<% if @upgrade_detection.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #c62828;">upgrade</span> Upgrade Detection</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Categories where per-transaction cost increased</span>
+    </div>
+    <div style="padding: 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+      <% @upgrade_detection.first(6).each do |u| %>
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; background: var(--bg);">
+          <div style="font-weight: 700; font-size: 0.875rem; margin-bottom: 0.5rem;"><%= u[:category] %></div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.375rem;">
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">Before</span>
+            <span style="font-size: 0.875rem;"><%= number_to_currency(u[:early_avg_size]) %>/txn</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">Now</span>
+            <span style="font-size: 0.875rem; font-weight: 700;"><%= number_to_currency(u[:recent_avg_size]) %>/txn</span>
+          </div>
+          <div style="text-align: center; padding: 0.25rem 0.5rem; border-radius: 9999px; background: rgba(198,40,40,0.1); color: #c62828; font-weight: 700; font-size: 0.8125rem;">
+            +<%= u[:increase_pct] %>% per transaction
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# New Spending Categories %>
+<% if @new_categories.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #fb8c00;">new_releases</span> New Spending Categories</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Categories that appeared recently but not earlier</span>
+    </div>
+    <div style="padding: 0;">
+      <% @new_categories.first(8).each do |nc| %>
+        <div style="padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: #fb8c00;">fiber_new</span>
+            <span style="font-weight: 600;"><%= nc[:category] %></span>
+          </div>
+          <span style="font-weight: 700;"><%= number_to_currency(nc[:total]) %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Savings Rate Trend %>
+<% if @savings_rate_data.size >= 2 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: <%= @savings_eroded ? 'var(--negative)' : 'var(--positive)' %>;">savings</span>
+        Savings Rate Trend
+        <% if @savings_eroded %>
+          <span style="font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: rgba(234,67,53,0.15); color: var(--negative); font-weight: 600; margin-left: 0.5rem;">ERODING</span>
+        <% end %>
+      </h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        sr_chart_w = [(@savings_rate_data.size * 60 + 80), 400].max
+        sr_max = [@savings_rate_data.map { |d| d[:rate] }.max.to_f, 50].max
+        sr_min = [@savings_rate_data.map { |d| d[:rate] }.min.to_f, -10].min
+        sr_range = sr_max - sr_min
+        sr_range = 1 if sr_range == 0
+        sr_plot_h = 120
+        sr_plot_y = 15
+        sr_plot_x = 45
+        sr_gap = (@savings_rate_data.size > 1 ? (sr_chart_w - sr_plot_x - 30).to_f / (@savings_rate_data.size - 1) : 0)
+        sr_zero_y = sr_plot_y + sr_plot_h - ((0 - sr_min) / sr_range * sr_plot_h)
+
+        sr_points = @savings_rate_data.each_with_index.map { |d, i|
+          x = sr_plot_x + i * sr_gap
+          y = sr_plot_y + sr_plot_h - ((d[:rate] - sr_min) / sr_range * sr_plot_h)
+          [x, y, d]
+        }
+        sr_polyline = sr_points.map { |x, y, _| "#{x.round(1)},#{y.round(1)}" }.join(" ")
+      %>
+      <svg viewBox="0 0 <%= sr_chart_w %> 160" style="width: 100%; height: auto; max-width: 100%; font-family: Inter, sans-serif;">
+        <%# Zero line %>
+        <line x1="<%= sr_plot_x %>" y1="<%= sr_zero_y.round(1) %>" x2="<%= sr_chart_w - 10 %>" y2="<%= sr_zero_y.round(1) %>" stroke="var(--border)" stroke-width="1"/>
+        <text x="<%= sr_plot_x - 5 %>" y="<%= sr_zero_y.round(1) + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="7">0%</text>
+
+        <%# Grid lines %>
+        <% [sr_max, sr_max / 2, sr_min].each do |val| %>
+          <% y_pos = sr_plot_y + sr_plot_h - ((val - sr_min) / sr_range * sr_plot_h) %>
+          <line x1="<%= sr_plot_x %>" y1="<%= y_pos.round(1) %>" x2="<%= sr_chart_w - 10 %>" y2="<%= y_pos.round(1) %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3"/>
+          <text x="<%= sr_plot_x - 5 %>" y="<%= y_pos.round(1) + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="7"><%= val.round(0) %>%</text>
+        <% end %>
+
+        <%# Area fill %>
+        <polygon points="<%= sr_points.first[0].round(1) %>,<%= sr_zero_y.round(1) %> <%= sr_polyline %> <%= sr_points.last[0].round(1) %>,<%= sr_zero_y.round(1) %>"
+                 fill="var(--positive)" opacity="0.1"/>
+
+        <%# Line %>
+        <polyline points="<%= sr_polyline %>" fill="none" stroke="<%= @savings_eroded ? 'var(--negative)' : 'var(--positive)' %>" stroke-width="2" stroke-linejoin="round"/>
+
+        <%# Points and month labels %>
+        <% sr_points.each_with_index do |(x, y, d), i| %>
+          <circle cx="<%= x.round(1) %>" cy="<%= y.round(1) %>" r="2.5" fill="<%= d[:rate] < 0 ? 'var(--negative)' : 'var(--positive)' %>"/>
+          <% if i % [(@savings_rate_data.size / 6.0).ceil, 1].max == 0 || i == @savings_rate_data.size - 1 %>
+            <text x="<%= x.round(1) %>" y="155" text-anchor="middle" fill="var(--text-secondary)" font-size="6"><%= d[:month].slice(2, 5) %></text>
+          <% end %>
+        <% end %>
+      </svg>
+      <div style="display: flex; gap: 2rem; justify-content: center; margin-top: 0.75rem; font-size: 0.8125rem;">
+        <div>
+          <span style="color: var(--text-secondary);">Earlier Avg:</span>
+          <span style="font-weight: 700;"><%= @early_savings_rate %>%</span>
+        </div>
+        <div>
+          <span style="color: var(--text-secondary);">Recent Avg:</span>
+          <span style="font-weight: 700; color: <%= @savings_eroded ? 'var(--negative)' : 'var(--positive)' %>;"><%= @recent_savings_rate %>%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Cost Per Day Trend %>
+<% if @cost_per_day.size >= 2 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">today</span> Daily Living Cost Trend</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        cpd_max = @cost_per_day.map { |d| d[:daily] }.max.to_f
+        cpd_max = 1 if cpd_max == 0
+      %>
+      <div style="display: flex; align-items: flex-end; gap: 2px; height: 80px;">
+        <% @cost_per_day.each do |d| %>
+          <% bar_h = d[:daily] / cpd_max * 100 %>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+            <div style="font-size: 0.5625rem; color: var(--text-secondary); margin-bottom: 2px;" title="<%= number_to_currency(d[:daily]) %>/day"><%= d[:daily].round(0) %></div>
+            <div style="width: 100%; height: <%= bar_h %>%; background: var(--primary); opacity: 0.5; border-radius: 2px 2px 0 0; min-height: 2px;"></div>
+            <div style="font-size: 0.5rem; color: var(--text-secondary); margin-top: 2px; writing-mode: vertical-rl; transform: rotate(180deg); height: 2rem;"><%= d[:month].slice(2, 5) %></div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Creep Alerts %>
+<% if @creep_alerts.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">notification_important</span> Creep Alerts</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Categories with >20% increase quarter-over-quarter</span>
+    </div>
+    <div style="padding: 0;">
+      <% @creep_alerts.first(8).each do |a| %>
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 2.5rem; height: 2.5rem; border-radius: 50%; background: rgba(234,67,53,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--negative);">warning</span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 0.875rem;"><%= a[:category] %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              Previous quarter: <%= number_to_currency(a[:prev_quarter]) %> &rarr; Current: <%= number_to_currency(a[:curr_quarter]) %>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-weight: 700; color: var(--negative); font-size: 1rem;">+<%= a[:change_pct] %>%</div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Tips to Combat Lifestyle Inflation %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">lightbulb</span> Tips to Combat Lifestyle Inflation</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem;">
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; background: var(--bg);">
+        <div style="font-weight: 700; font-size: 0.875rem; margin-bottom: 0.375rem;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--positive);">auto_fix_high</span>
+          Automate Savings First
+        </div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">When income increases, automatically route the extra to savings before you get used to spending it.</div>
+      </div>
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; background: var(--bg);">
+        <div style="font-weight: 700; font-size: 0.875rem; margin-bottom: 0.375rem;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--positive);">timer</span>
+          48-Hour Rule
+        </div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">Wait 48 hours before any non-essential purchase over $50. Most impulse desires fade.</div>
+      </div>
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; background: var(--bg);">
+        <div style="font-weight: 700; font-size: 0.875rem; margin-bottom: 0.375rem;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--positive);">compare_arrows</span>
+          Track Cost-Per-Use
+        </div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">Before upgrading, calculate the cost per use of what you already own. Often upgrades aren't worth it.</div>
+      </div>
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; background: var(--bg);">
+        <div style="font-weight: 700; font-size: 0.875rem; margin-bottom: 0.375rem;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--positive);">price_check</span>
+          50/30/20 Check-In
+        </div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">Regularly verify your spending still aligns: 50% needs, 30% wants, 20% savings. Creep shifts this ratio.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Bottom Nav %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Dashboard", budget_dashboard_path, class: "btn" %>
+  <%= link_to "Spending Report", budget_reports_spending_path, class: "btn" %>
+  <%= link_to "Year in Review", budget_year_in_review_path, class: "btn" %>
+</div>

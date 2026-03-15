@@ -1,0 +1,164 @@
+<% content_for(:title) { "Journal Templates" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #ff8f00;">description</span>
+    Journal Templates
+  </h1>
+  <p style="color: var(--text-secondary); margin-top: 0.25rem; font-size: 0.875rem;">Pre-built templates to guide your trading journal entries</p>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Templates Available</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @templates.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Journal Entries</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @entry_count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Entry Length</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @avg_entry_length %> <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">words</span></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Writing Streak</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @writing_streak >= 3 ? 'var(--positive)' : 'var(--text)' %>;"><%= @writing_streak %> <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">days</span></div>
+    </div>
+  </div>
+</div>
+
+<%# Quick Start - Suggested Template %>
+<% suggested = @templates.find { |t| t[:id] == @suggested_template } %>
+<% if suggested %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid <%= suggested[:color] %>;">
+    <div style="padding: 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+        <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= suggested[:color] %>;">auto_awesome</span>
+        <span style="font-size: 0.875rem; font-weight: 600;">Start Writing Now</span>
+        <span style="font-size: 0.6875rem; color: var(--text-secondary); background: var(--bg); padding: 0.125rem 0.5rem; border-radius: 4px;">Suggested for this time of day</span>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span class="material-icons-outlined" style="font-size: 2rem; color: <%= suggested[:color] %>;"><%= suggested[:icon] %></span>
+          <div>
+            <div style="font-weight: 600;"><%= suggested[:name] %></div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);"><%= suggested[:description] %></div>
+          </div>
+        </div>
+        <%= link_to new_journal_entry_path(template: suggested[:id]), class: "btn btn-primary", style: "white-space: nowrap;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">edit</span>
+          Use Template
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Template Cards Grid %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <% @templates.each do |template| %>
+    <div class="card" style="display: flex; flex-direction: column;" data-controller="template-preview" data-template-preview-id-value="<%= template[:id] %>">
+      <div class="card-header" style="display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem;">
+        <span class="material-icons-outlined" style="font-size: 1.75rem; color: <%= template[:color] %>;"><%= template[:icon] %></span>
+        <div style="flex: 1;">
+          <div style="font-weight: 600;"><%= template[:name] %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= template[:sections].count %> sections</div>
+        </div>
+        <% usage = @usage_analysis.find { |u| u[:id] == template[:id] } %>
+        <% if usage && usage[:count] > 0 %>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary); background: var(--bg); padding: 0.125rem 0.5rem; border-radius: 4px;"><%= usage[:count] %> similar entries</span>
+        <% end %>
+      </div>
+      <div style="padding: 0 1.25rem 0.75rem; flex: 1;">
+        <p style="font-size: 0.8125rem; color: var(--text-secondary); margin: 0;"><%= template[:description] %></p>
+      </div>
+
+      <%# Preview toggle %>
+      <div style="padding: 0 1.25rem;">
+        <button onclick="this.closest('[data-controller=template-preview]').querySelector('[data-preview]').classList.toggle('hidden'); this.querySelector('.preview-icon').textContent = this.closest('[data-controller=template-preview]').querySelector('[data-preview]').classList.contains('hidden') ? 'expand_more' : 'expand_less';"
+                style="background: none; border: none; cursor: pointer; color: var(--primary); font-size: 0.8125rem; padding: 0; display: flex; align-items: center; gap: 0.25rem;">
+          <span class="material-icons-outlined preview-icon" style="font-size: 1rem;">expand_more</span>
+          Preview sections
+        </button>
+      </div>
+
+      <%# Section preview (hidden by default) %>
+      <div data-preview class="hidden" style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border); margin-top: 0.75rem;">
+        <% template[:sections].each_with_index do |section, i| %>
+          <div style="padding: 0.5rem 0; <%= i < template[:sections].count - 1 ? 'border-bottom: 1px solid var(--border);' : '' %>">
+            <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.25rem;">
+              <span style="color: <%= template[:color] %>; font-size: 0.75rem; margin-right: 0.25rem;"><%= i + 1 %>.</span>
+              <%= section[:title] %>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); font-style: italic;"><%= section[:prompt] %></div>
+          </div>
+        <% end %>
+      </div>
+
+      <%# Action %>
+      <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border); margin-top: auto;">
+        <%= link_to new_journal_entry_path(template: template[:id]), style: "display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.5rem 1rem; background: #{template[:color]}15; color: #{template[:color]}; border-radius: 6px; text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: background 0.15s;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem;">edit</span>
+          Use Template
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Usage Insights %>
+<% if @usage_analysis.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff8f00;">insights</span>
+        Usage Insights
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <p style="font-size: 0.8125rem; color: var(--text-secondary); margin: 0 0 1rem;">Based on content analysis of your existing journal entries:</p>
+      <div style="display: grid; gap: 0.5rem;">
+        <% @usage_analysis.each_with_index do |usage, i| %>
+          <% template = @templates.find { |t| t[:id] == usage[:id] } %>
+          <% next unless template %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; background: var(--bg); border-radius: 6px;">
+            <span style="font-size: 0.75rem; font-weight: 700; color: var(--text-secondary); width: 1.25rem; text-align: center;">#<%= i + 1 %></span>
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= template[:color] %>;"><%= template[:icon] %></span>
+            <span style="font-size: 0.875rem; flex: 1;"><%= usage[:label] %></span>
+            <span style="font-size: 0.8125rem; font-weight: 600;"><%= usage[:count] %></span>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary);">matching entries</span>
+          </div>
+        <% end %>
+      </div>
+
+      <% unused = @templates.select { |t| @usage_analysis.none? { |u| u[:id] == t[:id] } } %>
+      <% if unused.any? %>
+        <div style="margin-top: 1rem; padding: 0.75rem 1rem; background: #ff8f0010; border-radius: 6px; border-left: 3px solid #ff8f00;">
+          <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.25rem;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #ff8f00;">lightbulb</span>
+            Try something new
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">
+            You haven't tried: <%= unused.map { |t| t[:name] }.join(", ") %>. Diversifying your journaling can reveal new insights.
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Nav %>
+<div style="display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap; margin-top: 2rem;">
+  <%= link_to journal_entries_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">book</span> Journal
+  <% end %>
+  <%= link_to review_trades_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">rate_review</span> Trade Review
+  <% end %>
+  <%= link_to journal_insights_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">psychology</span> Insights
+  <% end %>
+</div>

@@ -1,0 +1,331 @@
+<% content_for(:title) { @query.present? ? "Search: #{@query}" : "Search" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">search</span>
+    Search
+  </h1>
+</div>
+
+<div class="card" style="margin-bottom: 1rem;" data-controller="search-filters">
+  <%= form_with url: search_path, method: :get, class: "search-form", data: { search_filters_target: "form" } do |f| %>
+    <div style="padding: 1rem 1.25rem;">
+      <div class="search-input-wrapper">
+        <span class="material-icons-outlined search-input-icon">search</span>
+        <%= f.text_field :q, value: params[:q], placeholder: "Search trades, notes, journal entries, and transactions...", class: "form-control search-input", autofocus: true, autocomplete: "off", data: { search_filters_target: "input", action: "keydown->search-filters#handleKey" } %>
+        <% if @query.present? %>
+          <%= link_to search_path, style: "display: flex; align-items: center; color: var(--text-secondary); text-decoration: none; padding: 0.25rem;" do %>
+            <span class="material-icons-outlined" style="font-size: 1.125rem;">close</span>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+
+    <% if @query.present? %>
+      <%
+        s_trades_count = @trades.count
+        s_journal_count = @journal_entries.count
+        s_notes_count = @notes.count
+        s_txn_count = @transactions.present? ? @transactions.count : 0
+      %>
+      <div style="display: flex; gap: 0; border-top: 1px solid var(--border); overflow-x: auto;" data-search-filters-target="tabs">
+        <button type="button" data-action="click->search-filters#filter" data-filter="all"
+                class="search-tab active" data-search-filters-target="tab">
+          All <span class="search-tab-count"><%= @total_results %></span>
+        </button>
+        <% if s_trades_count > 0 %>
+          <button type="button" data-action="click->search-filters#filter" data-filter="trades"
+                  class="search-tab" data-search-filters-target="tab">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">show_chart</span>
+            Trades <span class="search-tab-count"><%= s_trades_count %></span>
+          </button>
+        <% end %>
+        <% if s_journal_count > 0 %>
+          <button type="button" data-action="click->search-filters#filter" data-filter="journal"
+                  class="search-tab" data-search-filters-target="tab">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">auto_stories</span>
+            Journal <span class="search-tab-count"><%= s_journal_count %></span>
+          </button>
+        <% end %>
+        <% if s_notes_count > 0 %>
+          <button type="button" data-action="click->search-filters#filter" data-filter="notes"
+                  class="search-tab" data-search-filters-target="tab">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">description</span>
+            Notes <span class="search-tab-count"><%= s_notes_count %></span>
+          </button>
+        <% end %>
+        <% if s_txn_count > 0 %>
+          <button type="button" data-action="click->search-filters#filter" data-filter="transactions"
+                  class="search-tab" data-search-filters-target="tab">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">receipt</span>
+            Transactions <span class="search-tab-count"><%= s_txn_count %></span>
+          </button>
+        <% end %>
+      </div>
+    <% end %>
+  <% end %>
+</div>
+
+<% if @errors.any? %>
+  <% @errors.each do |error| %>
+    <div class="flash flash-alert"><%= error %></div>
+  <% end %>
+<% end %>
+
+<% if @query.present? %>
+  <% if @total_results == 0 %>
+    <div class="card" style="padding: 3rem; text-align: center;">
+      <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); opacity: 0.5;">search_off</span>
+      <h3 style="margin-top: 1rem; color: var(--text-secondary);">No results for "<%= @query %>"</h3>
+      <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">
+        Try a different search term or check your spelling.
+      </p>
+      <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+        <%= link_to "Browse Trades", trades_path, class: "btn btn-sm" %>
+        <%= link_to "Browse Notes", notes_path, class: "btn btn-sm" %>
+        <%= link_to "Browse Transactions", budget_transactions_path, class: "btn btn-sm" %>
+      </div>
+    </div>
+  <% else %>
+    <div class="search-results" data-search-filters-target="results">
+
+      <%# Trades Section %>
+      <% if @trades.any? %>
+        <div class="search-section" data-section="trades" data-search-filters-target="section">
+          <div class="card">
+            <div class="card-header">
+              <h2>
+                <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);">show_chart</span>
+                Trades
+              </h2>
+              <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= @trades.count %> found</span>
+            </div>
+            <% @trades.each do |trade| %>
+              <% trade_pnl = trade["pnl"].to_f %>
+              <%= link_to trade_path(trade["id"]), style: "display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; transition: background 0.15s;", class: "report-hub-link" do %>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                  <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= trade_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                    <%= trade_pnl >= 0 ? 'trending_up' : 'trending_down' %>
+                  </span>
+                  <div>
+                    <div style="font-weight: 600;"><%= trade["symbol"] %></div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                      <%= trade["side"]&.capitalize %> · <%= trade["setup"].presence || trade["asset_class"]&.capitalize || "Trade" %>
+                      · <%= Date.parse(trade["entry_time"]).strftime("%b %d, %Y") rescue "—" %>
+                    </div>
+                  </div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="font-weight: 600; color: <%= trade_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                    <%= trade_pnl >= 0 ? '+' : '' %><%= number_to_currency(trade_pnl) %>
+                  </div>
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= trade["status"]&.capitalize %></div>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <%# Journal Section %>
+      <% if @journal_entries.any? %>
+        <div class="search-section" data-section="journal" data-search-filters-target="section">
+          <div class="card">
+            <div class="card-header">
+              <h2>
+                <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #9c27b0;">auto_stories</span>
+                Journal Entries
+              </h2>
+              <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= @journal_entries.count %> found</span>
+            </div>
+            <% @journal_entries.each do |entry| %>
+              <%= link_to journal_entry_path(entry["id"]), style: "display: block; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; transition: background 0.15s;", class: "report-hub-link" do %>
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                  <span class="material-icons-outlined" style="font-size: 1.25rem; color: #9c27b0; margin-top: 2px;">auto_stories</span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                      <span style="font-weight: 600;"><%= entry["date"] %></span>
+                      <% if entry["mood"].present? %>
+                        <span style="font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--bg); color: var(--text-secondary);"><%= entry["mood"] %></span>
+                      <% end %>
+                    </div>
+                    <% if entry["content"].present? %>
+                      <p style="font-size: 0.8125rem; color: var(--text-secondary); margin: 0; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <%= truncate(entry["content"], length: 150) %>
+                      </p>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <%# Notes Section %>
+      <% if @notes.any? %>
+        <div class="search-section" data-section="notes" data-search-filters-target="section">
+          <div class="card">
+            <div class="card-header">
+              <h2>
+                <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1a73e8;">description</span>
+                Notes
+              </h2>
+              <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= @notes.count %> found</span>
+            </div>
+            <% @notes.each do |note| %>
+              <%= link_to note_path(note["id"]), style: "display: block; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; transition: background 0.15s;#{note["color"].present? ? " border-left: 3px solid #{note["color"]};" : ""}", class: "report-hub-link" do %>
+                <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+                  <span class="material-icons-outlined" style="font-size: 1.25rem; color: #1a73e8; margin-top: 2px;">
+                    <%= note["pinned"] ? 'push_pin' : 'description' %>
+                  </span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                      <span style="font-weight: 600;">
+                        <% if note["favorited"] %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #f9ab00;">star</span> <% end %>
+                        <%= note["title"].presence || "Untitled" %>
+                      </span>
+                      <% if note.dig("notebook", "name").present? %>
+                        <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--bg); color: var(--text-secondary);"><%= note.dig("notebook", "name") %></span>
+                      <% end %>
+                    </div>
+                    <% preview = note["content_preview"] || note["content"] %>
+                    <% if preview.present? %>
+                      <p style="font-size: 0.8125rem; color: var(--text-secondary); margin: 0; line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <%= truncate(preview, length: 150) %>
+                      </p>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <%# Transactions Section %>
+      <% if @transactions.present? && @transactions.any? %>
+        <div class="search-section" data-section="transactions" data-search-filters-target="section">
+          <div class="card">
+            <div class="card-header">
+              <h2>
+                <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #0d904f;">receipt</span>
+                Transactions
+              </h2>
+              <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= @transactions.count %> found</span>
+            </div>
+            <% @transactions.each do |txn| %>
+              <% is_income = txn["transaction_type"] == "income" %>
+              <%= link_to edit_budget_transaction_path(txn["id"]), style: "display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; transition: background 0.15s;", class: "report-hub-link" do %>
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                  <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= is_income ? 'var(--positive)' : 'var(--text-secondary)' %>;">
+                    <%= is_income ? 'arrow_downward' : 'arrow_upward' %>
+                  </span>
+                  <div>
+                    <div style="font-weight: 500;"><%= txn["description"].presence || txn["merchant"] || "Transaction" %></div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                      <%= txn["merchant"].present? ? "#{txn["merchant"]} · " : "" %><%= Date.parse(txn["transaction_date"]).strftime("%b %d, %Y") rescue txn["transaction_date"] %>
+                    </div>
+                  </div>
+                </div>
+                <div style="font-weight: 600; color: <%= is_income ? 'var(--positive)' : 'inherit' %>;">
+                  <%= is_income ? '+' : '-' %><%= number_to_currency(txn["amount"]) %>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+    </div>
+  <% end %>
+
+<% else %>
+  <%# Empty state with search suggestions %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); opacity: 0.4;">manage_search</span>
+    <h3 style="margin-top: 1rem; color: var(--text-secondary);">Search across everything</h3>
+    <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem; max-width: 28rem; margin-left: auto; margin-right: auto;">
+      Find trades by symbol, notes by title or content, journal entries by mood, and transactions by merchant.
+    </p>
+    <div style="margin-top: 1.5rem; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+      <% ["AAPL", "journal", "groceries", "strategy"].each do |suggestion| %>
+        <%= link_to search_path(q: suggestion), class: "btn btn-sm" do %>
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">search</span>
+          <%= suggestion %>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
+    <div class="card" style="padding: 1.25rem; text-align: center;">
+      <span class="material-icons-outlined" style="font-size: 2rem; color: var(--primary); opacity: 0.6;">show_chart</span>
+      <div style="font-weight: 600; margin-top: 0.5rem;">Trades</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Search by symbol, setup, or notes</div>
+    </div>
+    <div class="card" style="padding: 1.25rem; text-align: center;">
+      <span class="material-icons-outlined" style="font-size: 2rem; color: #1a73e8; opacity: 0.6;">description</span>
+      <div style="font-weight: 600; margin-top: 0.5rem;">Notes</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Search titles and content</div>
+    </div>
+    <div class="card" style="padding: 1.25rem; text-align: center;">
+      <span class="material-icons-outlined" style="font-size: 2rem; color: #9c27b0; opacity: 0.6;">auto_stories</span>
+      <div style="font-weight: 600; margin-top: 0.5rem;">Journal</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Search entries and reflections</div>
+    </div>
+    <div class="card" style="padding: 1.25rem; text-align: center;">
+      <span class="material-icons-outlined" style="font-size: 2rem; color: #0d904f; opacity: 0.6;">receipt</span>
+      <div style="font-weight: 600; margin-top: 0.5rem;">Transactions</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Search by merchant name</div>
+    </div>
+  </div>
+
+  <div style="text-align: center; margin-top: 1.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+    <kbd style="padding: 0.125rem 0.375rem; border-radius: 3px; background: var(--bg); border: 1px solid var(--border); font-size: 0.6875rem;">⌘K</kbd>
+    to open command palette &middot;
+    <kbd style="padding: 0.125rem 0.375rem; border-radius: 3px; background: var(--bg); border: 1px solid var(--border); font-size: 0.6875rem;">/</kbd>
+    to focus search
+  </div>
+<% end %>
+
+<style>
+  .search-tab {
+    padding: 0.625rem 1rem;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+  }
+  .search-tab:hover {
+    color: var(--text);
+    background: var(--bg);
+  }
+  .search-tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+  }
+  .search-tab-count {
+    font-size: 0.6875rem;
+    padding: 0.0625rem 0.375rem;
+    border-radius: 9999px;
+    background: var(--bg);
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+  .search-tab.active .search-tab-count {
+    background: var(--primary);
+    color: white;
+  }
+  .search-section {
+    margin-bottom: 1rem;
+  }
+</style>

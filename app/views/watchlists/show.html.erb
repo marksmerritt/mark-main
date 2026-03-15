@@ -1,0 +1,202 @@
+<%
+  w_symbol = @watchlist["symbol"]
+  w_target = @watchlist["target_entry"].to_f
+  w_above = @watchlist["alert_above"].to_f
+  w_below = @watchlist["alert_below"].to_f
+  w_has_target = @watchlist["target_entry"].present?
+  w_has_alerts = @watchlist["alert_above"].present? || @watchlist["alert_below"].present?
+  w_has_notes = @watchlist["notes"].present?
+
+  # Readiness score
+  w_readiness = 0
+  w_readiness += 1 if w_has_alerts
+  w_readiness += 1 if w_has_target
+  w_readiness += 1 if w_has_notes
+  w_readiness += 1 if @watchlist["asset_class"].present?
+  w_max_readiness = 4
+  w_readiness_pct = (w_readiness.to_f / w_max_readiness * 100).round(0)
+%>
+
+<div class="page-header">
+  <h1><%= w_symbol %></h1>
+  <div class="page-actions">
+    <%= link_to new_trade_path(trade: {
+      symbol: w_symbol,
+      asset_class: @watchlist["asset_class"],
+      entry_price: @watchlist["target_entry"],
+      side: "long"
+    }), class: "btn btn-primary" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">trending_up</span> Quick Trade
+    <% end %>
+    <%= link_to new_trade_plan_path(trade_plan: { symbol: w_symbol }), class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">assignment</span> Create Plan
+    <% end %>
+    <%= link_to "Edit", edit_watchlist_path(@watchlist["id"]), class: "btn" %>
+    <%= link_to "Delete", watchlist_path(@watchlist["id"]), data: { turbo_method: :delete, turbo_confirm: "Remove this symbol from your watchlist?" }, class: "btn btn-danger" %>
+    <%= link_to "Back to Watchlist", watchlists_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Hero card %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: stretch; flex-wrap: wrap;">
+    <%# Symbol & readiness %>
+    <div style="flex: 0 0 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; border-right: 1px solid var(--border);">
+      <div style="font-size: 2rem; font-weight: 700; letter-spacing: 0.5px;"><%= w_symbol %></div>
+      <% if @watchlist["asset_class"].present? %>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><%= @watchlist["asset_class"]&.capitalize %></div>
+      <% end %>
+      <div style="display: flex; gap: 0.375rem; align-items: center;">
+        <span class="badge badge-<%= @watchlist["priority"] %>"><%= @watchlist["priority"]&.capitalize %></span>
+        <% if @watchlist["active"] %>
+          <span class="badge badge-success">Active</span>
+        <% else %>
+          <span class="badge">Inactive</span>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Readiness & key levels %>
+    <div style="flex: 1; min-width: 280px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0;">
+      <div style="padding: 1.25rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Readiness</div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;">
+          <% w_max_readiness.times do |i| %>
+            <div style="width: 10px; height: 10px; border-radius: 50%; background: <%= i < w_readiness ? 'var(--primary)' : 'var(--border)' %>;"></div>
+          <% end %>
+          <span style="font-size: 0.8125rem; font-weight: 600; margin-left: 0.25rem;"><%= w_readiness %>/<%= w_max_readiness %></span>
+        </div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          <%= w_readiness == w_max_readiness ? "Fully prepared" : "#{w_max_readiness - w_readiness} item#{"s" if w_max_readiness - w_readiness > 1} missing" %>
+        </div>
+      </div>
+      <div style="padding: 1.25rem; border-bottom: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Target Entry</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= w_has_target ? number_to_currency(w_target) : "Not set" %></div>
+      </div>
+      <div style="padding: 1.25rem; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Alert Above</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: var(--positive);"><%= @watchlist["alert_above"].present? ? number_to_currency(w_above) : "—" %></div>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Alert Below</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: var(--negative);"><%= @watchlist["alert_below"].present? ? number_to_currency(w_below) : "—" %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Alert zone visualization %>
+  <% if w_has_alerts || w_has_target %>
+    <%
+      levels = []
+      levels << w_below if @watchlist["alert_below"].present? && w_below > 0
+      levels << w_target if w_has_target && w_target > 0
+      levels << w_above if @watchlist["alert_above"].present? && w_above > 0
+    %>
+    <% if levels.count >= 2 %>
+      <%
+        zone_min = levels.min * 0.99
+        zone_max = levels.max * 1.01
+        zone_range = zone_max - zone_min
+        zone_range = 1 if zone_range == 0
+      %>
+      <div style="padding: 0.75rem 1.25rem 1rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.375rem;">Price Zones</div>
+        <div style="position: relative; height: 2rem; background: var(--bg); border-radius: var(--radius); overflow: visible;">
+          <% if @watchlist["alert_below"].present? && w_below > 0 %>
+            <%
+              below_pos = ((w_below - zone_min) / zone_range * 100).clamp(0, 100).round(1)
+            %>
+            <div style="position: absolute; left: <%= below_pos %>%; top: 0; bottom: 0; width: 2px; background: var(--negative);"
+                 title="Alert Below: <%= number_to_currency(w_below) %>"></div>
+          <% end %>
+          <% if w_has_target && w_target > 0 %>
+            <%
+              target_pos = ((w_target - zone_min) / zone_range * 100).clamp(0, 100).round(1)
+            %>
+            <div style="position: absolute; left: <%= target_pos %>%; top: 0; bottom: 0; width: 2px; background: var(--primary);"
+                 title="Target Entry: <%= number_to_currency(w_target) %>"></div>
+          <% end %>
+          <% if @watchlist["alert_above"].present? && w_above > 0 %>
+            <%
+              above_pos = ((w_above - zone_min) / zone_range * 100).clamp(0, 100).round(1)
+            %>
+            <div style="position: absolute; left: <%= above_pos %>%; top: 0; bottom: 0; width: 2px; background: var(--positive);"
+                 title="Alert Above: <%= number_to_currency(w_above) %>"></div>
+          <% end %>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 0.25rem; font-size: 0.625rem;">
+          <% if @watchlist["alert_below"].present? %>
+            <span style="color: var(--negative);">Below: <%= number_to_currency(w_below) %></span>
+          <% end %>
+          <% if w_has_target %>
+            <span style="color: var(--primary); font-weight: 600;">Entry: <%= number_to_currency(w_target) %></span>
+          <% end %>
+          <% if @watchlist["alert_above"].present? %>
+            <span style="color: var(--positive);">Above: <%= number_to_currency(w_above) %></span>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+</div>
+
+<%# Checklist — what's missing %>
+<% missing_items = [] %>
+<% missing_items << { label: "Set price alerts", icon: "notifications", path: edit_watchlist_path(@watchlist["id"]) } unless w_has_alerts %>
+<% missing_items << { label: "Set target entry", icon: "gps_fixed", path: edit_watchlist_path(@watchlist["id"]) } unless w_has_target %>
+<% missing_items << { label: "Add notes/thesis", icon: "edit_note", path: edit_watchlist_path(@watchlist["id"]) } unless w_has_notes %>
+<% if missing_items.any? %>
+  <div class="card" style="margin-bottom: 1rem; border-left: 3px solid var(--primary);">
+    <div style="padding: 0.75rem 1.25rem;">
+      <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.5rem;">Improve your readiness:</div>
+      <% missing_items.each do |item| %>
+        <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; font-size: 0.8125rem;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--text-secondary);"><%= item[:icon] %></span>
+          <%= link_to item[:label], item[:path] %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<div class="trade-detail-grid">
+  <div class="trade-detail-main">
+    <div class="card">
+      <div class="card-header"><h2>Details</h2></div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Symbol</span>
+          <span class="detail-value"><%= w_symbol %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Asset Class</span>
+          <span class="detail-value"><%= @watchlist["asset_class"]&.capitalize || "—" %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Target Entry</span>
+          <span class="detail-value"><%= w_has_target ? number_to_currency(w_target) : "—" %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Alert Above</span>
+          <span class="detail-value"><%= @watchlist["alert_above"].present? ? number_to_currency(w_above) : "—" %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Alert Below</span>
+          <span class="detail-value"><%= @watchlist["alert_below"].present? ? number_to_currency(w_below) : "—" %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Priority</span>
+          <span class="detail-value"><%= @watchlist["priority"]&.capitalize %></span>
+        </div>
+      </div>
+    </div>
+
+    <% if w_has_notes %>
+      <div class="card">
+        <div class="card-header"><h2>Notes & Thesis</h2></div>
+        <div class="text-content"><%= simple_format(@watchlist["notes"]) %></div>
+      </div>
+    <% end %>
+  </div>
+</div>

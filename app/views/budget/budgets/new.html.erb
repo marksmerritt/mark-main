@@ -1,0 +1,69 @@
+<div class="page-header">
+  <h1>New Budget</h1>
+  <div class="page-actions">
+    <%= link_to "Back", budget_budgets_path, class: "btn" %>
+  </div>
+</div>
+
+<div class="card">
+  <% if @errors.present? %>
+    <div class="alert alert-danger" style="margin: 1rem 1.25rem 0;">
+      <ul style="margin: 0; padding-left: 1rem;">
+        <% @errors.each do |error| %>
+          <li><%= error %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <%= form_with url: budget_budgets_path, method: :post, class: "form-container" do |f| %>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+      <div class="form-group">
+        <%= f.label :month, "Month" %>
+        <%= f.select :month, (1..12).map { |m| [Date::MONTHNAMES[m], m] },
+            { selected: @budget["month"] || Date.current.month }, class: "form-control", name: "budget[month]" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :year, "Year" %>
+        <%= f.number_field :year, value: @budget["year"] || Date.current.year, class: "form-control", name: "budget[year]" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :income, "Monthly Income" %>
+        <%= f.number_field :income, value: @budget["income"], step: "0.01", class: "form-control", name: "budget[income]", placeholder: "8000.00" %>
+      </div>
+    </div>
+    <div class="form-group">
+      <%= f.label :name, "Budget Name (optional)" %>
+      <%= f.text_field :name, value: @budget["name"], class: "form-control", name: "budget[name]", placeholder: "e.g. March Budget" %>
+    </div>
+    <div class="form-group">
+      <%= f.label :notes, "Notes" %>
+      <%= f.text_area :notes, value: @budget["notes"], class: "form-control", name: "budget[notes]", rows: 3 %>
+    </div>
+
+    <% if @templates.is_a?(Array) && @templates.any? %>
+      <div class="form-group">
+        <label style="font-weight: 600; margin-bottom: 0.75rem; display: block;">Choose a Template</label>
+        <div class="template-grid">
+          <% @templates.each do |tmpl| %>
+            <label class="template-option">
+              <input type="radio" name="template" value="<%= tmpl["key"] %>"
+                     <%= 'checked' if tmpl["key"] == "ramsey" %>
+                     style="display: none;" data-template-radio>
+              <div class="template-card">
+                <strong><%= tmpl["name"] %></strong>
+                <span class="text-muted" style="font-size: 0.8rem; display: block; margin-top: 0.25rem;"><%= tmpl["description"] %></span>
+                <span class="badge badge-primary" style="margin-top: 0.5rem;"><%= tmpl["category_count"] %> categories</span>
+              </div>
+            </label>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <div class="form-actions">
+      <%= f.submit "Create Empty Budget", class: "btn" %>
+      <button type="submit" name="from_template" value="true" class="btn btn-primary">Create from Template</button>
+    </div>
+  <% end %>
+</div>

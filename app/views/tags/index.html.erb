@@ -1,29 +1,114 @@
 <div class="page-header">
   <h1>Tags</h1>
-  <%= link_to "New Tag", new_tag_path, class: "btn btn-primary" %>
+  <div class="page-actions">
+    <%= link_to reports_by_tag_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">analytics</span> Tag Report
+    <% end %>
+    <%= link_to "New Tag", new_tag_path, class: "btn btn-primary" %>
+  </div>
 </div>
 
-<div class="tags-grid">
-  <% if @tags.is_a?(Array) && @tags.any? %>
-    <% @tags.each do |tag| %>
+<% if @tags.is_a?(Array) && @tags.any? %>
+  <%
+    tags_with_stats = @tags.select { |t| t["stats"].is_a?(Hash) && t["stats"]["trade_count"].to_i > 0 }
+    total_tagged_trades = tags_with_stats.sum { |t| t["stats"]["trade_count"].to_i }
+    profitable_tags = tags_with_stats.count { |t| t["stats"]["total_pnl"].to_f > 0 }
+    total_tag_pnl = tags_with_stats.sum { |t| t["stats"]["total_pnl"].to_f }
+    best_tag = tags_with_stats.max_by { |t| t["stats"]["total_pnl"].to_f }
+    worst_tag = tags_with_stats.min_by { |t| t["stats"]["total_pnl"].to_f }
+    unused_tags = @tags.count { |t| !t["stats"].is_a?(Hash) || t["stats"]["trade_count"].to_i == 0 }
+  %>
+
+  <% if tags_with_stats.count >= 2 %>
+    <%# Tags overview %>
+    <div class="card" style="display: flex; align-items: center; gap: 2rem; padding: 1.25rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 200px;">
+        <h2 style="margin-bottom: 0.5rem;">Tag Overview</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 1rem;">
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Tags</div>
+            <div style="font-size: 1.125rem; font-weight: 700;"><%= @tags.count %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Active</div>
+            <div style="font-size: 1.125rem; font-weight: 700;"><%= tags_with_stats.count %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profitable</div>
+            <div style="font-size: 1.125rem; font-weight: 700; color: var(--positive);"><%= profitable_tags %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net P&L</div>
+            <div style="font-size: 1.125rem; font-weight: 700;" class="<%= total_tag_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(total_tag_pnl) %></div>
+          </div>
+        </div>
+      </div>
+      <% if best_tag && worst_tag && best_tag != worst_tag %>
+        <div style="display: flex; flex-direction: column; gap: 0.375rem; font-size: 0.8125rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--positive);">arrow_upward</span>
+            <span>Best: <strong><%= best_tag["name"] %></strong></span>
+            <span class="positive" style="font-weight: 600;"><%= number_to_currency(best_tag["stats"]["total_pnl"]) %></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--negative);">arrow_downward</span>
+            <span>Worst: <strong><%= worst_tag["name"] %></strong></span>
+            <span class="negative" style="font-weight: 600;"><%= number_to_currency(worst_tag["stats"]["total_pnl"]) %></span>
+          </div>
+          <% if unused_tags > 0 %>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              <%= unused_tags %> unused tag<%= unused_tags == 1 ? "" : "s" %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="tags-grid">
+    <% @tags.sort_by { |t| -(t.dig("stats", "total_pnl") || 0).to_f }.each do |tag| %>
+      <%
+        has_stats = tag["stats"].is_a?(Hash) && tag["stats"]["trade_count"].to_i > 0
+        pnl = has_stats ? tag["stats"]["total_pnl"].to_f : 0
+        trade_count = has_stats ? tag["stats"]["trade_count"].to_i : 0
+        win_rate = has_stats ? tag["stats"]["win_rate"].to_f : 0
+        wins = has_stats ? tag["stats"]["wins"].to_i : 0
+        losses = has_stats ? tag["stats"]["losses"].to_i : 0
+      %>
       <div class="card tag-card">
         <div class="tag-card-header">
           <span class="tag-color-swatch" style="background-color: <%= tag["color"] %>;"></span>
           <h3><%= link_to tag["name"], tag_path(tag["id"]) %></h3>
         </div>
-        <% if tag["stats"] %>
+        <% if has_stats %>
           <div class="tag-card-body">
             <div class="tag-stat">
               <span class="stat-label">Trades</span>
-              <span class="stat-value"><%= tag["stats"]["trade_count"] %></span>
+              <span class="stat-value"><%= trade_count %></span>
             </div>
             <div class="tag-stat">
-              <span class="stat-label">Total P&L</span>
-              <span class="stat-value <%= tag["stats"]["total_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
-                <%= number_to_currency(tag["stats"]["total_pnl"]) %>
+              <span class="stat-label">P&L</span>
+              <span class="stat-value <%= pnl >= 0 ? 'positive' : 'negative' %>">
+                <%= number_to_currency(pnl) %>
               </span>
             </div>
           </div>
+          <%# Win rate bar %>
+          <div style="padding: 0 0.75rem 0.5rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+              <span>Win Rate</span>
+              <span style="font-weight: 600; color: <%= win_rate >= 55 ? 'var(--positive)' : win_rate >= 45 ? 'var(--text)' : 'var(--negative)' %>;"><%= win_rate.round(0) %>%</span>
+            </div>
+            <div style="height: 0.375rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+              <div style="height: 100%; width: <%= win_rate %>%; background: <%= win_rate >= 55 ? 'var(--positive)' : win_rate >= 45 ? 'var(--primary)' : 'var(--negative)' %>; opacity: 0.7; border-radius: 4px;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.5625rem; color: var(--text-secondary); margin-top: 0.125rem;">
+              <span class="positive"><%= wins %>W</span>
+              <span class="negative"><%= losses %>L</span>
+            </div>
+          </div>
+        <% else %>
+          <div style="padding: 0.5rem 0.75rem; font-size: 0.8125rem; color: var(--text-secondary);">No trades tagged yet</div>
         <% end %>
         <div class="tag-card-footer">
           <%= link_to "View", tag_path(tag["id"]), class: "btn btn-sm" %>
@@ -31,9 +116,9 @@
         </div>
       </div>
     <% end %>
-  <% else %>
-    <div class="card empty-state">
-      <p>No tags yet. <%= link_to "Create your first tag", new_tag_path %> to organize your trades.</p>
-    </div>
-  <% end %>
-</div>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No tags yet. <%= link_to "Create your first tag", new_tag_path %> to organize your trades.</p>
+  </div>
+<% end %>

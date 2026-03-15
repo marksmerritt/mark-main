@@ -1,0 +1,571 @@
+<div class="page-header">
+  <h1>Budget Dashboard</h1>
+  <div class="page-actions">
+    <%= link_to "New Budget", new_budget_budget_path, class: "btn btn-primary" %>
+    <%= link_to "Add Transaction", new_budget_transaction_path, class: "btn" %>
+  </div>
+</div>
+
+<% if @overview.present? && !@overview["error"] %>
+  <% health_score = financial_health_score(overview: @overview, budget: @budget, debt: @debt, net_worth: @net_worth, recurring: @recurring) %>
+  <% score_color = health_score_color(health_score) %>
+
+  <div class="health-score-card">
+    <div class="health-score-circle" style="background: conic-gradient(<%= score_color %> 0% <%= health_score %>%, var(--border) <%= health_score %>% 100%);">
+      <div class="health-score-inner">
+        <span class="health-score-value"><%= health_score %></span>
+      </div>
+    </div>
+    <div class="health-score-details">
+      <h2>Financial Health</h2>
+      <span class="health-score-badge" style="background: <%= score_color %>;">
+        <%= health_score_label(health_score) %>
+      </span>
+      <div class="health-score-breakdown">
+        <div class="health-score-factor">
+          <span class="material-icons-outlined">savings</span>
+          <span>Savings Rate: <%= @overview["savings_rate"] %>%</span>
+        </div>
+        <div class="health-score-factor">
+          <span class="material-icons-outlined">account_balance_wallet</span>
+          <span>Budget: <%= @overview["remaining_budget"].to_f >= 0 ? "On Track" : "Over Budget" %></span>
+        </div>
+        <% if @debt.present? && !@debt["error"] %>
+          <div class="health-score-factor">
+            <span class="material-icons-outlined">credit_card</span>
+            <span>Debt Payments: <%= number_to_currency(@debt["total_minimum_payments"]) %>/mo</span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <div class="quick-actions">
+    <%= link_to new_budget_transaction_path, class: "quick-action-btn" do %>
+      <span class="material-icons-outlined">add_circle</span> Add Transaction
+    <% end %>
+    <%= link_to new_budget_budget_path, class: "quick-action-btn" do %>
+      <span class="material-icons-outlined">calculate</span> Create Budget
+    <% end %>
+    <%= link_to new_budget_fund_path, class: "quick-action-btn" do %>
+      <span class="material-icons-outlined">flag</span> Set Goal
+    <% end %>
+  </div>
+
+  <div class="card">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Income</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@overview["budget_income"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Spent</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@overview["total_spent"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Remaining</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @overview["remaining_budget"].to_f >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(@overview["remaining_budget"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @overview["savings_rate"] %>%</div>
+      </div>
+    </div>
+  </div>
+
+  <%# Income/Spent/Remaining stacked bar %>
+  <% if @overview["budget_income"].to_f > 0 %>
+    <%
+      income_val = @overview["budget_income"].to_f
+      spent_val = @overview["total_spent"].to_f
+      remaining_val = @overview["remaining_budget"].to_f
+      spent_pct = (spent_val / income_val * 100).clamp(0, 100).round(1)
+      remaining_pct = remaining_val > 0 ? (remaining_val / income_val * 100).clamp(0, 100).round(1) : 0
+    %>
+    <div class="card" style="margin-top: 0.75rem;">
+      <div style="padding: 0.75rem 1.25rem;">
+        <div style="display: flex; height: 1.5rem; border-radius: 0.75rem; overflow: hidden; background: var(--bg);">
+          <div style="width: <%= spent_pct %>%; background: var(--negative); opacity: 0.6;" title="Spent: <%= number_to_currency(spent_val) %>"></div>
+          <% if remaining_pct > 0 %>
+            <div style="width: <%= remaining_pct %>%; background: var(--positive); opacity: 0.4;" title="Remaining: <%= number_to_currency(remaining_val) %>"></div>
+          <% end %>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 0.375rem; font-size: 0.6875rem; color: var(--text-secondary);">
+          <span style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 8px; height: 8px; border-radius: 2px; background: var(--negative); opacity: 0.6;"></span>
+            Spent (<%= spent_pct %>%)
+          </span>
+          <span style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 8px; height: 8px; border-radius: 2px; background: var(--positive); opacity: 0.4;"></span>
+            Remaining (<%= remaining_pct %>%)
+          </span>
+          <span><%= number_to_currency(income_val) %> budget</span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Spending Pace Gauge %>
+  <% if @overview["total_spent"].to_f > 0 && @overview["budget_income"].to_f > 0 %>
+    <%
+      month_days = Date.current.end_of_month.day
+      day_of_month = Date.current.day
+      days_remaining = month_days - day_of_month
+      time_pct = (day_of_month.to_f / month_days * 100).round(1)
+      budget_pct = (@overview["total_spent"].to_f / @overview["budget_income"].to_f * 100).round(1)
+      pace_ratio = time_pct > 0 ? (budget_pct / time_pct).round(2) : 0
+      daily_rate = day_of_month > 0 ? (@overview["total_spent"].to_f / day_of_month).round(2) : 0
+      safe_daily = days_remaining > 0 ? (@overview["remaining_budget"].to_f / days_remaining).round(2) : 0
+      projected_total = daily_rate * month_days
+      pace_status = if pace_ratio <= 0.85 then "under"
+                    elsif pace_ratio <= 1.15 then "on-pace"
+                    else "over"
+                    end
+      pace_color = case pace_status
+                   when "under" then "var(--positive)"
+                   when "on-pace" then "var(--primary)"
+                   else "var(--negative)"
+                   end
+      pace_label = case pace_status
+                   when "under" then "Under Budget"
+                   when "on-pace" then "On Pace"
+                   else "Over Pace"
+                   end
+    %>
+    <div class="card" style="margin-top: 1.5rem; margin-bottom: 1.5rem;">
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;">
+          <%# Pace indicator %>
+          <div style="flex-shrink: 0; text-align: center;">
+            <div style="position: relative; width: 80px; height: 80px;">
+              <svg viewBox="0 0 36 36" style="transform: rotate(-90deg);">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" stroke-width="3" />
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="<%= pace_color %>" stroke-width="3"
+                        stroke-dasharray="<%= [budget_pct, 100].min %> 100"
+                        stroke-linecap="round" />
+                <%# Time marker %>
+                <%
+                  angle = time_pct / 100.0 * 2 * Math::PI - Math::PI / 2
+                  mx = 18 + 15.9 * Math.cos(angle)
+                  my = 18 + 15.9 * Math.sin(angle)
+                %>
+                <circle cx="<%= mx.round(1) %>" cy="<%= my.round(1) %>" r="2" fill="var(--text-primary)" />
+              </svg>
+              <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+                <span style="font-size: 1rem; font-weight: 700; color: <%= pace_color %>;"><%= budget_pct.round(0) %>%</span>
+                <span style="font-size: 0.5rem; color: var(--text-secondary);">spent</span>
+              </div>
+            </div>
+          </div>
+
+          <%# Pace details %>
+          <div style="flex: 1; min-width: 200px;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <span class="badge badge-<%= pace_status == 'over' ? 'danger' : pace_status == 'on-pace' ? 'primary' : 'success' %>"><%= pace_label %></span>
+              <span style="font-size: 0.8125rem; color: var(--text-secondary);">Day <%= day_of_month %> of <%= month_days %></span>
+            </div>
+            <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+              <div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Daily Rate</div>
+                <div style="font-size: 0.9375rem; font-weight: 600;"><%= number_to_currency(daily_rate) %>/day</div>
+              </div>
+              <div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Safe to Spend</div>
+                <div style="font-size: 0.9375rem; font-weight: 600;" class="<%= safe_daily >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(safe_daily) %>/day</div>
+              </div>
+              <div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Projected</div>
+                <div style="font-size: 0.9375rem; font-weight: 600;" class="<%= projected_total <= @overview["budget_income"].to_f ? 'positive' : 'negative' %>"><%= number_to_currency(projected_total) %></div>
+              </div>
+              <div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">Days Left</div>
+                <div style="font-size: 0.9375rem; font-weight: 600;"><%= days_remaining %></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @budget.present? && @budget["budget_categories"].present? %>
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <h2><%= @budget["display_name"] || "Current Budget" %></h2>
+        <%= zero_based_indicator(@budget) %>
+      </div>
+      <%
+        month_days = Date.current.end_of_month.day
+        day_of_month = Date.current.day
+        time_pct = (day_of_month.to_f / month_days * 100).round(1)
+      %>
+      <div class="budget-categories-list">
+        <% @budget["budget_categories"].each do |cat| %>
+          <%
+            spend_pct = cat["percentage_used"].to_f
+            velocity = spend_pct > 0 && time_pct > 0 ? (spend_pct / time_pct).round(2) : 0
+            projected = cat["planned_amount"].to_f > 0 && time_pct > 0 ? (cat["actual_spent"].to_f / time_pct * 100).round(2) : 0
+            velocity_status = if spend_pct == 0 then "neutral"
+                              elsif velocity <= 0.85 then "under"
+                              elsif velocity <= 1.15 then "on-pace"
+                              else "over"
+                              end
+            velocity_icon = case velocity_status
+                           when "under" then "trending_down"
+                           when "on-pace" then "check_circle"
+                           when "over" then "trending_up"
+                           else "remove"
+                           end
+            velocity_color = case velocity_status
+                            when "under" then "var(--positive)"
+                            when "on-pace" then "var(--primary)"
+                            when "over" then "var(--negative)"
+                            else "var(--text-secondary)"
+                            end
+          %>
+          <div class="budget-category-row">
+            <div class="budget-category-info">
+              <strong><%= cat["name"] %></strong>
+              <span class="text-muted"><%= number_to_currency(cat["actual_spent"]) %> of <%= number_to_currency(cat["planned_amount"]) %></span>
+            </div>
+            <div class="budget-progress-bar" style="position: relative;">
+              <div class="budget-progress-fill <%= budget_progress_class(cat["percentage_used"]) %>"
+                   style="width: <%= [cat["percentage_used"].to_f, 100].min %>%"></div>
+              <div class="budget-pace-marker" style="left: <%= time_pct %>%;" title="Expected pace (<%= time_pct %>%)"></div>
+            </div>
+            <span class="budget-velocity-indicator" style="color: <%= velocity_color %>;" title="<%= velocity_status == 'over' ? "Projected: #{number_to_currency(projected)}" : '' %>">
+              <span class="material-icons-outlined" style="font-size: 1rem;"><%= velocity_icon %></span>
+              <%= cat["percentage_used"] %>%
+            </span>
+          </div>
+        <% end %>
+      </div>
+      <div class="budget-pace-legend">
+        <span class="text-muted">Day <%= day_of_month %>/<%= month_days %> (<%= time_pct %>% of month) — vertical marker shows expected pace</span>
+      </div>
+    </div>
+  <% end %>
+<% end %>
+
+<% if @forecast.is_a?(Hash) && @forecast["error"].nil? %>
+  <div class="content-grid" style="margin-top: 1.5rem;">
+    <div class="card">
+      <div class="card-header">
+        <h2>Month Forecast</h2>
+        <%= link_to "Details", budget_reports_forecast_path, class: "btn btn-sm" %>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Daily Spend Rate</span>
+          <span class="detail-value"><%= number_to_currency(@forecast["daily_spend_rate"]) %>/day</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Safe to Spend</span>
+          <span class="detail-value positive"><%= number_to_currency(@forecast["safe_to_spend_daily"]) %>/day</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Projected End</span>
+          <span class="detail-value <%= @forecast["on_track"] ? 'positive' : 'negative' %>">
+            <%= number_to_currency(@forecast["projected_remaining"]) %>
+          </span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Status</span>
+          <span class="detail-value">
+            <span class="badge badge-<%= @forecast["on_track"] ? "success" : "warning" %>">
+              <%= @forecast["on_track"] ? "On Track" : "Over Pace" %>
+            </span>
+          </span>
+        </div>
+      </div>
+      <% pct_time = @forecast["days_total"].to_i > 0 ? ((@forecast["days_elapsed"].to_f / @forecast["days_total"]) * 100).round(0) : 0 %>
+      <% pct_budget = @forecast["budget_income"].to_f > 0 ? ((@forecast["spent_so_far"].to_f / @forecast["budget_income"].to_f) * 100).round(0) : 0 %>
+      <div style="padding: 0 1.25rem 1rem;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.25rem;">
+          <span class="text-muted">Time (<%= @forecast["days_elapsed"] %>/<%= @forecast["days_total"] %> days)</span>
+          <span class="text-muted">Budget used (<%= pct_budget %>%)</span>
+        </div>
+        <div class="budget-progress-bar" style="position: relative;">
+          <div class="budget-progress-fill <%= pct_budget > pct_time ? 'progress-warning' : 'progress-safe' %>"
+               style="width: <%= [pct_budget, 100].min %>%"></div>
+          <div style="position: absolute; left: <%= pct_time %>%; top: -2px; bottom: -2px; width: 2px; background: var(--text-primary); opacity: 0.5;"></div>
+        </div>
+      </div>
+    </div>
+
+    <% if @alerts.is_a?(Array) && @alerts.any? %>
+      <div class="card">
+        <div class="card-header">
+          <h2>Unread Alerts (<%= @alerts.size %>)</h2>
+          <%= link_to "View All", budget_alerts_path, class: "btn btn-sm" %>
+        </div>
+        <div style="max-height: 280px; overflow-y: auto;">
+          <% @alerts.first(5).each do |alert| %>
+            <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; gap: 0.75rem; align-items: flex-start;">
+              <span class="material-icons-outlined" style="font-size: 1.1rem; margin-top: 2px; color: var(--<%= alert["severity"] == "critical" ? "danger" : alert["severity"] == "warning" ? "warning" : "primary" %>);">
+                <%= case alert["severity"]; when "critical" then "error"; when "warning" then "warning"; else "info"; end %>
+              </span>
+              <div style="flex: 1; min-width: 0;">
+                <strong style="font-size: 0.85rem;"><%= alert["title"] %></strong>
+                <% if alert["message"].present? %>
+                  <p class="text-muted" style="font-size: 0.8rem; margin: 0.15rem 0 0;"><%= truncate(alert["message"], length: 80) %></p>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<div class="content-grid" style="margin-top: 1.5rem;">
+  <% if @categories.is_a?(Array) && @categories.any? %>
+    <%
+      spending_cats = @categories.select { |c| c["actual"].to_f > 0 }.sort_by { |c| -c["actual"].to_f }
+      donut_data = spending_cats.first(8).map { |c| { label: c["name"], value: c["actual"].to_f } }
+      if spending_cats.length > 8
+        other_total = spending_cats[8..].sum { |c| c["actual"].to_f }
+        donut_data << { label: "Other", value: other_total }
+      end
+    %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Spending Breakdown</h2>
+        <%= link_to "Details", budget_spending_path, class: "btn btn-sm" %>
+      </div>
+      <div style="display: flex; gap: 1.5rem; padding: 1rem 1.25rem; align-items: center; flex-wrap: wrap;">
+        <div data-controller="donut"
+             data-donut-data-value="<%= donut_data.to_json %>"
+             data-donut-size-value="180"
+             style="flex-shrink: 0;">
+          <div data-donut-target="canvas"></div>
+        </div>
+        <div data-controller="donut"
+             data-donut-data-value="<%= donut_data.to_json %>"
+             style="flex: 1; min-width: 180px;">
+          <div data-donut-target="canvas" style="display: none;"></div>
+          <div data-donut-target="legend" class="donut-legend"></div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%
+    upcoming_bills = []
+    if @recurring_items.is_a?(Array)
+      upcoming_bills = @recurring_items.select do |item|
+        next false unless item["next_due"].present?
+        due = Date.parse(item["next_due"]) rescue nil
+        due && due >= Date.current && due <= 7.days.from_now.to_date
+      end.sort_by { |item| item["next_due"] }
+    end
+  %>
+  <div class="card">
+    <div class="card-header">
+      <h2>Upcoming Bills</h2>
+      <%= link_to "Manage", budget_recurring_index_path, class: "btn btn-sm" %>
+    </div>
+    <% if upcoming_bills.any? %>
+      <div class="upcoming-bills-list">
+        <% upcoming_bills.each do |bill| %>
+          <% due = Date.parse(bill["next_due"]) rescue nil %>
+          <div class="upcoming-bill-row">
+            <div class="upcoming-bill-info">
+              <span class="material-icons-outlined">receipt_long</span>
+              <div>
+                <strong><%= bill["name"] %></strong>
+                <span class="text-muted"><%= due&.strftime("%b %d") %></span>
+              </div>
+            </div>
+            <span class="upcoming-bill-amount"><%= number_to_currency(bill["amount"]) %></span>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="text-muted" style="padding: 0.5rem 0; font-size: 0.875rem;">No bills due in the next 7 days.</p>
+    <% end %>
+  </div>
+</div>
+
+<div class="content-grid" style="margin-top: 1.5rem;">
+  <% if @net_worth.present? && !@net_worth["error"] %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Net Worth</h2>
+        <%= link_to "Details", budget_reports_net_worth_path, class: "btn btn-sm" %>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Assets</span>
+          <span class="detail-value positive"><%= number_to_currency(@net_worth["assets"]) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Liabilities</span>
+          <span class="detail-value negative"><%= number_to_currency(@net_worth["liabilities"]) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Net Worth</span>
+          <span class="detail-value <%= @net_worth["net_worth"].to_f >= 0 ? 'positive' : 'negative' %>">
+            <strong><%= number_to_currency(@net_worth["net_worth"]) %></strong>
+          </span>
+        </div>
+      </div>
+      <%
+        nw_data = @nw_timeline.is_a?(Array) ? @nw_timeline : (@nw_timeline.is_a?(Hash) ? (@nw_timeline["snapshots"] || @nw_timeline["timeline"] || []) : [])
+      %>
+      <% if nw_data.length >= 2 %>
+        <div class="chart-container"
+             data-controller="chart"
+             data-chart-type-value="line"
+             data-chart-points-value="<%= nw_data.map { |pt| { x: pt["date"] || pt["snapshot_date"], y: pt["net_worth"] } }.to_json %>"
+             style="padding: 0.5rem 1rem;">
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if @debt.present? && !@debt["error"] && @debt["total_debt"].to_f > 0 %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Debt Overview</h2>
+        <%= link_to "Details", budget_debt_accounts_path, class: "btn btn-sm" %>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Total Debt</span>
+          <span class="detail-value negative"><%= number_to_currency(@debt["total_debt"]) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Monthly Minimums</span>
+          <span class="detail-value"><%= number_to_currency(@debt["total_minimum_payments"]) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Monthly Interest</span>
+          <span class="detail-value negative"><%= number_to_currency(@debt["total_monthly_interest"]) %></span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<div class="content-grid" style="margin-top: 1.5rem;">
+  <% if @funds.is_a?(Array) && @funds.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Sinking Funds</h2>
+        <%= link_to "View All", budget_funds_path, class: "btn btn-sm" %>
+      </div>
+      <% @funds.first(4).each do |fund| %>
+        <div class="budget-category-row" style="padding: 0.5rem 1.25rem;">
+          <div class="budget-category-info">
+            <strong><%= fund["name"] %></strong>
+            <span class="text-muted"><%= number_to_currency(fund["current_amount"]) %> of <%= number_to_currency(fund["target_amount"]) %></span>
+          </div>
+          <div class="budget-progress-bar">
+            <div class="budget-progress-fill progress-safe" style="width: <%= [fund["percentage_funded"].to_f, 100].min %>%"></div>
+          </div>
+          <span class="budget-category-pct"><%= fund["percentage_funded"] %>%</span>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if @recurring.present? && !@recurring["error"] %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Recurring Bills</h2>
+        <%= link_to "Manage", budget_recurring_index_path, class: "btn btn-sm" %>
+      </div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Monthly Total</span>
+          <span class="detail-value"><%= number_to_currency(@recurring["total_monthly"]) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Annual Total</span>
+          <span class="detail-value"><%= number_to_currency(@recurring["total_annual"]) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Active Bills</span>
+          <span class="detail-value"><%= @recurring["count"] %></span>
+        </div>
+        <% if @recurring["overdue"].to_i > 0 %>
+          <div class="detail-item">
+            <span class="detail-label">Overdue</span>
+            <span class="detail-value negative"><%= @recurring["overdue"] %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @trends.is_a?(Array) && @trends.any? %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header"><h2>Spending Trends (6 Months)</h2></div>
+    <div data-controller="chart"
+         data-chart-type-value="bar"
+         data-chart-points-value="<%= @trends.map { |t| { x: t["label"], y: t["expenses"] } }.to_json %>"
+         style="height: 200px; padding: 1rem;">
+    </div>
+  </div>
+<% end %>
+
+<%# 90-Day Spending Heatmap %>
+<% if @daily_spending.is_a?(Hash) && @daily_spending.any? %>
+  <%
+    heatmap_end = Date.current
+    heatmap_start = heatmap_end - 89.days
+    # Align to start of week (Sunday)
+    grid_start = heatmap_start - heatmap_start.wday.days
+    max_daily = @daily_spending.values.max.to_f
+    max_daily = 1 if max_daily == 0
+    total_days = (heatmap_end - grid_start).to_i + 1
+    weeks = (total_days / 7.0).ceil
+  %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header"><h2>Daily Spending (90 Days)</h2></div>
+    <div style="padding: 1rem 1.25rem; overflow-x: auto;">
+      <div style="display: flex; gap: 0.125rem; font-size: 0.5625rem;">
+        <div style="display: flex; flex-direction: column; gap: 0.125rem; margin-right: 0.25rem; padding-top: 0;">
+          <% %w[S M T W T F S].each do |d| %>
+            <div style="width: 1rem; height: 0.75rem; line-height: 0.75rem; text-align: right; color: var(--text-secondary);"><%= d %></div>
+          <% end %>
+        </div>
+        <% weeks.times do |w| %>
+          <div style="display: flex; flex-direction: column; gap: 0.125rem;">
+            <% 7.times do |d| %>
+              <%
+                cell_date = grid_start + (w * 7 + d).days
+                in_range = cell_date >= heatmap_start && cell_date <= heatmap_end
+                spent = @daily_spending[cell_date.to_s].to_f
+                intensity = in_range ? (spent / max_daily).clamp(0, 1) : 0
+                # Color from light to dark based on spending intensity
+                if !in_range
+                  bg = "transparent"
+                elsif spent == 0
+                  bg = "var(--bg)"
+                else
+                  opacity = (0.15 + intensity * 0.7).round(2)
+                  bg = "rgba(217, 48, 37, #{opacity})"
+                end
+              %>
+              <div style="width: 0.75rem; height: 0.75rem; border-radius: 2px; background: <%= bg %>;<%= in_range ? ' border: 1px solid var(--border);' : '' %>"
+                   title="<%= cell_date.strftime('%b %d') %>: <%= in_range ? number_to_currency(spent) : '' %>"></div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; font-size: 0.6875rem; color: var(--text-secondary);">
+        <span>Less</span>
+        <% [0, 0.2, 0.4, 0.6, 0.8, 1.0].each do |level| %>
+          <div style="width: 0.75rem; height: 0.75rem; border-radius: 2px; border: 1px solid var(--border);
+                      background: <%= level == 0 ? 'var(--bg)' : "rgba(217, 48, 37, #{(0.15 + level * 0.7).round(2)})" %>;"></div>
+        <% end %>
+        <span>More</span>
+        <span style="margin-left: auto;">Peak: <%= number_to_currency(max_daily) %> on <%= @daily_spending.max_by { |_, v| v }&.first %></span>
+      </div>
+    </div>
+  </div>
+<% end %>

@@ -1,0 +1,72 @@
+<div class="page-header">
+  <h1>Version <%= @version["version_number"] || @version["id"] %></h1>
+  <div class="page-actions">
+    <%= link_to "Revert to this version", revert_note_note_version_path(@note["id"], @version["id"]),
+        data: { turbo_method: :post, turbo_confirm: "Are you sure you want to revert to this version?" },
+        class: "btn btn-primary" %>
+    <%= link_to "Back to History", note_note_versions_path(@note["id"]), class: "btn" %>
+    <%= link_to "Back to Note", note_path(@note["id"]), class: "btn" %>
+  </div>
+</div>
+
+<div class="trade-detail-grid">
+  <div class="trade-detail-main">
+    <div class="card">
+      <div class="card-header">
+        <h2>Content at this Version</h2>
+      </div>
+
+      <% if @version["title"].present? %>
+        <div class="detail-item">
+          <span class="detail-label">Title</span>
+          <span class="detail-value"><%= @version["title"] %></span>
+        </div>
+      <% end %>
+
+      <% if @version["content"].present? %>
+        <div class="text-content"><%= raw @version["content_html"].presence || simple_format(@version["content"]) %></div>
+      <% else %>
+        <p class="empty-state">No content at this version.</p>
+      <% end %>
+    </div>
+
+    <% if @version["diff"].present? %>
+      <div class="card">
+        <div class="card-header">
+          <h2>Changes</h2>
+        </div>
+        <div class="version-diff">
+          <pre><%= @version["diff"] %></pre>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="trade-detail-sidebar">
+    <div class="card">
+      <div class="card-header"><h2>Version Details</h2></div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Version</span>
+          <span class="detail-value"><%= @version["version_number"] || @version["id"] %></span>
+        </div>
+        <% if @version.dig("user", "name") || @version["user_name"] %>
+          <div class="detail-item">
+            <span class="detail-label">Changed By</span>
+            <span class="detail-value"><%= @version.dig("user", "name") || @version["user_name"] %></span>
+          </div>
+        <% end %>
+        <div class="detail-item">
+          <span class="detail-label">Date</span>
+          <span class="detail-value"><%= Time.parse(@version["created_at"]).strftime("%b %d, %Y %l:%M %p") if @version["created_at"] %></span>
+        </div>
+        <% if @version["event"].present? %>
+          <div class="detail-item">
+            <span class="detail-label">Event</span>
+            <span class="detail-value"><%= @version["event"].titleize %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

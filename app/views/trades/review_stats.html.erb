@@ -1,0 +1,306 @@
+<% content_for(:title) { "Review Analytics" } %>
+
+<div class="page-header">
+  <h1>Review Analytics</h1>
+  <div class="page-actions">
+    <%= link_to "Review Queue", review_trades_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<% if @stats.is_a?(Hash) %>
+  <%
+    total_reviewed = @stats["total_reviewed"].to_i
+    total_closed = @stats["total_closed"].to_i
+    review_rate = @stats["review_rate"].to_f
+    unreviewed = @stats["unreviewed_count"].to_i
+    adherence = @stats["plan_adherence_rate"].to_f
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Review Progress</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= total_reviewed %> / <%= total_closed %></div>
+        <div class="budget-progress-bar" style="margin-top: 0.25rem;">
+          <div class="budget-progress-fill progress-safe" style="width: <%= review_rate %>%;"></div>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= review_rate %>% reviewed</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Unreviewed</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= unreviewed > 10 ? 'var(--negative)' : unreviewed > 0 ? '#f9ab00' : 'var(--positive)' %>;"><%= unreviewed %></div>
+        <% if unreviewed > 0 %>
+          <div style="font-size: 0.75rem;"><%= link_to "Review now →", review_trades_path %></div>
+        <% else %>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">All caught up!</div>
+        <% end %>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Plan Adherence</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= adherence >= 70 ? 'positive' : adherence >= 50 ? '' : 'negative' %>"><%= adherence %>%</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= adherence >= 80 ? "Excellent discipline" : adherence >= 60 ? "Room to improve" : "Needs attention" %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Discipline Dashboard %>
+  <%
+    pnl_by_grade = @stats["pnl_by_grade"]
+    active_grades = pnl_by_grade.is_a?(Array) ? pnl_by_grade.select { |g| g["count"].to_i > 0 } : []
+    planned_pnl = @stats["planned_trades_pnl"]
+    unplanned_pnl = @stats["unplanned_trades_pnl"]
+  %>
+  <% if active_grades.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Grade Impact</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <%
+          max_grade_pnl = active_grades.map { |g| g["avg_pnl"].to_f.abs }.max.to_f
+          max_grade_pnl = 1 if max_grade_pnl == 0
+          grade_colors = { "A" => "#0d904f", "B" => "#1a73e8", "C" => "#f9ab00", "D" => "#e8710a", "F" => "#d93025" }
+        %>
+        <% active_grades.each do |g| %>
+          <%
+            avg = g["avg_pnl"].to_f
+            width = (avg.abs / max_grade_pnl * 40).round(1)
+            color = grade_colors[g["grade"]] || "#80868b"
+          %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+            <div style="width: 36px; height: 36px; border-radius: 50%; background: <%= color %>22;
+                        display: flex; align-items: center; justify-content: center;
+                        font-size: 1rem; font-weight: 700; color: <%= color %>; flex-shrink: 0;">
+              <%= g["grade"] %>
+            </div>
+            <div style="flex: 1; position: relative; height: 20px;">
+              <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border);"></div>
+              <% if avg >= 0 %>
+                <div style="position: absolute; left: 50%; top: 2px; bottom: 2px; width: <%= width %>%;
+                            background: <%= color %>; opacity: 0.7; border-radius: 0 3px 3px 0;"></div>
+              <% else %>
+                <div style="position: absolute; right: 50%; top: 2px; bottom: 2px; width: <%= width %>%;
+                            background: <%= color %>; opacity: 0.7; border-radius: 3px 0 0 3px;"></div>
+              <% end %>
+            </div>
+            <div style="width: 120px; font-size: 0.8125rem; display: flex; justify-content: space-between;">
+              <span class="<%= pnl_class(avg) %>"><%= number_to_currency(avg) %></span>
+              <span class="text-muted"><%= g["count"] %> trades</span>
+            </div>
+          </div>
+        <% end %>
+        <div style="margin-top: 0.75rem; font-size: 0.8125rem; color: var(--text-secondary);">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">lightbulb</span>
+          <% best_grade = active_grades.max_by { |g| g["avg_pnl"].to_f } %>
+          <% worst_grade = active_grades.min_by { |g| g["avg_pnl"].to_f } %>
+          <% if best_grade && worst_grade && best_grade != worst_grade %>
+            Grade <%= best_grade["grade"] %> trades average <%= number_to_currency(best_grade["avg_pnl"]) %> vs
+            Grade <%= worst_grade["grade"] %> at <%= number_to_currency(worst_grade["avg_pnl"]) %>.
+            <% if best_grade["avg_pnl"].to_f > 0 && worst_grade["avg_pnl"].to_f < 0 %>
+              <strong>Your grading accurately predicts outcomes — trust it.</strong>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <% pnl_by_grade = @stats["pnl_by_grade"] %>
+  <% if pnl_by_grade.is_a?(Array) && pnl_by_grade.any? { |g| g["count"].to_i > 0 } %>
+    <h2 style="margin-bottom: 1rem;">Performance by Grade</h2>
+    <div class="card" style="margin-bottom: 2rem;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Grade</th>
+            <th style="text-align: right;">Trades</th>
+            <th style="text-align: right;">Total P&L</th>
+            <th style="text-align: right;">Avg P&L</th>
+            <th style="text-align: right;">Win Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% pnl_by_grade.each do |g| %>
+            <% next if g["count"].to_i.zero? %>
+            <tr>
+              <td>
+                <strong style="font-size: 1.25rem;"><%= g["grade"] %></strong>
+              </td>
+              <td style="text-align: right;"><%= g["count"] %></td>
+              <td style="text-align: right;" class="<%= g["total_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+                <%= number_to_currency(g["total_pnl"]) %>
+              </td>
+              <td style="text-align: right;" class="<%= g["avg_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+                <%= number_to_currency(g["avg_pnl"]) %>
+              </td>
+              <td style="text-align: right;"><%= g["win_rate"] %>%</td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-bottom: 2rem;">
+      <div class="card-header"><h2>P&L by Grade</h2></div>
+      <div style="padding: 1.25rem;">
+        <canvas height="250"
+                data-controller="chart"
+                data-chart-type-value="bar"
+                data-chart-data-value='<%= {
+                  labels: pnl_by_grade.select { |g| g["count"].to_i > 0 }.map { |g| "Grade #{g["grade"]}" },
+                  datasets: [{
+                    label: "Avg P&L",
+                    data: pnl_by_grade.select { |g| g["count"].to_i > 0 }.map { |g| g["avg_pnl"] },
+                    backgroundColor: pnl_by_grade.select { |g| g["count"].to_i > 0 }.map { |g| g["avg_pnl"].to_f >= 0 ? "rgba(34, 197, 94, 0.7)" : "rgba(239, 68, 68, 0.7)" }
+                  }]
+                }.to_json %>'></canvas>
+      </div>
+    </div>
+  <% end %>
+
+  <% pnl_by_emotion = @stats["pnl_by_emotion"] %>
+  <% if pnl_by_emotion.is_a?(Array) && pnl_by_emotion.any? %>
+    <%
+      emotion_icons = { "calm" => "spa", "focused" => "center_focus_strong", "confident" => "verified",
+                        "anxious" => "mood_bad", "fearful" => "warning", "greedy" => "attach_money",
+                        "fomo" => "speed", "revenge" => "whatshot", "bored" => "bedtime" }
+      sorted_emotions = pnl_by_emotion.sort_by { |e| -e["avg_pnl"].to_f }
+      max_emotion_pnl = sorted_emotions.map { |e| e["avg_pnl"].to_f.abs }.max.to_f
+      max_emotion_pnl = 1 if max_emotion_pnl == 0
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Emotional Impact</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <% sorted_emotions.each do |e| %>
+          <%
+            avg = e["avg_pnl"].to_f
+            bar_w = (avg.abs / max_emotion_pnl * 40).round(1)
+            icon = emotion_icons[e["state"]] || "mood"
+          %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.625rem;">
+            <div style="width: 80px; display: flex; align-items: center; gap: 0.375rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; color: var(--text-secondary);"><%= icon %></span>
+              <strong style="font-size: 0.8125rem;"><%= e["state"]&.capitalize %></strong>
+            </div>
+            <div style="flex: 1; position: relative; height: 20px;">
+              <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border);"></div>
+              <% if avg >= 0 %>
+                <div style="position: absolute; left: 50%; top: 2px; bottom: 2px; width: <%= bar_w %>%;
+                            background: var(--positive); opacity: 0.7; border-radius: 0 3px 3px 0;"></div>
+              <% else %>
+                <div style="position: absolute; right: 50%; top: 2px; bottom: 2px; width: <%= bar_w %>%;
+                            background: var(--negative); opacity: 0.7; border-radius: 3px 0 0 3px;"></div>
+              <% end %>
+            </div>
+            <div style="width: 140px; display: flex; justify-content: space-between; font-size: 0.8125rem;">
+              <span class="<%= pnl_class(avg) %>"><%= number_to_currency(avg) %>/trade</span>
+              <span class="text-muted"><%= e["win_rate"] %>% WR</span>
+            </div>
+          </div>
+        <% end %>
+        <%# Insight %>
+        <% profitable_moods = sorted_emotions.select { |e| e["avg_pnl"].to_f > 0 }.map { |e| e["state"]&.capitalize } %>
+        <% costly_moods = sorted_emotions.select { |e| e["avg_pnl"].to_f < 0 }.map { |e| e["state"]&.capitalize } %>
+        <% if profitable_moods.any? || costly_moods.any? %>
+          <div style="margin-top: 0.75rem; padding: 0.75rem; border-radius: var(--radius); background: var(--bg); font-size: 0.8125rem;">
+            <% if profitable_moods.any? %>
+              <span class="positive">Profitable states:</span> <%= profitable_moods.join(", ") %>
+            <% end %>
+            <% if costly_moods.any? %>
+              <% if profitable_moods.any? %><br><% end %>
+              <span class="negative">Costly states:</span> <%= costly_moods.join(", ") %>
+              — consider stepping away when feeling <%= costly_moods.first&.downcase %>.
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Plan Adherence Comparison %>
+  <% plan_followed = @stats["followed_plan_pnl"] %>
+  <% plan_not_followed = @stats["not_followed_plan_pnl"] %>
+  <% if plan_followed.is_a?(Hash) && plan_not_followed.is_a?(Hash) && (plan_followed["count"].to_i + plan_not_followed["count"].to_i) >= 5 %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Plan Adherence Impact</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 200px; padding: 1rem; border-radius: var(--radius); background: var(--bg); border-left: 4px solid var(--positive);">
+            <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">check_circle</span>
+              Followed Plan
+            </div>
+            <div style="font-size: 1.25rem; font-weight: 700;" class="<%= pnl_class(plan_followed["avg_pnl"]) %>">
+              <%= number_to_currency(plan_followed["avg_pnl"]) %>/trade
+            </div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+              <%= plan_followed["count"] %> trades · <%= plan_followed["win_rate"] %>% WR
+            </div>
+          </div>
+          <div style="flex: 1; min-width: 200px; padding: 1rem; border-radius: var(--radius); background: var(--bg); border-left: 4px solid var(--negative);">
+            <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.5rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">cancel</span>
+              Didn't Follow Plan
+            </div>
+            <div style="font-size: 1.25rem; font-weight: 700;" class="<%= pnl_class(plan_not_followed["avg_pnl"]) %>">
+              <%= number_to_currency(plan_not_followed["avg_pnl"]) %>/trade
+            </div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+              <%= plan_not_followed["count"] %> trades · <%= plan_not_followed["win_rate"] %>% WR
+            </div>
+          </div>
+        </div>
+        <% diff = plan_followed["avg_pnl"].to_f - plan_not_followed["avg_pnl"].to_f %>
+        <% if diff > 0 %>
+          <div style="margin-top: 0.75rem; font-size: 0.8125rem; color: var(--text-secondary);">
+            Following your plan adds <strong class="positive"><%= number_to_currency(diff) %></strong> per trade on average.
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <% grade_dist = @stats["grade_distribution"] %>
+  <% emotion_dist = @stats["emotion_distribution"] %>
+  <% if (grade_dist.is_a?(Hash) && grade_dist.any?) || (emotion_dist.is_a?(Hash) && emotion_dist.any?) %>
+    <div class="content-grid" style="margin-bottom: 2rem;">
+      <% if grade_dist.is_a?(Hash) && grade_dist.any? %>
+        <div class="card" style="padding: 1.25rem;">
+          <h3 style="margin-bottom: 0.75rem;">Grade Distribution</h3>
+          <% grade_dist.sort_by { |k, _| k }.each do |grade, count| %>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <strong><%= grade %></strong>
+              <div style="flex: 1; margin: 0 0.75rem;">
+                <div class="budget-progress-bar">
+                  <div class="budget-progress-fill progress-safe" style="width: <%= @stats["total_reviewed"].to_i > 0 ? (count.to_f / @stats["total_reviewed"] * 100).round(1) : 0 %>%"></div>
+                </div>
+              </div>
+              <span><%= count %></span>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <% if emotion_dist.is_a?(Hash) && emotion_dist.any? %>
+        <div class="card" style="padding: 1.25rem;">
+          <h3 style="margin-bottom: 0.75rem;">Emotion Distribution</h3>
+          <% emotion_dist.sort_by { |_, v| -v }.each do |state, count| %>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <strong><%= state&.capitalize %></strong>
+              <div style="flex: 1; margin: 0 0.75rem;">
+                <div class="budget-progress-bar">
+                  <div class="budget-progress-fill progress-safe" style="width: <%= @stats["total_reviewed"].to_i > 0 ? (count.to_f / @stats["total_reviewed"] * 100).round(1) : 0 %>%"></div>
+                </div>
+              </div>
+              <span><%= count %></span>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p>No review data available yet. Start reviewing your trades to see analytics.</p>
+    <div style="margin-top: 1rem;">
+      <%= link_to "Start Reviewing", review_trades_path, class: "btn btn-primary" %>
+    </div>
+  </div>
+<% end %>

@@ -1,0 +1,282 @@
+<% content_for(:title) { "Spending Personality" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #e91e63;">face</span>
+    Spending Personality Profile
+  </h1>
+</div>
+
+<% if @personality.present? %>
+
+<%# Personality Result Card %>
+<div class="card" style="margin-bottom: 1.5rem; text-align: center; padding: 2rem 1.5rem; border-top: 4px solid <%= @personality[:color] %>;">
+  <span class="material-icons-outlined" style="font-size: 3.5rem; color: <%= @personality[:color] %>; display: block; margin-bottom: 0.75rem;"><%= @personality[:icon] %></span>
+  <div style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem;"><%= @personality[:name] %></div>
+  <div style="font-size: 0.875rem; color: var(--text-secondary); max-width: 600px; margin: 0 auto; line-height: 1.6;">
+    <%= @personality[:description] %>
+  </div>
+</div>
+
+<%# Radar / Spider Chart (SVG Hexagon) %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">radar</span> Personality Dimensions</h2>
+  </div>
+  <div style="padding: 1.25rem; display: flex; justify-content: center;">
+    <%
+      dim_keys = [:planning, :impulse_control, :consistency, :frugality, :diversity, :time_discipline]
+      dim_labels = dim_keys.map { |k| @dimensions[k][:label] }
+      dim_scores = dim_keys.map { |k| @dimensions[k][:score] }
+      cx = 200
+      cy = 200
+      max_r = 150
+      levels = 4
+    %>
+    <svg viewBox="0 0 400 400" style="max-width: 400px; width: 100%;" xmlns="http://www.w3.org/2000/svg">
+      <%# Grid levels %>
+      <% levels.times do |lvl| %>
+        <% r = max_r * (lvl + 1).to_f / levels %>
+        <polygon
+          points="<%= 6.times.map { |i| angle = (Math::PI * 2 * i / 6) - Math::PI / 2; "#{(cx + r * Math.cos(angle)).round(1)},#{(cy + r * Math.sin(angle)).round(1)}" }.join(' ') %>"
+          fill="none" stroke="var(--border)" stroke-width="1" opacity="0.4"
+        />
+      <% end %>
+
+      <%# Axis lines %>
+      <% 6.times do |i| %>
+        <% angle = (Math::PI * 2 * i / 6) - Math::PI / 2 %>
+        <line
+          x1="<%= cx %>" y1="<%= cy %>"
+          x2="<%= (cx + max_r * Math.cos(angle)).round(1) %>"
+          y2="<%= (cy + max_r * Math.sin(angle)).round(1) %>"
+          stroke="var(--border)" stroke-width="1" opacity="0.3"
+        />
+      <% end %>
+
+      <%# Data polygon %>
+      <polygon
+        points="<%= 6.times.map { |i| angle = (Math::PI * 2 * i / 6) - Math::PI / 2; r = max_r * dim_scores[i] / 100.0; "#{(cx + r * Math.cos(angle)).round(1)},#{(cy + r * Math.sin(angle)).round(1)}" }.join(' ') %>"
+        fill="<%= @personality[:color] %>" fill-opacity="0.2"
+        stroke="<%= @personality[:color] %>" stroke-width="2.5"
+      />
+
+      <%# Data points %>
+      <% 6.times do |i| %>
+        <% angle = (Math::PI * 2 * i / 6) - Math::PI / 2 %>
+        <% r = max_r * dim_scores[i] / 100.0 %>
+        <circle cx="<%= (cx + r * Math.cos(angle)).round(1) %>" cy="<%= (cy + r * Math.sin(angle)).round(1) %>" r="4" fill="<%= @personality[:color] %>" />
+      <% end %>
+
+      <%# Labels %>
+      <% 6.times do |i| %>
+        <% angle = (Math::PI * 2 * i / 6) - Math::PI / 2 %>
+        <% lx = cx + (max_r + 28) * Math.cos(angle) %>
+        <% ly = cy + (max_r + 28) * Math.sin(angle) %>
+        <% anchor = if lx < cx - 10 then "end" elsif lx > cx + 10 then "start" else "middle" end %>
+        <text x="<%= lx.round(1) %>" y="<%= ly.round(1) %>" text-anchor="<%= anchor %>" dominant-baseline="central" fill="var(--text)" style="font-size: 11px; font-weight: 500;"><%= dim_labels[i] %></text>
+        <text x="<%= lx.round(1) %>" y="<%= (ly + 14).round(1) %>" text-anchor="<%= anchor %>" dominant-baseline="central" fill="var(--text-secondary)" style="font-size: 10px;"><%= dim_scores[i] %>/100</text>
+      <% end %>
+    </svg>
+  </div>
+</div>
+
+<%# Dimension Scores Bar Chart %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Dimension Scores</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% @dimensions.each do |key, dim| %>
+      <div style="margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.375rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: <%= @personality[:color] %>;"><%= dim[:icon] %></span>
+            <span style="font-size: 0.8125rem; font-weight: 600;"><%= dim[:label] %></span>
+          </div>
+          <span style="font-size: 0.8125rem; font-weight: 700; color: <%= @personality[:color] %>;"><%= dim[:score] %></span>
+        </div>
+        <div style="height: 0.5rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: <%= dim[:score] %>%; background: <%= @personality[:color] %>; border-radius: 4px; transition: width 0.6s ease;"></div>
+        </div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= dim[:description] %></div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Strengths & Growth Areas %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <%# Strengths %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">thumb_up</span> Your Strengths</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @personality[:strengths].each do |strength| %>
+        <div style="display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.625rem;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--positive); margin-top: 2px;">check_circle</span>
+          <span style="font-size: 0.8125rem;"><%= strength %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Growth Areas %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff9800;">trending_up</span> Growth Areas</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @personality[:growth_areas].each do |area| %>
+        <div style="display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.625rem;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; color: #ff9800; margin-top: 2px;">arrow_forward</span>
+          <span style="font-size: 0.8125rem;"><%= area %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Personalized Tips %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2196f3;">lightbulb</span> Personalized Tips</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+      <% @personality[:tips].each_with_index do |tip, idx| %>
+        <div style="padding: 1rem; background: var(--bg); border-radius: 8px; border-left: 3px solid <%= @personality[:color] %>;">
+          <div style="font-size: 0.75rem; font-weight: 600; color: <%= @personality[:color] %>; margin-bottom: 0.25rem;">TIP <%= idx + 1 %></div>
+          <div style="font-size: 0.8125rem; line-height: 1.5;"><%= tip %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Spending Pattern Evidence %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">analytics</span> Classification Evidence</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+      <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 8px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Transactions Analyzed</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @evidence[:total_transactions] %></div>
+      </div>
+      <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 8px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Months Covered</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @evidence[:months_analyzed] %></div>
+      </div>
+      <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 8px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @evidence[:savings_rate] %>%</div>
+      </div>
+      <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 8px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Transaction</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@evidence[:avg_transaction]) %></div>
+      </div>
+    </div>
+
+    <%# Allocation Breakdown %>
+    <div style="margin-bottom: 1.25rem;">
+      <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.75rem;">Spending Allocation</div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem;">
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Needs</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);"><%= @evidence[:needs_pct] %>%</div>
+        </div>
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Wants</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: #9c27b0;"><%= @evidence[:wants_pct] %>%</div>
+        </div>
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Savings</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= @evidence[:savings_pct] %>%</div>
+        </div>
+      </div>
+      <div style="height: 1rem; border-radius: 4px; overflow: hidden; display: flex; margin-top: 0.5rem;">
+        <div style="width: <%= @evidence[:needs_pct] %>%; background: var(--primary); opacity: 0.6;"></div>
+        <div style="width: <%= @evidence[:wants_pct] %>%; background: #9c27b0; opacity: 0.5;"></div>
+        <div style="width: <%= @evidence[:savings_pct] %>%; background: var(--positive); opacity: 0.6;"></div>
+      </div>
+    </div>
+
+    <%# Behavioral Patterns %>
+    <div style="margin-bottom: 1.25rem;">
+      <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.75rem;">Behavioral Patterns</div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Weekend Spending</div>
+          <div style="font-size: 1rem; font-weight: 600;"><%= @evidence[:weekend_ratio] %>%</div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">of transactions (baseline: 28.6%)</div>
+        </div>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Small Purchases (&lt;$20)</div>
+          <div style="font-size: 1rem; font-weight: 600;"><%= @evidence[:small_purchase_ratio] %>%</div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">of all transactions</div>
+        </div>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Morning Spending</div>
+          <div style="font-size: 1rem; font-weight: 600;"><%= @evidence[:morning_pct] %>%</div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">of timed transactions</div>
+        </div>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Categories Used</div>
+          <div style="font-size: 1rem; font-weight: 600;"><%= @evidence[:categories_used] %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @evidence[:category_names].first(8).join(", ") %><%= ", ..." if @evidence[:category_names].size > 8 %></div>
+        </div>
+      </div>
+    </div>
+
+    <%# Monthly Spending Trend %>
+    <% if @evidence[:monthly_totals].any? %>
+      <div>
+        <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 0.75rem;">Monthly Spending Trend</div>
+        <% sorted_months = @evidence[:monthly_totals].sort_by { |k, _| k } %>
+        <% max_monthly = sorted_months.map(&:last).max %>
+        <% max_monthly = 1.0 if max_monthly.to_f <= 0 %>
+        <div style="display: flex; align-items: flex-end; gap: 0.375rem; height: 120px;">
+          <% sorted_months.each do |month, total| %>
+            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%;">
+              <div style="flex: 1; width: 100%; display: flex; align-items: flex-end;">
+                <div style="width: 100%; height: <%= (total / max_monthly * 100).round %>%; background: <%= @personality[:color] %>; border-radius: 3px 3px 0 0; opacity: 0.7; min-height: 2px;" title="<%= number_to_currency(total) %>"></div>
+              </div>
+              <div style="font-size: 0.5625rem; color: var(--text-secondary); margin-top: 0.25rem; writing-mode: vertical-rl; transform: rotate(180deg); max-height: 3rem; overflow: hidden;"><%= month %></div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<% else %>
+
+<div class="card" style="padding: 3rem; text-align: center;">
+  <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); display: block; margin-bottom: 1rem;">face</span>
+  <div style="font-size: 1.125rem; font-weight: 600;">Not Enough Data</div>
+  <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
+    Add more transactions to discover your spending personality. We need at least a few transactions to analyze your patterns.
+  </div>
+</div>
+
+<% end %>
+
+<%# Bottom Navigation %>
+<div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem;">
+  <%= link_to budget_dashboard_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary); display: block; margin-bottom: 0.25rem;">dashboard</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Dashboard</span>
+  <% end %>
+  <%= link_to budget_income_allocator_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--positive); display: block; margin-bottom: 0.25rem;">pie_chart</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Income Allocator</span>
+  <% end %>
+  <%= link_to budget_reports_spending_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #2196f3; display: block; margin-bottom: 0.25rem;">receipt_long</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Spending Report</span>
+  <% end %>
+</div>

@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How It Was Built: Parallel Agent Architecture</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface-2: #1c2128;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-secondary: #8b949e;
+      --primary: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --purple: #bc8cff;
+      --orange: #d29922;
+      --cyan: #39d2c0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 2rem 1rem;
+    }
+
+    .container { max-width: 960px; margin: 0 auto; }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--primary), var(--purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.25rem;
+    }
+
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--text-secondary);
+      margin-bottom: 2.5rem;
+    }
+
+    h2 {
+      font-size: 1.375rem;
+      font-weight: 700;
+      margin: 2.5rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 1.5rem 0 0.5rem;
+      color: var(--primary);
+    }
+
+    p, li { color: var(--text-secondary); font-size: 0.9375rem; }
+    p { margin-bottom: 0.75rem; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      margin-top: 0.375rem;
+    }
+
+    .green { color: var(--green); }
+    .blue { color: var(--primary); }
+    .purple { color: var(--purple); }
+    .orange { color: var(--orange); }
+    .cyan { color: var(--cyan); }
+    .red { color: var(--red); }
+
+    .diagram {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+    }
+
+    .timeline {
+      position: relative;
+      padding-left: 2rem;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      left: 0.5rem;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, var(--primary), var(--purple), var(--green));
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 1.5rem;
+      padding: 1rem 1.25rem;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -1.75rem;
+      top: 1.25rem;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--primary);
+      border: 2px solid var(--bg);
+    }
+
+    .timeline-item.agent::before { background: var(--purple); }
+    .timeline-item.direct::before { background: var(--green); }
+    .timeline-item.verify::before { background: var(--cyan); }
+
+    .timeline-label {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+
+    .timeline-label.agent-label { color: var(--purple); }
+    .timeline-label.direct-label { color: var(--green); }
+    .timeline-label.verify-label { color: var(--cyan); }
+
+    .timeline-title { font-weight: 600; font-size: 0.9375rem; color: var(--text); }
+    .timeline-desc { font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem; }
+
+    .agent-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.8125rem;
+    }
+
+    .agent-table th, .agent-table td {
+      padding: 0.625rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .agent-table th {
+      color: var(--text-secondary);
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 600;
+    }
+
+    .agent-table td { color: var(--text); }
+
+    .badge {
+      display: inline-block;
+      padding: 0.125rem 0.5rem;
+      border-radius: 12px;
+      font-size: 0.6875rem;
+      font-weight: 600;
+    }
+
+    .badge-agent { background: rgba(188, 140, 255, 0.15); color: var(--purple); }
+    .badge-direct { background: rgba(63, 185, 80, 0.15); color: var(--green); }
+    .badge-bg { background: rgba(88, 166, 255, 0.15); color: var(--primary); }
+
+    .arch-diagram {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem;
+    }
+
+    .arch-box {
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.875rem;
+      text-align: center;
+      min-width: 200px;
+    }
+
+    .arch-orchestrator {
+      background: linear-gradient(135deg, rgba(88, 166, 255, 0.2), rgba(188, 140, 255, 0.2));
+      border: 2px solid var(--primary);
+      color: var(--primary);
+      font-size: 1rem;
+    }
+
+    .arch-row {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .arch-agent {
+      background: rgba(188, 140, 255, 0.1);
+      border: 1px solid var(--purple);
+      color: var(--purple);
+      font-size: 0.8125rem;
+      padding: 0.5rem 1rem;
+    }
+
+    .arch-direct {
+      background: rgba(63, 185, 80, 0.1);
+      border: 1px solid var(--green);
+      color: var(--green);
+      font-size: 0.8125rem;
+      padding: 0.5rem 1rem;
+    }
+
+    .arch-arrow {
+      color: var(--text-secondary);
+      font-size: 1.25rem;
+      line-height: 1;
+    }
+
+    .key-insight {
+      background: linear-gradient(135deg, rgba(88, 166, 255, 0.08), rgba(188, 140, 255, 0.08));
+      border: 1px solid rgba(88, 166, 255, 0.2);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin: 1rem 0;
+    }
+
+    .key-insight strong { color: var(--primary); }
+
+    .principle-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .principle-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+
+    .principle-card h4 {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.375rem;
+    }
+
+    .principle-card p {
+      font-size: 0.8125rem;
+      margin: 0;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 0.5rem;
+      margin: 1rem 0;
+    }
+
+    .feature-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 0.625rem 0.75rem;
+      font-size: 0.8125rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .feature-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 0.8125rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>How It Was Built</h1>
+    <p class="subtitle">Parallel agent orchestration for autonomous full-stack feature development</p>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value green">30+</div>
+        <div class="stat-label">Features Built</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value purple">25+</div>
+        <div class="stat-label">Background Agents</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value blue">1,782</div>
+        <div class="stat-label">Tests Passing</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value cyan">100%</div>
+        <div class="stat-label">Line Coverage</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value orange">123</div>
+        <div class="stat-label">Controllers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value red">281</div>
+        <div class="stat-label">View Templates</div>
+      </div>
+    </div>
+
+    <!-- Architecture -->
+    <h2>The Architecture</h2>
+    <p>The key to speed was a <strong style="color: var(--primary);">parallel orchestration pattern</strong>: one primary AI agent (the "orchestrator") coordinated dozens of specialized background agents, each working on independent features simultaneously. The orchestrator never waited idle &mdash; while agents built features in the background, it built features directly.</p>
+
+    <div class="diagram">
+      <div class="arch-diagram">
+        <div class="arch-box arch-orchestrator">Claude Opus 4.6 &mdash; Orchestrator</div>
+        <div class="arch-arrow">&darr;&ensp;spawns &amp; coordinates&ensp;&darr;</div>
+        <div class="arch-row">
+          <div class="arch-box arch-agent">Agent 1<br><small>Equity Simulator</small></div>
+          <div class="arch-box arch-agent">Agent 2<br><small>Playbook Comparison</small></div>
+          <div class="arch-box arch-agent">Agent 3<br><small>Symbol Deep Dive</small></div>
+          <div class="arch-box arch-agent">Agent 4<br><small>Strategy Builder</small></div>
+          <div class="arch-box arch-agent">Agent 5<br><small>Morning Briefing</small></div>
+        </div>
+        <div class="arch-arrow">&uarr;&ensp;concurrent with&ensp;&uarr;</div>
+        <div class="arch-row">
+          <div class="arch-box arch-direct">Direct Build 1<br><small>Snapshot Report</small></div>
+          <div class="arch-box arch-direct">Direct Build 2<br><small>Streak Calendar</small></div>
+          <div class="arch-box arch-direct">Direct Build 3<br><small>Sizing Backtest</small></div>
+          <div class="arch-box arch-direct">Direct Build 4<br><small>Consistency Report</small></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Roles -->
+    <h2>Two Roles, One Conversation</h2>
+
+    <div class="principle-grid">
+      <div class="principle-card">
+        <h4 style="color: var(--green);">Orchestrator (Direct Builder)</h4>
+        <p>The primary agent in the conversation. It read files, created controllers and views directly, added routes, wired up quick search and command palette entries, added nav links, verified HTTP 200 responses, and coordinated all work. It never sat idle &mdash; while agents ran in background, it built features itself.</p>
+      </div>
+      <div class="principle-card">
+        <h4 style="color: var(--purple);">Background Agents</h4>
+        <p>Specialized sub-agents launched with detailed prompts. Each received full context about the codebase conventions (API patterns, CSS variables, Stimulus controllers, defensive coding) and was given a complete feature specification. They worked autonomously and reported back when done.</p>
+      </div>
+    </div>
+
+    <!-- How agents were deployed -->
+    <h2>Agent Deployment Strategy</h2>
+
+    <div class="key-insight">
+      <strong>Key Insight:</strong> Agents were launched in batches of 2-3 at a time, always for features that touched <em>different files</em>. This avoided merge conflicts. The orchestrator handled shared files (routes.rb, quick_search_controller.rb, command_palette_controller.js, application.html.erb) directly, since those needed sequential edits.
+    </div>
+
+    <table class="agent-table">
+      <thead>
+        <tr>
+          <th>Feature</th>
+          <th>Method</th>
+          <th>What It Built</th>
+          <th>Files Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Snapshot Report</td>
+          <td><span class="badge badge-direct">Direct</span></td>
+          <td>Printable performance snapshot with A-F grade, period selection, daily P&L chart</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Streak Calendar</td>
+          <td><span class="badge badge-direct">Direct</span></td>
+          <td>GitHub-style heatmaps for trading &amp; journaling, consistency score ring</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Sizing Backtest</td>
+          <td><span class="badge badge-direct">Direct</span></td>
+          <td>6 position sizing strategies backtested on real trades with equity curve overlay</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Consistency Report</td>
+          <td><span class="badge badge-direct">Direct</span></td>
+          <td>9-dimension behavioral consistency score with radar chart and recommendations</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Equity Simulator</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>What-if simulator with sliders for position size, stop-loss, remove worst trades</td>
+          <td>Controller + View + Stimulus JS</td>
+        </tr>
+        <tr>
+          <td>Playbook Comparison</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Side-by-side playbook stats with overlaid equity curves</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Symbol Deep Dive</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Exhaustive single-symbol breakdown with 8 chart types</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Trade Templates</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Save/reuse trade setups with AI-suggested templates</td>
+          <td>Controller + View + Stimulus JS</td>
+        </tr>
+        <tr>
+          <td>Spending vs Trading</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Pearson correlation, dual-axis chart, behavioral insights</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Strategy Builder</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>6-dimension analysis, combo rankings, interactive strategy builder</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Morning Briefing</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Readiness score, yesterday's recap, financial snapshot, motivational quote</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Account Health</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>0-100 health score from 3 APIs, SVG gauge, improvement recommendations</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Achievements</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>23 badges across 6 categories with progress tracking and gamification</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Profit Targets</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Daily/weekly/monthly P&L targets with progress bars and hit rate donut</td>
+          <td>Controller + View + Stimulus JS</td>
+        </tr>
+        <tr>
+          <td>Risk Rules</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>7 configurable rules, traffic-light dashboard, breach history</td>
+          <td>Controller + View + Stimulus JS</td>
+        </tr>
+        <tr>
+          <td>Market Session</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Live ET clock, 6 session cards with countdowns, 24-hour timeline</td>
+          <td>Controller + View + Stimulus JS</td>
+        </tr>
+        <tr>
+          <td>Trade Calendar</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Monthly calendar with per-day trade chips, P&L tinting</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Habit Tracker</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>6 daily habits, 30-day heatmap, discipline score, today's checklist</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Portfolio Overview</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Unified financial picture from 3 APIs, equity curve, allocation bar</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Goal Tracker</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>11 unified goals across trading, budget, writing with progress rings</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Smart Alerts</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>20+ checks across 5 severity categories with action links</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Weekly Planner</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>7-day grid with trades, journal, notes, transactions, reminders</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>What-If Simulator</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>5 scenarios with equity curve overlays and impact analysis</td>
+          <td>Added to reports controller + View</td>
+        </tr>
+        <tr>
+          <td>Period Comparison</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Date pickers, head-to-head bars, overlaid equity curves, verdict section</td>
+          <td>Enhanced controller + View rewrite</td>
+        </tr>
+        <tr>
+          <td>Mood Analytics</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Journal-trade mood correlation, monthly trends, behavioral insights</td>
+          <td>Enhanced controller + View rewrite</td>
+        </tr>
+        <tr>
+          <td>Leaderboard</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>8 categories, Hall of Fame, time filters, R-multiple rankings</td>
+          <td>Added to reports controller + View</td>
+        </tr>
+        <tr>
+          <td>Trade Comparison</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Searchable trade selector, radar chart, butterfly P&L chart, comparison matrix</td>
+          <td>Controller rewrite + View + Stimulus JS</td>
+        </tr>
+        <tr>
+          <td>Merchant Insights</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Per-merchant analysis, frequency classification, trend detection</td>
+          <td>Controller + View</td>
+        </tr>
+        <tr>
+          <td>Financial Calendar</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Color-coded event dots, click-to-expand popovers, cash flow bars</td>
+          <td>Added to dashboard controller + View</td>
+        </tr>
+        <tr>
+          <td>Bill Negotiation</td>
+          <td><span class="badge badge-agent">Background Agent</span></td>
+          <td>Negotiation scoring, price increase detection, playbook with scripts</td>
+          <td>Added to reports controller + View</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Testing agents -->
+    <h2>Testing &amp; Coverage Agents</h2>
+    <p>Separate agents were deployed specifically for test writing and coverage improvement:</p>
+
+    <table class="agent-table">
+      <thead>
+        <tr>
+          <th>Agent Task</th>
+          <th>Result</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Write trade review tests</td>
+          <td><span class="badge badge-agent">36 tests added</span></td>
+          <td>Model + controller tests for trade reviews, mood analytics</td>
+        </tr>
+        <tr>
+          <td>Fix trading-journal coverage</td>
+          <td><span class="badge" style="background: rgba(63, 185, 80, 0.15); color: var(--green);">93% &rarr; 100%</span></td>
+          <td>95 new tests across 7 files: reports, distribution, models, bulk ops, calculator, comparison</td>
+        </tr>
+        <tr>
+          <td>Add mood analytics tests</td>
+          <td><span class="badge badge-agent">13 tests, 94 assertions</span></td>
+          <td>Auth, structure, distribution, PnL correlation, weekly trends, edge cases</td>
+        </tr>
+        <tr>
+          <td>ERB cleanup (budget views)</td>
+          <td><span class="badge badge-agent">15 files updated</span></td>
+          <td>Replaced stats-grid/stat-card classes with inline card-strip pattern</td>
+        </tr>
+        <tr>
+          <td>ERB cleanup (trading views)</td>
+          <td><span class="badge badge-agent">20 files updated</span></td>
+          <td>Same pattern replacement across reports, trades, journal views</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- The workflow -->
+    <h2>The Workflow in Action</h2>
+
+    <div class="timeline">
+      <div class="timeline-item direct">
+        <div class="timeline-label direct-label">Orchestrator &mdash; Direct Build</div>
+        <div class="timeline-title">Create Snapshot Report</div>
+        <div class="timeline-desc">Read existing controller, created the view (200+ lines of ERB with SVG charts, period selector, print CSS), added route, verified 200.</div>
+      </div>
+
+      <div class="timeline-item agent">
+        <div class="timeline-label agent-label">Launched 2 Background Agents</div>
+        <div class="timeline-title">Equity Simulator + Playbook Comparison</div>
+        <div class="timeline-desc">Each agent received detailed specs including API conventions, CSS variables, Stimulus patterns, and defensive coding requirements. They worked completely autonomously.</div>
+      </div>
+
+      <div class="timeline-item direct">
+        <div class="timeline-label direct-label">Orchestrator &mdash; Direct Build (concurrent)</div>
+        <div class="timeline-title">Streak Calendar</div>
+        <div class="timeline-desc">While agents ran, built a GitHub-style contribution heatmap with trading &amp; journaling grids, streak tracking, monthly breakdown, and consistency score. Controller + View + route.</div>
+      </div>
+
+      <div class="timeline-item agent">
+        <div class="timeline-label agent-label">Launched Agent</div>
+        <div class="timeline-title">Symbol Deep Dive</div>
+        <div class="timeline-desc">Dispatched while building the next feature directly.</div>
+      </div>
+
+      <div class="timeline-item direct">
+        <div class="timeline-label direct-label">Orchestrator &mdash; Direct Build (concurrent)</div>
+        <div class="timeline-title">Position Sizing Backtest</div>
+        <div class="timeline-desc">Built 6 sizing strategies (Fixed Fractional, Kelly, Half Kelly, Anti-Martingale, Fixed Dollar) with equity curve overlay chart and comparison table.</div>
+      </div>
+
+      <div class="timeline-item direct">
+        <div class="timeline-label direct-label">Orchestrator &mdash; Direct Build</div>
+        <div class="timeline-title">Consistency Report</div>
+        <div class="timeline-desc">9-dimension behavioral analysis with radar chart, rolling win rate stability, improvement recommendations. The most complex direct build.</div>
+      </div>
+
+      <div class="timeline-item verify">
+        <div class="timeline-label verify-label">Orchestrator &mdash; Verification</div>
+        <div class="timeline-title">Verify all pages, add to nav/search/palette</div>
+        <div class="timeline-desc">Batch-verified all pages return HTTP 200. Added entries to quick_search_controller.rb, command_palette_controller.js, and application.html.erb &mdash; the shared files only the orchestrator touched.</div>
+      </div>
+
+      <div class="timeline-item agent">
+        <div class="timeline-label agent-label">Background Agents Complete</div>
+        <div class="timeline-title">All 25+ agents reported back</div>
+        <div class="timeline-desc">Each agent's output was acknowledged. Any issues (missing routes, wrong API methods, missing views) were caught and fixed by the orchestrator.</div>
+      </div>
+    </div>
+
+    <!-- Design Principles -->
+    <h2>Why It Worked</h2>
+
+    <div class="principle-grid">
+      <div class="principle-card">
+        <h4>1. File-Level Isolation</h4>
+        <p>Each agent created its own controller and view files. Shared files (routes, nav, search) were only edited by the orchestrator, eliminating conflicts.</p>
+      </div>
+      <div class="principle-card">
+        <h4>2. Detailed Agent Prompts</h4>
+        <p>Every agent received the full codebase conventions: API client methods, response formats, CSS variables, icon library, chart patterns, error handling. They produced code that matched the existing style.</p>
+      </div>
+      <div class="principle-card">
+        <h4>3. Never Idle</h4>
+        <p>The orchestrator built features directly while agents worked in background. This doubled or tripled effective throughput compared to sequential work.</p>
+      </div>
+      <div class="principle-card">
+        <h4>4. Verify Everything</h4>
+        <p>Every feature was HTTP 200-verified with curl. Agent output was reviewed for correctness. Broken API method calls and missing files were caught and fixed immediately.</p>
+      </div>
+      <div class="principle-card">
+        <h4>5. Defensive Conventions</h4>
+        <p>All agents were instructed to use <code>do...end</code> blocks for Thread.new (not <code>{}</code>), check <code>is_a?(Hash)</code> on API responses, and handle empty data gracefully. This prevented runtime errors.</p>
+      </div>
+      <div class="principle-card">
+        <h4>6. Standing Directive</h4>
+        <p>The user's instruction was simple: "Keep going until I tell you to stop." This eliminated approval overhead and allowed fully autonomous execution across sessions.</p>
+      </div>
+    </div>
+
+    <!-- Final counts -->
+    <h2>Final Codebase</h2>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-value blue">123</div>
+        <div class="stat-label">Controllers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value green">281</div>
+        <div class="stat-label">Views</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value purple">52</div>
+        <div class="stat-label">Stimulus Controllers</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value orange">279</div>
+        <div class="stat-label">Routes</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value cyan">4,598</div>
+        <div class="stat-label">Test Assertions</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value red">4</div>
+        <div class="stat-label">Rails Apps</div>
+      </div>
+    </div>
+
+    <div class="key-insight">
+      <strong>The Result:</strong> A comprehensive personal finance and trading platform with 30+ feature pages, all built in a single extended session through parallel agent orchestration. Three API backends with 100% test coverage on the primary service. Every page verified, every route wired, every search entry added.
+    </div>
+
+    <footer>
+      <p>Built with Claude Opus 4.6 &middot; Anthropic Claude Code CLI &middot; March 2026</p>
+      <p style="margin-top: 0.25rem; font-size: 0.75rem;">The orchestrator model and all background agents ran the same Claude Opus 4.6 model.</p>
+    </footer>
+  </div>
+</body>
+</html>

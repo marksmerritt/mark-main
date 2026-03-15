@@ -1,0 +1,379 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">psychology</span>
+    Trading Habits Analyzer
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Reports Hub", reports_index_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<% if @total_trades.to_i < 5 %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary);">psychology</span>
+    <h2 style="margin: 1rem 0 0.5rem;">Not Enough Data</h2>
+    <p style="color: var(--text-secondary);">You need at least 5 closed trades to analyze habits. You have <%= @total_trades %>.</p>
+  </div>
+<% else %>
+
+<%# Overview strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades Analyzed</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_trades %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @win_rate >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @win_rate %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total P&L</div>
+      <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @total_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(@total_pnl) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Hour</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @best_hour ? format_hour(@best_hour) : "—" %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Day</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @best_day || "—" %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Trades/Day</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @avg_trades_per_day || "—" %></div>
+    </div>
+  </div>
+</div>
+
+<%# Habit Insights %>
+<% if @habits.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">lightbulb</span> Key Habit Insights</h2>
+    </div>
+    <% @habits.each do |h| %>
+      <%
+        bg = case h[:type]
+             when "positive" then "rgba(52,168,83,0.08)"
+             when "warning" then "rgba(249,171,0,0.08)"
+             else "rgba(26,115,232,0.08)"
+             end
+        color = case h[:type]
+                when "positive" then "var(--positive)"
+                when "warning" then "#f9ab00"
+                else "var(--primary)"
+                end
+      %>
+      <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: <%= bg %>;">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: <%= color %>; margin-top: 2px;"><%= h[:icon] %></span>
+        <div>
+          <div style="font-weight: 600; font-size: 0.9375rem; margin-bottom: 0.25rem;"><%= h[:title] %></div>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5;"><%= h[:text] %></div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# Time of Day Chart %>
+<% if @by_hour.any? %>
+  <%
+    max_trades_hour = @by_hour.values.map { |d| d[:trades] }.max.to_f
+    max_trades_hour = 1 if max_trades_hour == 0
+    max_pnl_hour = @by_hour.values.map { |d| d[:avg_pnl].abs }.max.to_f
+    max_pnl_hour = 1 if max_pnl_hour == 0
+    sorted_hours = @by_hour.sort_by { |h, _| h }
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">schedule</span> Performance by Time of Day</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <svg viewBox="0 0 800 280" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <!-- Grid lines -->
+        <line x1="60" y1="20" x2="60" y2="220" stroke="var(--border)" stroke-width="0.5"/>
+        <line x1="60" y1="120" x2="780" y2="120" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4"/>
+        <line x1="60" y1="220" x2="780" y2="220" stroke="var(--border)" stroke-width="0.5"/>
+
+        <text x="55" y="25" text-anchor="end" fill="var(--text-secondary)" font-size="9">+$<%= max_pnl_hour.round(0) %></text>
+        <text x="55" y="123" text-anchor="end" fill="var(--text-secondary)" font-size="9">$0</text>
+        <text x="55" y="225" text-anchor="end" fill="var(--text-secondary)" font-size="9">-$<%= max_pnl_hour.round(0) %></text>
+
+        <% bar_width = [((780 - 60).to_f / sorted_hours.count) * 0.6, 30].min %>
+        <% sorted_hours.each_with_index do |(hour, data), i| %>
+          <%
+            x = 60 + (i + 0.5) * ((780 - 60).to_f / sorted_hours.count)
+            pnl_height = (data[:avg_pnl] / max_pnl_hour * 100).abs
+            pnl_y = data[:avg_pnl] >= 0 ? 120 - pnl_height : 120
+            color = data[:avg_pnl] >= 0 ? "var(--positive)" : "var(--negative)"
+            opacity = (data[:trades].to_f / max_trades_hour * 0.6 + 0.4).round(2)
+          %>
+          <rect x="<%= x - bar_width / 2 %>" y="<%= pnl_y %>" width="<%= bar_width %>" height="<%= [pnl_height, 1].max %>"
+                fill="<%= color %>" opacity="<%= opacity %>" rx="2"/>
+          <!-- Trade count dot -->
+          <circle cx="<%= x %>" cy="<%= 250 - (data[:trades].to_f / max_trades_hour * 20) %>" r="3"
+                  fill="var(--primary)" opacity="0.6"/>
+          <text x="<%= x %>" y="<%= 270 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8">
+            <%= hour % 12 == 0 ? 12 : hour % 12 %><%= hour < 12 ? 'a' : 'p' %>
+          </text>
+        <% end %>
+
+        <text x="420" y="12" text-anchor="middle" fill="var(--text-secondary)" font-size="9">Avg P&L by Hour (bar opacity = trade volume)</text>
+      </svg>
+    </div>
+
+    <table class="table" style="font-size: 0.8125rem;">
+      <thead>
+        <tr>
+          <th>Hour</th>
+          <th style="text-align: right;">Trades</th>
+          <th style="text-align: right;">Win Rate</th>
+          <th style="text-align: right;">Avg P&L</th>
+          <th style="text-align: right;">Total P&L</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% sorted_hours.each do |hour, data| %>
+          <tr style="<%= hour == @best_hour ? 'background: rgba(52,168,83,0.06);' : (hour == @worst_hour ? 'background: rgba(234,67,53,0.06);' : '') %>">
+            <td>
+              <strong><%= format_hour(hour) %></strong>
+              <% if hour == @best_hour %><span style="color: var(--positive); font-size: 0.6875rem;"> Best</span><% end %>
+              <% if hour == @worst_hour %><span style="color: var(--negative); font-size: 0.6875rem;"> Worst</span><% end %>
+            </td>
+            <td style="text-align: right;"><%= data[:trades] %></td>
+            <td style="text-align: right; color: <%= data[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= data[:win_rate] %>%</td>
+            <td style="text-align: right;" class="<%= data[:avg_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:avg_pnl]) %></td>
+            <td style="text-align: right;" class="<%= data[:pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:pnl]) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<%# Day of Week Chart %>
+<% if @by_day.any? %>
+  <%
+    max_day_pnl = @by_day.values.map { |d| d[:avg_pnl].abs }.max.to_f
+    max_day_pnl = 1 if max_day_pnl == 0
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">calendar_month</span> Performance by Day of Week</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <svg viewBox="0 0 700 200" style="width: 100%; max-width: 700px; height: auto; font-family: Inter, sans-serif;">
+        <line x1="80" y1="90" x2="680" y2="90" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4"/>
+        <% bar_w = 60 %>
+        <% @by_day.each_with_index do |(day, data), i| %>
+          <%
+            x = 80 + i * 100 + 20
+            bar_h = (data[:avg_pnl].abs / max_day_pnl * 70).round
+            bar_y = data[:avg_pnl] >= 0 ? 90 - bar_h : 90
+            color = data[:avg_pnl] >= 0 ? "var(--positive)" : "var(--negative)"
+          %>
+          <rect x="<%= x %>" y="<%= bar_y %>" width="<%= bar_w %>" height="<%= [bar_h, 2].max %>"
+                fill="<%= color %>" opacity="0.7" rx="3"/>
+          <text x="<%= x + bar_w / 2 %>" y="<%= data[:avg_pnl] >= 0 ? bar_y - 5 : bar_y + bar_h + 12 %>"
+                text-anchor="middle" fill="<%= color %>" font-size="10" font-weight="600">
+            <%= data[:avg_pnl] >= 0 ? '+' : '' %>$<%= data[:avg_pnl].round(0) %>
+          </text>
+          <text x="<%= x + bar_w / 2 %>" y="180" text-anchor="middle" fill="var(--text-secondary)" font-size="10"><%= day[0..2] %></text>
+          <text x="<%= x + bar_w / 2 %>" y="192" text-anchor="middle" fill="var(--text-secondary)" font-size="8"><%= data[:win_rate] %>% WR</text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Hold Time Analysis %>
+  <% if @hold_buckets.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">timer</span> Hold Time Impact</h2>
+      </div>
+      <table class="table" style="font-size: 0.8125rem;">
+        <thead>
+          <tr>
+            <th>Duration</th>
+            <th style="text-align: right;">Trades</th>
+            <th style="text-align: right;">Win Rate</th>
+            <th style="text-align: right;">Avg P&L</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @hold_buckets.each do |label, data| %>
+            <tr style="<%= label == @best_duration ? 'background: rgba(52,168,83,0.06);' : '' %>">
+              <td>
+                <strong><%= label %></strong>
+                <% if label == @best_duration %><span style="color: var(--positive); font-size: 0.6875rem;"> Best</span><% end %>
+              </td>
+              <td style="text-align: right;"><%= data[:trades] %></td>
+              <td style="text-align: right; color: <%= data[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= data[:win_rate] %>%</td>
+              <td style="text-align: right;" class="<%= data[:avg_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:avg_pnl]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
+  <%# Trade Volume Impact %>
+  <% if @daily_trade_impact.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">speed</span> Daily Volume Impact</h2>
+      </div>
+      <table class="table" style="font-size: 0.8125rem;">
+        <thead>
+          <tr>
+            <th>Trades/Day</th>
+            <th style="text-align: right;">Days</th>
+            <th style="text-align: right;">Win Rate</th>
+            <th style="text-align: right;">Avg Daily P&L</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @daily_trade_impact.each do |label, data| %>
+            <tr>
+              <td><strong><%= label %></strong></td>
+              <td style="text-align: right;"><%= data[:days] %></td>
+              <td style="text-align: right; color: <%= data[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= data[:win_rate] %>%</td>
+              <td style="text-align: right;" class="<%= data[:avg_daily_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:avg_daily_pnl]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# First vs Last Trade %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">wb_twilight</span> First vs Last Trade of Day</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">First Trade Win Rate</div>
+          <div style="font-size: 2rem; font-weight: 700; color: <%= @first_trade_wr >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @first_trade_wr %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @first_trade_stats[:count] %> days</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Last Trade Win Rate</div>
+          <div style="font-size: 2rem; font-weight: 700; color: <%= @last_trade_wr >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @last_trade_wr %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @last_trade_stats[:count] %> days</div>
+        </div>
+      </div>
+      <% diff = @first_trade_wr - @last_trade_wr %>
+      <% if diff.abs > 5 %>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: <%= diff > 0 ? 'rgba(249,171,0,0.08)' : 'rgba(52,168,83,0.08)' %>; border-radius: 6px; font-size: 0.8125rem;">
+          <% if diff > 0 %>
+            <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px; color: #f9ab00;">warning</span>
+            Your win rate drops <%= diff.round(1) %> points from first to last trade. Consider stopping earlier.
+          <% else %>
+            <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px; color: var(--positive);">check_circle</span>
+            Your last trades actually perform better — you warm up as the day progresses.
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Position Size Impact %>
+  <% if @avg_position_size %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">straighten</span> Position Size Analysis</h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Average Size</div>
+            <div style="font-size: 1.125rem; font-weight: 600;"><%= number_to_currency(@avg_position_size) %></div>
+          </div>
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Median Size</div>
+            <div style="font-size: 1.125rem; font-weight: 600;"><%= number_to_currency(@median_position_size) %></div>
+          </div>
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Smallest</div>
+            <div style="font-size: 1.125rem; font-weight: 600;"><%= number_to_currency(@min_position_size) %></div>
+          </div>
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Largest</div>
+            <div style="font-size: 1.125rem; font-weight: 600;"><%= number_to_currency(@max_position_size) %></div>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div style="text-align: center; padding: 0.75rem; border: 1px solid var(--border); border-radius: 6px;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Small Positions WR</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: <%= @small_position_wr >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @small_position_wr %>%</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">Avg: <%= number_to_currency(@small_position_avg_pnl) %></div>
+          </div>
+          <div style="text-align: center; padding: 0.75rem; border: 1px solid var(--border); border-radius: 6px;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Large Positions WR</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: <%= @large_position_wr >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @large_position_wr %>%</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">Avg: <%= number_to_currency(@large_position_avg_pnl) %></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Trading Frequency %>
+  <% if @trades_by_date&.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Trading Frequency</h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Active Trading Days</div>
+            <div style="font-size: 1.125rem; font-weight: 600;"><%= @most_active_days %></div>
+          </div>
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg Trades/Day</div>
+            <div style="font-size: 1.125rem; font-weight: 600;"><%= @avg_trades_per_day %></div>
+          </div>
+        </div>
+        <% if @max_trades_day %>
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px; margin-bottom: 1rem;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Most Active Day</div>
+            <div style="font-size: 1rem; font-weight: 600;"><%= @max_trades_day[0] %> — <%= @max_trades_day[1] %> trades</div>
+          </div>
+        <% end %>
+        <% if @after_win_count > 0 && @after_loss_count > 0 %>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+            <strong>Post-Outcome Volume:</strong>
+            <span style="color: var(--positive);"><%= @after_win_count %></span> trades after winning days vs
+            <span style="color: var(--negative);"><%= @after_loss_count %></span> after losing days
+            <% ratio = @after_loss_count.to_f / @after_win_count %>
+            <% if ratio > 1.2 %>
+              <div style="margin-top: 0.5rem; padding: 0.5rem; background: rgba(249,171,0,0.08); border-radius: 4px;">
+                <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #f9ab00;">warning</span>
+                You tend to trade more after losses — potential revenge trading pattern.
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+  <%= link_to "Discipline Report", reports_discipline_path, class: "btn" %>
+  <%= link_to "By Time", reports_by_time_path, class: "btn" %>
+  <%= link_to "By Duration", reports_by_duration_path, class: "btn" %>
+</div>
+
+<% end %>

@@ -1,0 +1,229 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">donut_large</span>
+    Equity Breakdown
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Equity Curve", reports_equity_curve_path, class: "btn btn-sm" %>
+    <%= link_to "Reports Hub", reports_index_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<% if @total_trades.to_i < 5 %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary);">donut_large</span>
+    <h2 style="margin: 1rem 0 0.5rem;">Not Enough Data</h2>
+    <p style="color: var(--text-secondary);">Need at least 5 closed trades. You have <%= @total_trades %>.</p>
+  </div>
+<% else %>
+
+<%# P&L Contribution Bars %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+  <%# Side Contribution %>
+  <div class="card" style="padding: 1.25rem;">
+    <h3 style="font-size: 0.875rem; margin-bottom: 0.75rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">swap_vert</span>
+      P&L by Side
+    </h3>
+    <% @side_contribution.each do |c| %>
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span style="width: 50px; font-size: 0.8125rem; font-weight: 500;"><%= c[:name] %></span>
+        <div style="flex: 1; height: 24px; background: var(--bg); border-radius: 4px; overflow: hidden; position: relative;">
+          <div style="height: 100%; width: <%= [c[:pct].abs, 100].min %>%; background: <%= c[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.6; border-radius: 4px;"></div>
+        </div>
+        <span style="font-size: 0.8125rem; font-weight: 600; min-width: 70px; text-align: right;" class="<%= c[:pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(c[:pnl]) %></span>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Asset Class Contribution %>
+  <div class="card" style="padding: 1.25rem;">
+    <h3 style="font-size: 0.875rem; margin-bottom: 0.75rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">pie_chart</span>
+      P&L by Asset Class
+    </h3>
+    <% @asset_contribution.each do |c| %>
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span style="width: 60px; font-size: 0.8125rem; font-weight: 500;"><%= c[:name] %></span>
+        <div style="flex: 1; height: 24px; background: var(--bg); border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: <%= [c[:pct].abs, 100].min %>%; background: <%= c[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.6; border-radius: 4px;"></div>
+        </div>
+        <span style="font-size: 0.8125rem; font-weight: 600; min-width: 70px; text-align: right;" class="<%= c[:pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(c[:pnl]) %></span>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Side Equity Curves %>
+<% if @by_side.count >= 2 %>
+  <%
+    all_eq = @by_side.values.flat_map { |d| d[:curve].map { |c| c[:equity] } }
+    max_eq = [all_eq.max.to_f, 1].max
+    min_eq = all_eq.min.to_f
+    eq_range = [max_eq - min_eq, 1].max
+    max_len = @by_side.values.map { |d| d[:curve].count }.max
+    side_colors = { "long" => "#34a853", "short" => "#ea4335", "unknown" => "#607d8b" }
+    chart_w = 700; chart_h = 200; pad_l = 70; pad_r = 20
+    usable_w = chart_w - pad_l - pad_r
+    usable_h = chart_h - 30
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Equity Curves: Long vs Short</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h + 20 %>" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <% 5.times do |i| %>
+          <% y = 15 + i * (usable_h / 4.0) %>
+          <line x1="<%= pad_l %>" y1="<%= y %>" x2="<%= chart_w - pad_r %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3"/>
+          <text x="<%= pad_l - 5 %>" y="<%= y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="8">
+            $<%= (max_eq - i * eq_range / 4.0).round(0) %>
+          </text>
+        <% end %>
+
+        <%# Zero line %>
+        <% zero_y = 15 + (max_eq / eq_range * usable_h) %>
+        <line x1="<%= pad_l %>" y1="<%= zero_y %>" x2="<%= chart_w - pad_r %>" y2="<%= zero_y %>" stroke="var(--border)" stroke-width="1" stroke-dasharray="6,3"/>
+
+        <% @by_side.each do |side, data| %>
+          <%
+            color = side_colors[side] || "#607d8b"
+            points = data[:curve].map { |c|
+              x = pad_l + (c[:trade] - 1).to_f / [max_len - 1, 1].max * usable_w
+              y = 15 + (max_eq - c[:equity]) / eq_range * usable_h
+              "#{x.round(1)},#{y.clamp(5, chart_h + 10).round(1)}"
+            }.join(' ')
+          %>
+          <polyline points="<%= points %>" fill="none" stroke="<%= color %>" stroke-width="2" opacity="0.8"/>
+        <% end %>
+
+        <%# Legend %>
+        <% @by_side.each_with_index do |(side, _), i| %>
+          <rect x="<%= pad_l + i * 80 %>" y="<%= chart_h + 8 %>" width="12" height="3" fill="<%= side_colors[side] || '#607d8b' %>" rx="1"/>
+          <text x="<%= pad_l + i * 80 + 16 %>" y="<%= chart_h + 13 %>" fill="var(--text-secondary)" font-size="9"><%= side.capitalize %></text>
+        <% end %>
+      </svg>
+    </div>
+
+    <%# Side stats table %>
+    <table class="table" style="font-size: 0.8125rem;">
+      <thead>
+        <tr>
+          <th>Side</th>
+          <th style="text-align: right;">Trades</th>
+          <th style="text-align: right;">Record</th>
+          <th style="text-align: right;">Win Rate</th>
+          <th style="text-align: right;">Avg P&L</th>
+          <th style="text-align: right;">Total P&L</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @by_side.each do |side, data| %>
+          <tr>
+            <td><strong><%= side.capitalize %></strong></td>
+            <td style="text-align: right;"><%= data[:trades] %></td>
+            <td style="text-align: right;"><span class="positive"><%= data[:wins] %>W</span> <span class="negative"><%= data[:losses] %>L</span></td>
+            <td style="text-align: right; color: <%= data[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= data[:win_rate] %>%</td>
+            <td style="text-align: right;" class="<%= data[:avg_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:avg_pnl]) %></td>
+            <td style="text-align: right; font-weight: 600;" class="<%= data[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:total_pnl]) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<%# Asset Class Cards %>
+<% if @by_asset.count >= 2 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">category</span> By Asset Class</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0;">
+      <% asset_colors = %w[#34a853 #1a73e8 #f9ab00 #ea4335 #9c27b0 #00bcd4] %>
+      <% @by_asset.each_with_index do |(asset, data), i| %>
+        <div style="padding: 1rem 1.25rem; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span style="width: 10px; height: 10px; border-radius: 2px; background: <%= asset_colors[i % asset_colors.length] %>;"></span>
+            <strong style="font-size: 0.875rem;"><%= asset.capitalize %></strong>
+          </div>
+          <div style="font-size: 1.25rem; font-weight: 700;" class="<%= data[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:total_pnl]) %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= data[:trades] %> trades · <%= data[:win_rate] %>% WR</div>
+          <% if data[:curve].count >= 3 %>
+            <%
+              mini_eq = data[:curve].map { |c| c[:equity] }
+              mini_max = mini_eq.max.to_f; mini_min = mini_eq.min.to_f
+              mini_range = [mini_max - mini_min, 1].max
+              mini_pts = data[:curve].map { |c|
+                x = 5 + (c[:trade] - 1).to_f / [data[:curve].count - 1, 1].max * 170
+                y = 3 + (mini_max - c[:equity]) / mini_range * 24
+                "#{x.round(1)},#{y.round(1)}"
+              }.join(' ')
+            %>
+            <svg viewBox="0 0 180 30" style="width: 100%; height: 25px; margin-top: 0.375rem;">
+              <polyline points="<%= mini_pts %>" fill="none" stroke="<%= asset_colors[i % asset_colors.length] %>" stroke-width="1.5" opacity="0.7"/>
+            </svg>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Monthly Performance Table %>
+<% if @by_month.count >= 2 %>
+  <%
+    max_month_pnl = @by_month.values.map { |d| d[:total_pnl].abs }.max.to_f
+    max_month_pnl = 1 if max_month_pnl == 0
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">calendar_month</span> Monthly P&L Breakdown</h2>
+    </div>
+    <table class="table" style="font-size: 0.8125rem;">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th style="text-align: right;">Trades</th>
+          <th style="text-align: right;">W/L</th>
+          <th style="text-align: right;">Win Rate</th>
+          <th style="text-align: right;">Avg P&L</th>
+          <th>P&L</th>
+          <th style="text-align: right;">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @by_month.each do |month, data| %>
+          <tr>
+            <td><strong><%= month %></strong></td>
+            <td style="text-align: right;"><%= data[:trades] %></td>
+            <td style="text-align: right;"><span class="positive"><%= data[:wins] %></span>/<span class="negative"><%= data[:losses] %></span></td>
+            <td style="text-align: right; color: <%= data[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= data[:win_rate] %>%</td>
+            <td style="text-align: right;" class="<%= data[:avg_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:avg_pnl]) %></td>
+            <td>
+              <div style="display: flex; align-items: center; gap: 0.375rem;">
+                <div style="width: 80px; height: 12px; background: var(--bg); border-radius: 3px; overflow: hidden; position: relative;">
+                  <%
+                    bar_pct = (data[:total_pnl].abs / max_month_pnl * 100).round
+                    bar_color = data[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)'
+                  %>
+                  <div style="height: 100%; width: <%= bar_pct %>%; background: <%= bar_color %>; opacity: 0.6; border-radius: 3px;"></div>
+                </div>
+              </div>
+            </td>
+            <td style="text-align: right; font-weight: 600;" class="<%= data[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:total_pnl]) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+  <%= link_to "Equity Curve", reports_equity_curve_path, class: "btn" %>
+  <%= link_to "By Symbol", reports_by_symbol_path, class: "btn" %>
+  <%= link_to "Monthly P&L", reports_monthly_performance_path, class: "btn" %>
+</div>
+
+<% end %>

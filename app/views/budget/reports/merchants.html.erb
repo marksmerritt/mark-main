@@ -1,0 +1,288 @@
+<div class="page-header">
+  <h1>Merchant Insights</h1>
+</div>
+
+<div class="card" style="margin-bottom: 1rem;">
+  <%= form_with url: budget_reports_merchants_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :months, "Time Period" %>
+        <%= f.select :months, [[" 1 Month", 1], ["3 Months", 3], ["6 Months", 6], ["12 Months", 12]],
+            { selected: @months }, class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @data.present? && !@data["error"] %>
+  <%
+    total_spend = @data["total_spend"].to_f
+    unique_merchants = @data["unique_merchants"].to_i
+    avg_per_merchant = @data["avg_per_merchant"].to_f
+    all_merchants = @data["top_merchants"].is_a?(Array) ? @data["top_merchants"] : []
+    top3_total = all_merchants.first(3).sum { |m| m["total"].to_f }
+    top3_pct = total_spend > 0 ? (top3_total / total_spend * 100).round(0) : 0
+    avg_per_visit = all_merchants.any? ? (total_spend / all_merchants.sum { |m| m["count"].to_i }.to_f).round(2) : 0
+  %>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Merchant Spend</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(total_spend) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Unique Merchants</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= unique_merchants %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg per Merchant</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(avg_per_merchant) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg per Visit</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(avg_per_visit) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Top 3 Concentration</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= top3_pct > 60 ? 'negative' : '' %>"><%= top3_pct %>%</div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= top3_pct > 60 ? "Highly concentrated" : top3_pct > 40 ? "Moderate spread" : "Well diversified" %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Period</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @months %> month<%= @months > 1 ? "s" : "" %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Treemap visualization of merchant spending %>
+  <% if all_merchants.length >= 3 %>
+    <%
+      treemap_merchants = all_merchants.first(10)
+      treemap_total = treemap_merchants.sum { |m| m["total"].to_f }
+      treemap_colors = ["#1a73e8", "#0d904f", "#d93025", "#f9ab00", "#7b1fa2", "#00796b", "#c62828", "#1565c0", "#e8710a", "#9334e6"]
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Spending Treemap</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: flex; flex-wrap: wrap; gap: 3px; min-height: 120px;">
+          <% treemap_merchants.each_with_index do |m, i| %>
+            <%
+              share = treemap_total > 0 ? (m["total"].to_f / treemap_total * 100).round(1) : 0
+              # Flex-basis proportional to share
+              flex_val = [share, 8].max
+            %>
+            <div style="flex: <%= flex_val %> 1 0; min-width: 60px; min-height: 50px; padding: 0.5rem;
+                        background: <%= treemap_colors[i % treemap_colors.length] %>; opacity: 0.75;
+                        border-radius: var(--radius); color: white; display: flex; flex-direction: column; justify-content: center;"
+                 title="<%= m["merchant"] %>: <%= number_to_currency(m["total"]) %> (<%= share %>%)">
+              <div style="font-size: 0.6875rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><%= m["merchant"] %></div>
+              <div style="font-size: 0.8125rem; font-weight: 700;"><%= number_to_currency(m["total"]) %></div>
+              <div style="font-size: 0.5625rem; opacity: 0.8;"><%= share %>%</div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Spending frequency analysis %>
+  <% if @data["top_merchants"].is_a?(Array) && @data["top_merchants"].count >= 3 %>
+    <%
+      merchants = @data["top_merchants"]
+      max_total = merchants.map { |m| m["total"].to_f }.max.to_f
+      max_count = merchants.map { |m| m["count"].to_i }.max.to_f
+      max_total = 1 if max_total == 0
+      max_count = 1 if max_count == 0
+
+      # Classify merchants
+      frequent_small = merchants.select { |m| m["count"].to_i >= (max_count * 0.4) && m["average"].to_f <= (max_total / max_count * 0.7) }
+      infrequent_large = merchants.select { |m| m["count"].to_i <= (max_count * 0.3) && m["average"].to_f >= (max_total / max_count * 1.5) }
+      top_by_frequency = merchants.sort_by { |m| -m["count"].to_i }.first(5)
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Spending Frequency Map</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="position: relative; height: 200px; border-left: 1px solid var(--border); border-bottom: 1px solid var(--border); margin-bottom: 1rem;">
+          <span style="position: absolute; left: -2rem; top: 50%; transform: rotate(-90deg) translateX(50%); font-size: 0.625rem; color: var(--text-secondary); white-space: nowrap;">Total Spent</span>
+          <span style="position: absolute; bottom: -1.25rem; left: 50%; transform: translateX(-50%); font-size: 0.625rem; color: var(--text-secondary);">Frequency (visits)</span>
+          <% merchants.first(12).each_with_index do |m, i| %>
+            <%
+              x_pct = (m["count"].to_i / max_count * 85 + 5).round(1)
+              y_pct = (100 - (m["total"].to_f / max_total * 85 + 5)).round(1)
+              size = [(m["total"].to_f / max_total * 30 + 10).round(0), 40].min
+              dot_colors = ["#1a73e8", "#0d904f", "#e8710a", "#d93025", "#9334e6", "#f9ab00"]
+            %>
+            <div style="position: absolute; left: <%= x_pct %>%; top: <%= y_pct %>%; width: <%= size %>px; height: <%= size %>px; border-radius: 50%;
+                        background: <%= dot_colors[i % dot_colors.length] %>; opacity: 0.6; transform: translate(-50%, -50%); cursor: default;"
+                 title="<%= m["merchant"] %>: <%= m["count"] %> visits, <%= number_to_currency(m["total"]) %> total, avg <%= number_to_currency(m["average"]) %>">
+            </div>
+            <% if merchants.count <= 8 || i < 5 %>
+              <span style="position: absolute; left: <%= x_pct %>%; top: calc(<%= y_pct %>% + <%= size / 2 + 2 %>px); transform: translateX(-50%);
+                           font-size: 0.5625rem; color: var(--text-secondary); white-space: nowrap; pointer-events: none;">
+                <%= m["merchant"].to_s.truncate(10) %>
+              </span>
+            <% end %>
+          <% end %>
+        </div>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.8125rem;">
+          <% if frequent_small.any? %>
+            <div style="flex: 1; min-width: 200px; padding: 0.5rem; border-radius: var(--radius); background: rgba(26,115,232,0.06); border: 1px solid rgba(26,115,232,0.2);">
+              <strong style="font-size: 0.75rem;">Frequent, Low-Cost</strong>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;">
+                <%= frequent_small.map { |m| m["merchant"] }.first(3).join(", ") %>
+              </div>
+            </div>
+          <% end %>
+          <% if infrequent_large.any? %>
+            <div style="flex: 1; min-width: 200px; padding: 0.5rem; border-radius: var(--radius); background: rgba(217,48,37,0.06); border: 1px solid rgba(217,48,37,0.2);">
+              <strong style="font-size: 0.75rem;">Infrequent, High-Cost</strong>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;">
+                <%= infrequent_large.map { |m| m["merchant"] }.first(3).join(", ") %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @data["top_merchants"].is_a?(Array) && @data["top_merchants"].any? %>
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-header"><h2>Top Merchants</h2></div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Merchant</th>
+              <th style="text-align: right;">Total</th>
+              <th style="text-align: right;">Transactions</th>
+              <th style="text-align: right;">Average</th>
+              <th style="text-align: right;">% of Spend</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @data["top_merchants"].each_with_index do |m, idx| %>
+              <tr>
+                <td><span class="badge badge-primary"><%= idx + 1 %></span></td>
+                <td><strong><%= m["merchant"] %></strong></td>
+                <td style="text-align: right;" class="negative"><%= number_to_currency(m["total"]) %></td>
+                <td style="text-align: right;"><%= m["count"] %></td>
+                <td style="text-align: right;"><%= number_to_currency(m["average"]) %></td>
+                <td style="text-align: right;">
+                  <% pct = @data["total_spend"].to_f > 0 ? (m["total"].to_f / @data["total_spend"].to_f * 100).round(1) : 0 %>
+                  <span class="<%= budget_progress_class(pct) %>" style="padding: 0.125rem 0.5rem; border-radius: 4px; color: white; font-size: 0.8rem;">
+                    <%= pct %>%
+                  </span>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Spending Distribution</h2></div>
+        <div style="padding: 1rem;">
+          <% total = @data["total_spend"].to_f %>
+          <% @data["top_merchants"].first(10).each do |m| %>
+            <div style="margin-bottom: 0.75rem;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                <span style="font-size: 0.875rem; font-weight: 500;"><%= m["merchant"] %></span>
+                <span style="font-size: 0.875rem;"><%= number_to_currency(m["total"]) %></span>
+              </div>
+              <div class="budget-progress-bar">
+                <% width = total > 0 ? [(m["total"].to_f / total) * 100, 100].min : 0 %>
+                <div class="budget-progress-fill progress-safe" style="width: <%= width %>%"></div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @data["monthly_trends"].is_a?(Hash) && @data["monthly_trends"].any? %>
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header"><h2>Top 5 Monthly Trends</h2></div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Merchant</th>
+            <% # Get month labels from first merchant's data %>
+            <% first_merchant_data = @data["monthly_trends"].values.first %>
+            <% if first_merchant_data.is_a?(Array) %>
+              <% first_merchant_data.each do |period| %>
+                <th style="text-align: right;"><%= period["label"] %></th>
+              <% end %>
+            <% end %>
+            <th style="text-align: right;">Trend</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @data["monthly_trends"].each do |merchant, periods| %>
+            <tr>
+              <td><strong><%= merchant %></strong></td>
+              <% if periods.is_a?(Array) %>
+                <% periods.each do |p| %>
+                  <td style="text-align: right;"><%= number_to_currency(p["amount"]) %></td>
+                <% end %>
+                <% if periods.length >= 2 %>
+                  <% latest = periods.last["amount"].to_f %>
+                  <% previous = periods[-2]["amount"].to_f %>
+                  <% change = previous > 0 ? ((latest - previous) / previous * 100).round(1) : 0 %>
+                  <td style="text-align: right;">
+                    <span class="<%= change <= 0 ? 'positive' : 'negative' %>">
+                      <%= change >= 0 ? "+" : "" %><%= change %>%
+                    </span>
+                  </td>
+                <% else %>
+                  <td></td>
+                <% end %>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+  <%# Merchant Insights %>
+  <% if all_merchants.length >= 3 %>
+    <%
+      most_frequent = all_merchants.max_by { |m| m["count"].to_i }
+      highest_avg = all_merchants.max_by { |m| m["average"].to_f }
+      biggest_spender = all_merchants.max_by { |m| m["total"].to_f }
+    %>
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header"><h2>Merchant Insights</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <div class="insight-item insight-info" style="margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined">repeat</span>
+          <span>Most frequent: <strong><%= most_frequent["merchant"] %></strong> with <%= most_frequent["count"] %> visits (<%= number_to_currency(most_frequent["average"]) %> avg).</span>
+        </div>
+        <div class="insight-item insight-warning" style="margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined">attach_money</span>
+          <span>Highest per-visit: <strong><%= highest_avg["merchant"] %></strong> averaging <%= number_to_currency(highest_avg["average"]) %> per transaction.</span>
+        </div>
+        <div class="insight-item insight-neutral" style="margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined">leaderboard</span>
+          <span>Top spender: <strong><%= biggest_spender["merchant"] %></strong> at <%= number_to_currency(biggest_spender["total"]) %> (<%= total_spend > 0 ? (biggest_spender["total"].to_f / total_spend * 100).round(1) : 0 %>% of total).</span>
+        </div>
+        <% if top3_pct > 50 %>
+          <div class="insight-item insight-danger" style="margin-bottom: 0.5rem;">
+            <span class="material-icons-outlined">warning</span>
+            <span>Top 3 merchants account for <%= top3_pct %>% of spending. Consider if these are all necessary expenses.</span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p>Add transactions with merchant names to see merchant spending insights.</p>
+  </div>
+<% end %>

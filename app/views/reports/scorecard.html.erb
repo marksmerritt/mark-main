@@ -1,0 +1,340 @@
+<div class="page-header">
+  <h1>Performance Scorecard</h1>
+  <div class="page-actions">
+    <button class="btn" onclick="window.print()">
+      <span class="material-icons-outlined">print</span> Print
+    </button>
+  </div>
+</div>
+
+<div class="card">
+  <%= form_with url: reports_scorecard_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :start_date, "Start Date" %>
+        <%= f.date_field :start_date, value: params[:start_date], class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :end_date, "End Date" %>
+        <%= f.date_field :end_date, value: params[:end_date], class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+        <%= link_to "Clear", reports_scorecard_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @stats.present? && !@stats["error"] %>
+  <% grade = performance_grade(@stats, @risk) %>
+
+  <% if grade %>
+    <div class="scorecard-hero">
+      <div class="card scorecard-overall">
+        <div class="grade-circle <%= grade_color_class(grade[:letter]) %>">
+          <span class="grade-letter"><%= grade[:letter] %></span>
+          <span class="grade-score"><%= grade[:overall] %>/100</span>
+        </div>
+        <h2>Overall Performance</h2>
+        <p class="text-muted">Based on <%= @stats["total_trades"] %> trades</p>
+      </div>
+    </div>
+
+    <%
+      categories = {
+        profitability: { label: "Profitability", icon: "trending_up", tip: "Based on total P&L performance" },
+        win_rate: { label: "Win Rate", icon: "check_circle", tip: "Percentage of winning trades" },
+        risk_management: { label: "Risk Mgmt", icon: "shield", tip: "Based on profit factor" },
+        consistency: { label: "Consistency", icon: "balance", tip: "Average win vs average loss ratio" },
+        discipline: { label: "Discipline", icon: "psychology", tip: "Based on risk-adjusted returns (Sharpe ratio)" }
+      }
+    %>
+
+    <%# Radar chart for scorecard dimensions %>
+    <div class="content-grid" style="margin-bottom: 1.5rem;">
+      <div class="card">
+        <div class="card-header"><h2>Performance Radar</h2></div>
+        <div style="padding: 1rem; display: flex; justify-content: center;">
+          <%
+            sc_dims = categories.map { |key, meta| { label: meta[:label], score: grade[:categories][key].to_i } }
+            sc_cx = 140; sc_cy = 130; sc_r = 100
+            sc_n = sc_dims.length
+            sc_angle_step = 360.0 / sc_n
+            overall_color = grade[:overall] >= 80 ? "var(--positive)" : grade[:overall] >= 60 ? "var(--primary)" : grade[:overall] >= 40 ? "#f9ab00" : "var(--negative)"
+          %>
+          <svg viewBox="0 0 280 270" style="width: 100%; max-width: 280px;">
+            <% [20, 40, 60, 80, 100].each do |pct| %>
+              <polygon points="<%= sc_dims.each_with_index.map { |_, j|
+                angle = (sc_angle_step * j - 90) * Math::PI / 180
+                x = sc_cx + sc_r * pct / 100.0 * Math.cos(angle)
+                y = sc_cy + sc_r * pct / 100.0 * Math.sin(angle)
+                "#{x.round(1)},#{y.round(1)}"
+              }.join(' ') %>" fill="none" stroke="var(--border)" stroke-width="0.5" />
+            <% end %>
+            <% sc_dims.each_with_index do |dim, j| %>
+              <%
+                angle = (sc_angle_step * j - 90) * Math::PI / 180
+                lx = (sc_cx + sc_r * Math.cos(angle)).round(1)
+                ly = (sc_cy + sc_r * Math.sin(angle)).round(1)
+                tx = (sc_cx + (sc_r + 18) * Math.cos(angle)).round(1)
+                ty = (sc_cy + (sc_r + 18) * Math.sin(angle)).round(1)
+              %>
+              <line x1="<%= sc_cx %>" y1="<%= sc_cy %>" x2="<%= lx %>" y2="<%= ly %>" stroke="var(--border)" stroke-width="0.5" />
+              <text x="<%= tx %>" y="<%= ty.to_f + 4 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="9" font-weight="600"><%= dim[:label] %></text>
+            <% end %>
+            <polygon points="<%= sc_dims.each_with_index.map { |dim, j|
+              angle = (sc_angle_step * j - 90) * Math::PI / 180
+              x = sc_cx + sc_r * dim[:score] / 100.0 * Math.cos(angle)
+              y = sc_cy + sc_r * dim[:score] / 100.0 * Math.sin(angle)
+              "#{x.round(1)},#{y.round(1)}"
+            }.join(' ') %>" fill="<%= overall_color %>" fill-opacity="0.15" stroke="<%= overall_color %>" stroke-width="2" />
+            <% sc_dims.each_with_index do |dim, j| %>
+              <%
+                angle = (sc_angle_step * j - 90) * Math::PI / 180
+                px = (sc_cx + sc_r * dim[:score] / 100.0 * Math.cos(angle)).round(1)
+                py = (sc_cy + sc_r * dim[:score] / 100.0 * Math.sin(angle)).round(1)
+              %>
+              <circle cx="<%= px %>" cy="<%= py %>" r="3" fill="<%= overall_color %>" />
+            <% end %>
+          </svg>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><h2>Category Scores</h2></div>
+        <div style="padding: 1rem 1.25rem;">
+          <% categories.each do |key, meta| %>
+            <%
+              cat_score = grade[:categories][key].to_i
+              cat_letter = grade[:letters][key]
+              cat_color = cat_score >= 80 ? "var(--positive)" : cat_score >= 60 ? "var(--primary)" : cat_score >= 40 ? "#f9ab00" : "var(--negative)"
+            %>
+            <div style="display: flex; align-items: center; gap: 0.625rem; margin-bottom: 0.875rem;">
+              <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= cat_color %>; width: 20px;"><%= meta[:icon] %></span>
+              <span style="width: 90px; font-size: 0.8125rem; font-weight: 600;"><%= meta[:label] %></span>
+              <div style="flex: 1; height: 14px; background: var(--bg); border-radius: 7px; overflow: hidden;">
+                <div style="height: 100%; width: <%= cat_score %>%; background: <%= cat_color %>; border-radius: 7px; transition: width 0.3s;"></div>
+              </div>
+              <span class="grade-badge <%= grade_color_class(cat_letter) %>" style="font-size: 0.75rem; padding: 0.125rem 0.5rem;"><%= cat_letter %></span>
+              <span style="width: 30px; text-align: right; font-size: 0.8125rem; font-weight: 700; color: <%= cat_color %>;"><%= cat_score %></span>
+            </div>
+          <% end %>
+          <%
+            strongest = grade[:categories].max_by { |_, v| v }
+            weakest = grade[:categories].min_by { |_, v| v }
+          %>
+          <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.8125rem;">
+            <span class="positive">Strongest:</span> <strong><%= categories[strongest[0]][:label] %></strong> (<%= strongest[1] %>)
+            &nbsp;&bull;&nbsp;
+            <span class="negative">Weakest:</span> <strong><%= categories[weakest[0]][:label] %></strong> (<%= weakest[1] %>)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="scorecard-grid">
+      <% categories.each do |key, meta| %>
+        <div class="card scorecard-category">
+          <div class="scorecard-category-header">
+            <span class="material-icons-outlined"><%= meta[:icon] %></span>
+            <h3><%= meta[:label] %></h3>
+          </div>
+          <div class="scorecard-category-grade">
+            <span class="grade-badge <%= grade_color_class(grade[:letters][key]) %>">
+              <%= grade[:letters][key] %>
+            </span>
+            <span class="grade-score-sm"><%= grade[:categories][key] %>/100</span>
+          </div>
+          <div class="scorecard-bar">
+            <div class="scorecard-bar-fill <%= grade_color_class(grade[:letters][key]) %>"
+                 style="width: <%= grade[:categories][key] %>%"></div>
+          </div>
+          <p class="text-muted" style="font-size: 0.75rem; margin-top: 0.375rem;"><%= meta[:tip] %></p>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-header">
+          <h2>Key Metrics</h2>
+        </div>
+        <table class="table">
+          <tbody>
+            <tr>
+              <td><strong>Total P&L</strong></td>
+              <td class="<%= pnl_class(@stats["total_pnl"]) %>"><%= number_to_currency(@stats["total_pnl"]) %></td>
+            </tr>
+            <tr>
+              <td><strong>Win Rate</strong></td>
+              <td><%= @stats["win_rate"] %>%</td>
+            </tr>
+            <tr>
+              <td><strong>Profit Factor</strong></td>
+              <td><%= @stats["profit_factor"] %></td>
+            </tr>
+            <tr>
+              <td><strong>Avg Win</strong></td>
+              <td class="positive"><%= number_to_currency(@stats["avg_win"]) %></td>
+            </tr>
+            <tr>
+              <td><strong>Avg Loss</strong></td>
+              <td class="negative"><%= number_to_currency(@stats["avg_loss"]) %></td>
+            </tr>
+            <tr>
+              <td><strong>Largest Win</strong></td>
+              <td class="positive"><%= number_to_currency(@stats["largest_win"]) %></td>
+            </tr>
+            <tr>
+              <td><strong>Largest Loss</strong></td>
+              <td class="negative"><%= number_to_currency(@stats["largest_loss"]) %></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <% if @risk.present? && !@risk["error"] %>
+        <div class="card">
+          <div class="card-header">
+            <h2>Risk Metrics</h2>
+          </div>
+          <table class="table">
+            <tbody>
+              <tr>
+                <td><strong>Sharpe Ratio</strong></td>
+                <td><%= @risk["sharpe_like"] %></td>
+              </tr>
+              <tr>
+                <td><strong>Sortino Ratio</strong></td>
+                <td><%= @risk["sortino_ratio"] %></td>
+              </tr>
+              <tr>
+                <td><strong>Max Drawdown</strong></td>
+                <td class="negative"><%= number_to_currency(@risk["max_drawdown"]) %></td>
+              </tr>
+              <tr>
+                <td><strong>Expectancy</strong></td>
+                <td class="<%= pnl_class(@risk["expectancy"]) %>"><%= number_to_currency(@risk["expectancy"]) %></td>
+              </tr>
+              <tr>
+                <td><strong>Kelly Criterion</strong></td>
+                <td><%= @risk["kelly_criterion"] %>%</td>
+              </tr>
+              <tr>
+                <td><strong>Recovery Factor</strong></td>
+                <td><%= @risk["recovery_factor"] %></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      <% end %>
+    </div>
+
+    <% if grade %>
+      <%
+        weakest = grade[:categories].min_by { |_, score| score }
+        improvements = []
+        if grade[:categories][:profitability].to_i < 60
+          improvements << { area: "Profitability", tip: "Focus on holding winning trades longer. Consider trailing stops instead of fixed targets.", icon: "trending_up" }
+        end
+        if grade[:categories][:win_rate].to_i < 60
+          improvements << { area: "Win Rate", tip: "Be more selective with entries. Wait for A+ setups only and avoid trading during low-probability conditions.", icon: "target" }
+        end
+        if grade[:categories][:risk_management].to_i < 60
+          improvements << { area: "Risk Management", tip: "Improve your profit factor by cutting losses earlier. Use strict stop losses and honor them.", icon: "shield" }
+        end
+        if grade[:categories][:consistency].to_i < 60
+          improvements << { area: "Consistency", tip: "Your win/loss size ratio needs work. Ensure winners are larger than losers on average.", icon: "balance" }
+        end
+        if grade[:categories][:discipline].to_i < 60
+          improvements << { area: "Discipline", tip: "Track and follow your playbooks. Journal daily to identify patterns in undisciplined trades.", icon: "psychology" }
+        end
+      %>
+      <% if improvements.any? %>
+        <div class="card">
+          <div class="card-header">
+            <h2>Areas for Improvement</h2>
+          </div>
+          <div style="padding: 0.75rem 1.25rem;">
+            <% improvements.first(3).each do |imp| %>
+              <div class="insight-item insight-neutral" style="margin-bottom: 0.5rem;">
+                <span class="material-icons-outlined"><%= imp[:icon] %></span>
+                <div>
+                  <strong><%= imp[:area] %>:</strong>
+                  <span><%= imp[:tip] %></span>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
+
+    <%# Win/Loss profile %>
+    <%
+      avg_win = @stats["avg_win"].to_f
+      avg_loss = @stats["avg_loss"].to_f.abs
+      largest_win = @stats["largest_win"].to_f
+      largest_loss = @stats["largest_loss"].to_f.abs
+      max_wl = [avg_win, avg_loss, largest_win, largest_loss].max
+      max_wl = 1 if max_wl == 0
+    %>
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header"><h2>Win/Loss Profile</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <% [
+          { label: "Avg Win", val: avg_win, color: "var(--positive)" },
+          { label: "Avg Loss", val: avg_loss, color: "var(--negative)" },
+          { label: "Best Win", val: largest_win, color: "#0d904f" },
+          { label: "Worst Loss", val: largest_loss, color: "#d93025" }
+        ].each do |row| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+            <span style="width: 80px; font-size: 0.8125rem; font-weight: 600;"><%= row[:label] %></span>
+            <div style="flex: 1; height: 16px; background: var(--bg); border-radius: 4px; overflow: hidden;">
+              <div style="height: 100%; width: <%= (row[:val] / max_wl * 100).round(1) %>%; background: <%= row[:color] %>; opacity: 0.6; border-radius: 4px;"></div>
+            </div>
+            <span style="width: 80px; text-align: right; font-size: 0.8125rem; font-weight: 600; color: <%= row[:color] %>;"><%= number_to_currency(row[:val]) %></span>
+          </div>
+        <% end %>
+        <% if avg_loss > 0 %>
+          <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); font-size: 0.8125rem;">
+            <strong>Payoff Ratio: <%= (avg_win / avg_loss).round(2) %>:1</strong>
+            <span class="text-muted"> —
+              <% pr = avg_win / avg_loss %>
+              <%= pr >= 2 ? "Excellent risk/reward" : pr >= 1.5 ? "Good reward relative to risk" : pr >= 1 ? "Balanced, wins and losses similar" : "Losses outpace wins — need high win rate" %>
+            </span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <h2>Grade Scale</h2>
+      </div>
+      <table class="table">
+        <thead>
+          <tr><th>Grade</th><th>Score</th><th>Meaning</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="grade-badge grade-a">A+</span></td><td>90-100</td><td>Exceptional performance</td></tr>
+          <tr><td><span class="grade-badge grade-a">A / A-</span></td><td>80-89</td><td>Strong, consistent results</td></tr>
+          <tr><td><span class="grade-badge grade-b">B+</span></td><td>75-79</td><td>Above average, room to improve</td></tr>
+          <tr><td><span class="grade-badge grade-b">B / B-</span></td><td>65-74</td><td>Solid foundation, working edge</td></tr>
+          <tr><td><span class="grade-badge grade-c">C+ / C / C-</span></td><td>50-64</td><td>Break-even zone, needs work</td></tr>
+          <tr><td><span class="grade-badge grade-d">D</span></td><td>40-49</td><td>Below average, review strategy</td></tr>
+          <tr><td><span class="grade-badge grade-f">F</span></td><td>&lt; 40</td><td>Significant issues, reassess approach</td></tr>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="card empty-state">
+      <p>Need at least 5 closed trades to generate a scorecard.</p>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p>No data available.</p>
+  </div>
+<% end %>

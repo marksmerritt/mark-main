@@ -1,0 +1,262 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--positive);">savings</span>
+    Savings Dashboard
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Budget", budget_dashboard_path, class: "btn" %>
+    <%= link_to "New Goal", new_budget_goal_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<%# Overall savings hero %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="padding: 2rem; text-align: center;">
+    <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px;">Total Saved</div>
+    <div style="font-size: 2.5rem; font-weight: 700; color: var(--positive); margin: 0.25rem 0;">
+      <%= number_to_currency(@overall_saved) %>
+    </div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary);">
+      across sinking funds, goals, and challenges
+    </div>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0; border-top: 1px solid var(--border);">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Sinking Funds</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@total_saved) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @funds.count %> funds</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Goal Progress</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@total_goal_progress) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">of <%= number_to_currency(@total_goal_target) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Active Goals</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= @active_goals %></div>
+      <div style="font-size: 0.6875rem; color: var(--positive);"><%= @completed_goals %> completed</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Challenges</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= @active_challenges %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= number_to_currency(@total_challenge_saved) %> saved</div>
+    </div>
+  </div>
+</div>
+
+<%# Savings composition donut %>
+<% components = [
+  { label: "Sinking Funds", amount: @total_saved, color: "#1a73e8" },
+  { label: "Goals", amount: @total_goal_progress, color: "#0d904f" },
+  { label: "Challenges", amount: @total_challenge_saved, color: "#f9ab00" }
+].select { |c| c[:amount] > 0 } %>
+<% if components.count >= 2 %>
+  <%
+    donut_total = components.sum { |c| c[:amount] }.to_f
+    donut_total = 1 if donut_total == 0
+    cx = 80; cy = 80; r = 60; stroke_w = 20
+    circumference = 2 * Math::PI * r
+    offset = 0
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Savings Composition</h2></div>
+    <div style="padding: 1rem 1.25rem; display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+      <svg viewBox="0 0 160 160" style="width: 160px; flex-shrink: 0;">
+        <% components.each do |comp| %>
+          <%
+            pct = comp[:amount] / donut_total
+            dash = circumference * pct
+            gap = circumference - dash
+          %>
+          <circle cx="<%= cx %>" cy="<%= cy %>" r="<%= r %>" fill="none"
+                  stroke="<%= comp[:color] %>" stroke-width="<%= stroke_w %>"
+                  stroke-dasharray="<%= dash.round(1) %> <%= gap.round(1) %>"
+                  stroke-dashoffset="<%= (-offset).round(1) %>"
+                  transform="rotate(-90 <%= cx %> <%= cy %>)" />
+          <% offset += dash %>
+        <% end %>
+        <text x="<%= cx %>" y="<%= cy - 4 %>" text-anchor="middle" fill="var(--text)" font-size="14" font-weight="700">
+          <%= number_to_currency(@overall_saved) %>
+        </text>
+        <text x="<%= cx %>" y="<%= cy + 10 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8">total saved</text>
+      </svg>
+      <div style="flex: 1; min-width: 150px;">
+        <% components.each do |comp| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+            <span style="width: 12px; height: 12px; border-radius: 3px; background: <%= comp[:color] %>;"></span>
+            <div style="flex: 1;">
+              <div style="font-size: 0.875rem; font-weight: 600;"><%= comp[:label] %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= (comp[:amount] / donut_total * 100).round(0) %>%</div>
+            </div>
+            <div style="font-size: 0.875rem; font-weight: 700;"><%= number_to_currency(comp[:amount]) %></div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Sinking Funds %>
+  <% if @funds.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #1a73e8;">account_balance</span>
+          Sinking Funds
+        </h2>
+        <%= link_to "Manage", budget_funds_path, class: "btn btn-sm" %>
+      </div>
+      <div style="padding: 0;">
+        <% @funds.sort_by { |f| -(f["current_amount"].to_f) }.each do |fund| %>
+          <%
+            current = fund["current_amount"].to_f
+            target = fund["target_amount"].to_f
+            progress = target > 0 ? (current / target * 100).round(0) : 0
+            progress_color = progress >= 100 ? "var(--positive)" : progress >= 50 ? "#1a73e8" : "#f9ab00"
+          %>
+          <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+              <span style="font-size: 0.875rem; font-weight: 600;"><%= fund["name"] %></span>
+              <span style="font-size: 0.875rem; font-weight: 700; color: <%= progress_color %>;"><%= number_to_currency(current) %></span>
+            </div>
+            <% if target > 0 %>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <div style="flex: 1; height: 5px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                  <div style="height: 100%; width: <%= [progress, 100].min %>%; background: <%= progress_color %>; border-radius: 3px;"></div>
+                </div>
+                <span style="font-size: 0.6875rem; color: var(--text-secondary);"><%= progress %>%</span>
+              </div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;">
+                Target: <%= number_to_currency(target) %>
+                <% if current < target %>
+                  &middot; <%= number_to_currency(target - current) %> to go
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Goals %>
+  <% if @goals.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #0d904f;">flag</span>
+          Financial Goals
+        </h2>
+        <%= link_to "Manage", budget_goals_path, class: "btn btn-sm" %>
+      </div>
+      <div style="padding: 0;">
+        <% @goals.sort_by { |g| g["status"] == "active" ? 0 : 1 }.each do |goal| %>
+          <%
+            current = goal["current_amount"].to_f
+            target = goal["target_amount"].to_f
+            progress = target > 0 ? (current / target * 100).round(0) : 0
+            is_complete = goal["status"] == "completed" || progress >= 100
+            progress_color = is_complete ? "var(--positive)" : progress >= 50 ? "#0d904f" : "#f9ab00"
+          %>
+          <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); <%= is_complete ? 'opacity: 0.7;' : '' %>">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+              <div>
+                <span style="font-size: 0.875rem; font-weight: 600;"><%= goal["name"] %></span>
+                <% if is_complete %>
+                  <span style="font-size: 0.5625rem; padding: 0.0625rem 0.375rem; background: rgba(13,144,79,0.1); color: var(--positive); border-radius: 3px; margin-left: 0.25rem;">DONE</span>
+                <% end %>
+              </div>
+              <span style="font-size: 0.875rem; font-weight: 700;"><%= number_to_currency(current) %> <span style="color: var(--text-secondary); font-weight: 400;">/ <%= number_to_currency(target) %></span></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <div style="flex: 1; height: 5px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; width: <%= [progress, 100].min %>%; background: <%= progress_color %>; border-radius: 3px;"></div>
+              </div>
+              <span style="font-size: 0.6875rem; color: var(--text-secondary);"><%= progress %>%</span>
+            </div>
+            <% if goal["target_date"].present? && !is_complete %>
+              <%
+                target_date = Date.parse(goal["target_date"]) rescue nil
+                if target_date
+                  days_left = (target_date - Date.current).to_i
+                  urgency_color = days_left < 30 ? "var(--negative)" : days_left < 90 ? "#f9ab00" : "var(--text-secondary)"
+                end
+              %>
+              <% if target_date %>
+                <div style="font-size: 0.6875rem; color: <%= urgency_color %>; margin-top: 0.25rem;">
+                  <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -2px;">event</span>
+                  Due <%= target_date.strftime("%b %-d, %Y") %>
+                  <% if days_left > 0 %>
+                    (<%= days_left %> days left)
+                  <% elsif days_left == 0 %>
+                    (today!)
+                  <% else %>
+                    (<%= days_left.abs %> days overdue)
+                  <% end %>
+                </div>
+              <% end %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Savings Challenges %>
+<% if @challenges.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #f9ab00;">military_tech</span>
+        Savings Challenges
+      </h2>
+      <%= link_to "Manage", budget_challenges_path, class: "btn btn-sm" %>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; padding: 1rem 1.25rem;">
+      <% @challenges.each do |ch| %>
+        <%
+          current = ch["current_amount"].to_f
+          target = ch["target_amount"].to_f
+          progress = target > 0 ? (current / target * 100).round(0) : 0
+          is_active = ch["status"] == "active"
+          is_complete = ch["status"] == "completed" || progress >= 100
+        %>
+        <div style="padding: 1rem; background: var(--bg); border-radius: var(--radius); border-left: 3px solid <%= is_complete ? 'var(--positive)' : is_active ? '#f9ab00' : 'var(--border)' %>;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.875rem; font-weight: 600;"><%= ch["name"] || ch["challenge_type"]&.titleize %></span>
+            <% if is_complete %>
+              <span class="material-icons-outlined" style="color: var(--positive);">check_circle</span>
+            <% elsif is_active %>
+              <span style="font-size: 0.5625rem; padding: 0.125rem 0.375rem; background: rgba(249,171,0,0.15); color: #f9ab00; border-radius: 3px; font-weight: 600;">ACTIVE</span>
+            <% end %>
+          </div>
+          <div style="font-size: 1.125rem; font-weight: 700;">
+            <%= number_to_currency(current) %>
+            <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 400;">/ <%= number_to_currency(target) %></span>
+          </div>
+          <div style="height: 6px; background: var(--surface); border-radius: 3px; overflow: hidden; margin-top: 0.5rem;">
+            <div style="height: 100%; width: <%= [progress, 100].min %>%; background: <%= is_complete ? 'var(--positive)' : '#f9ab00' %>; border-radius: 3px;"></div>
+          </div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= progress %>% complete</div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Empty state %>
+<% if @funds.empty? && @goals.empty? && @challenges.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); display: block; margin-bottom: 1rem;">savings</span>
+    <h3>Start Saving</h3>
+    <p class="text-muted" style="margin: 0.5rem 0 1rem;">Create sinking funds, set financial goals, or start a savings challenge to track your progress.</p>
+    <div style="display: flex; gap: 0.5rem; justify-content: center;">
+      <%= link_to "Create Fund", new_budget_fund_path, class: "btn btn-primary" %>
+      <%= link_to "Set Goal", new_budget_goal_path, class: "btn" %>
+      <%= link_to "Start Challenge", new_budget_challenge_path, class: "btn" %>
+    </div>
+  </div>
+<% end %>

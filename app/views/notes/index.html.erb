@@ -1,0 +1,306 @@
+<div class="page-header">
+  <h1>Notes</h1>
+  <div class="page-actions">
+    <%= link_to "New Note", new_note_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<% if @notes_stats.present? && !@notes_stats["error"] %>
+  <%
+    total = @notes_stats["total_notes"] || @notes_stats["notes_count"] || 0
+    notebooks_count = @notes_stats["total_notebooks"] || @notes_stats["notebooks_count"] || 0
+    tags_count = @notes_stats["total_tags"] || @notes_stats["tags_count"] || 0
+    words = @notes_stats["total_words"] || @notes_stats["word_count"] || 0
+
+    # Compute writing streak from activity data if available
+    activity = @notes_stats["activity"] || @notes_stats["recent_activity"] || []
+    # Estimate streak from notes created today/recently
+    today_count = @notes_stats["today_count"] || @notes_stats["notes_today"] || 0
+    week_count = @notes_stats["this_week_count"] || @notes_stats["notes_this_week"] || 0
+  %>
+  <div class="card" style="margin-bottom: 1rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Notes</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= total %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">This Week</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= week_count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Today</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= today_count %></div>
+      </div>
+      <% if words.to_i > 0 %>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Words Written</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= number_with_delimiter(words) %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Writing Activity Heatmap %>
+  <% if @activity.is_a?(Array) && @activity.any? %>
+    <%
+      activity_by_date = @activity.each_with_object({}) { |a, h| h[a["date"]] = a["count"].to_i }
+      max_count = activity_by_date.values.max || 1
+      # Build 30-day grid
+      today = Date.current
+      days_30 = (0..29).map { |i| today - (29 - i) }
+    %>
+    <div class="card" style="margin-bottom: 1rem;">
+      <div class="card-header">
+        <h2>Writing Activity (30 days)</h2>
+        <span style="font-size: 0.8125rem; color: var(--text-secondary);">
+          <%= activity_by_date.values.sum %> notes in <%= activity_by_date.count %> days
+        </span>
+      </div>
+      <div style="padding: 0.75rem 1.25rem;">
+        <div style="display: flex; gap: 3px; flex-wrap: wrap;">
+          <% days_30.each do |day| %>
+            <%
+              date_str = day.strftime("%Y-%m-%d")
+              count = activity_by_date[date_str] || 0
+              intensity = count > 0 ? (count.to_f / max_count).clamp(0.2, 1) : 0
+              is_today = day == today
+            %>
+            <div style="width: calc((100% - 87px) / 30); min-width: 14px; aspect-ratio: 1;
+                        border-radius: 3px;
+                        background: <%= count > 0 ? "rgba(26,115,232, #{(intensity * 0.6).round(2)})" : "var(--bg)" %>;
+                        border: <%= is_today ? '2px solid var(--primary)' : '1px solid var(--border)' %>;"
+                 title="<%= day.strftime('%b %d') %>: <%= count %> note<%= count == 1 ? '' : 's' %>">
+            </div>
+          <% end %>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.6875rem; color: var(--text-secondary);">
+          <span><%= days_30.first.strftime("%b %d") %></span>
+          <div style="display: flex; align-items: center; gap: 0.25rem;">
+            <span>Less</span>
+            <% [0, 0.2, 0.4, 0.7, 1.0].each do |level| %>
+              <div style="width: 10px; height: 10px; border-radius: 2px; background: <%= level > 0 ? "rgba(26,115,232, #{(level * 0.6).round(2)})" : "var(--bg)" %>; border: 1px solid var(--border);"></div>
+            <% end %>
+            <span>More</span>
+          </div>
+          <span>Today</span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Notebook word count breakdown %>
+  <% if @notebooks.is_a?(Array) && @notebooks.count > 1 && @notes_stats.present? %>
+    <%
+      nb_stats = @notes_stats["by_notebook"] || @notes_stats["notebooks"]
+      if nb_stats.is_a?(Array) && nb_stats.any?
+        nb_max_words = nb_stats.map { |n| n["word_count"].to_i }.max.to_f
+        nb_max_words = 1 if nb_max_words == 0
+        total_words_all = nb_stats.sum { |n| n["word_count"].to_i }
+      end
+    %>
+    <% if nb_stats.is_a?(Array) && nb_stats.any? %>
+      <div class="card" style="margin-bottom: 1rem;">
+        <div class="card-header">
+          <h2>Words by Notebook</h2>
+          <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= number_with_delimiter(total_words_all) %> total</span>
+        </div>
+        <div style="padding: 0.75rem 1.25rem;">
+          <% nb_stats.sort_by { |n| -n["word_count"].to_i }.first(8).each do |nb| %>
+            <%
+              wc = nb["word_count"].to_i
+              nc = nb["notes_count"] || nb["count"] || 0
+              bar_w = (wc / nb_max_words * 100).round(1)
+            %>
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <span style="min-width: 7rem; font-size: 0.8125rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><%= nb["name"] || nb["notebook_name"] %></span>
+              <div style="flex: 1; height: 0.75rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+                <div style="width: <%= bar_w %>%; height: 100%; background: var(--primary); opacity: 0.7; border-radius: 4px;"></div>
+              </div>
+              <span style="min-width: 5rem; text-align: right; font-size: 0.75rem; color: var(--text-secondary);"><%= number_with_delimiter(wc) %> words</span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <%# Writing Productivity Insights %>
+  <%
+    avg_words_per_note = total.to_i > 0 && words.to_i > 0 ? (words.to_f / total).round(0) : 0
+    weekly_velocity = week_count.to_i
+    daily_velocity = today_count.to_i
+  %>
+  <% if total.to_i >= 5 %>
+    <div class="card" style="margin-bottom: 1rem;">
+      <div class="card-header"><h2>Writing Insights</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+          <% if avg_words_per_note > 0 %>
+            <div style="flex: 1; min-width: 140px; padding: 0.75rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg Words / Note</div>
+              <div style="font-size: 1.25rem; font-weight: 700;"><%= number_with_delimiter(avg_words_per_note) %></div>
+              <div style="font-size: 0.625rem; color: var(--text-secondary);">
+                <%= avg_words_per_note >= 300 ? "Detailed writer" : avg_words_per_note >= 100 ? "Concise notes" : "Quick captures" %>
+              </div>
+            </div>
+          <% end %>
+          <% if notebooks_count.to_i > 0 %>
+            <div style="flex: 1; min-width: 140px; padding: 0.75rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Notes / Notebook</div>
+              <div style="font-size: 1.25rem; font-weight: 700;"><%= (total.to_f / notebooks_count).round(1) %></div>
+            </div>
+          <% end %>
+          <% if weekly_velocity > 0 %>
+            <div style="flex: 1; min-width: 140px; padding: 0.75rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Weekly Pace</div>
+              <div style="font-size: 1.25rem; font-weight: 700;"><%= weekly_velocity %> notes</div>
+              <div style="font-size: 0.625rem; color: var(--text-secondary);">
+                <%= weekly_velocity >= 7 ? "Daily writer!" : weekly_velocity >= 3 ? "Regular rhythm" : "Getting started" %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+        <%# Quick insight line %>
+        <%
+          insights = []
+          insights << "You've written #{number_with_delimiter(words)} words across #{total} notes" if words.to_i > 0
+          insights << "#{tags_count} tags help organize your knowledge" if tags_count.to_i > 3
+          insights << "#{notebooks_count} notebooks keep your thinking structured" if notebooks_count.to_i >= 2
+        %>
+        <% if insights.any? %>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--primary);">auto_awesome</span>
+            <%= insights.join(" · ") %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% end %>
+
+<div class="card">
+  <div class="card-header">
+    <h2>Filters</h2>
+  </div>
+
+  <%= form_with url: notes_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :notebook_id, "Notebook" %>
+        <% notebooks_for_select = @notebooks.is_a?(Array) ? @notebooks : [] %>
+        <%= f.select :notebook_id,
+              options_for_select(notebooks_for_select.map { |nb| [nb["name"], nb["id"]] }, params[:notebook_id]),
+              { include_blank: "All Notebooks" },
+              { class: "form-control" } %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :tag_id, "Tag" %>
+        <% tags_for_select = @tags.is_a?(Array) ? @tags : [] %>
+        <%= f.select :tag_id,
+              options_for_select(tags_for_select.map { |t| [t["name"], t["id"]] }, params[:tag_id]),
+              { include_blank: "All Tags" },
+              { class: "form-control" } %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :q, "Search" %>
+        <%= f.text_field :q, value: params[:q], placeholder: "Search notes...", class: "form-control" %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :favorited, "Favorited" %>
+        <%= f.select :favorited,
+              options_for_select([["Yes", "true"]], params[:favorited]),
+              { include_blank: "All" },
+              { class: "form-control" } %>
+      </div>
+
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Filter", class: "btn btn-primary" %>
+        <%= link_to "Clear", notes_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @notes.is_a?(Array) && @notes.any? %>
+  <div data-controller="note-bulk-actions"
+       data-note-bulk-actions-bulk-tag-url-value="<%= bulk_tag_notes_path %>"
+       data-note-bulk-actions-bulk-move-url-value="<%= bulk_move_notes_path %>"
+       data-note-bulk-actions-bulk-delete-url-value="<%= bulk_delete_notes_path %>"
+       data-note-bulk-actions-bulk-favorite-url-value="<%= bulk_favorite_notes_path %>"
+       data-note-bulk-actions-bulk-pin-url-value="<%= bulk_pin_notes_path %>"
+       data-note-bulk-actions-csrf-token-value="<%= form_authenticity_token %>">
+
+    <%# Bulk actions toolbar - hidden until notes are selected %>
+    <div class="card bulk-actions-bar hidden" data-note-bulk-actions-target="bar">
+      <div class="bulk-actions-content">
+        <div class="bulk-actions-left">
+          <label class="bulk-select-all">
+            <input type="checkbox" data-action="note-bulk-actions#toggleAll"> Select All
+          </label>
+          <span class="bulk-count"><span data-note-bulk-actions-target="count">0</span> selected</span>
+          <button type="button" class="btn btn-sm" data-action="note-bulk-actions#clear">Clear</button>
+        </div>
+        <div class="bulk-actions-right">
+          <% tags_for_bulk = @tags.is_a?(Array) ? @tags : [] %>
+          <% if tags_for_bulk.any? %>
+            <select data-note-bulk-actions-target="tagSelect" class="form-control form-control-sm" multiple size="1">
+              <% tags_for_bulk.each do |tag| %>
+                <option value="<%= tag["id"] %>"><%= tag["name"] %></option>
+              <% end %>
+            </select>
+            <button type="button" class="btn btn-sm" data-action="note-bulk-actions#bulkTag" title="Tag selected notes">
+              <span class="material-icons-outlined">label</span> Tag
+            </button>
+          <% end %>
+
+          <% notebooks_for_bulk = @notebooks.is_a?(Array) ? @notebooks : [] %>
+          <% if notebooks_for_bulk.any? %>
+            <select data-note-bulk-actions-target="notebookSelect" class="form-control form-control-sm">
+              <option value="">Move to...</option>
+              <% notebooks_for_bulk.each do |nb| %>
+                <option value="<%= nb["id"] %>"><%= nb["name"] %></option>
+              <% end %>
+            </select>
+            <button type="button" class="btn btn-sm" data-action="note-bulk-actions#bulkMove" title="Move selected notes">
+              <span class="material-icons-outlined">drive_file_move</span> Move
+            </button>
+          <% end %>
+
+          <button type="button" class="btn btn-sm" data-action="note-bulk-actions#bulkPin" title="Pin selected notes">
+            <span class="material-icons-outlined">push_pin</span> Pin
+          </button>
+
+          <button type="button" class="btn btn-sm" data-action="note-bulk-actions#bulkFavorite" title="Favorite selected notes">
+            <span class="material-icons-outlined">star</span> Favorite
+          </button>
+
+          <button type="button" class="btn btn-sm btn-danger" data-action="note-bulk-actions#bulkDelete" title="Delete selected notes">
+            <span class="material-icons-outlined">delete</span> Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="entries-list"
+         data-controller="infinite-scroll"
+         data-infinite-scroll-url-value="<%= notes_path(params.permit(:notebook_id, :tag_id, :q, :favorited).to_h.compact_blank) %>"
+         data-infinite-scroll-page-value="<%= @meta["page"] || 1 %>"
+         data-infinite-scroll-total-pages-value="<%= @meta["total_pages"] || 1 %>">
+      <div data-infinite-scroll-target="entries">
+        <%= render "note_cards" %>
+      </div>
+      <div data-infinite-scroll-target="loading" class="infinite-scroll-loading hidden">
+        Loading more notes...
+      </div>
+      <div data-infinite-scroll-target="sentinel" class="infinite-scroll-sentinel"></div>
+    </div>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No notes found. <%= link_to "Create your first note", new_note_path %>.</p>
+  </div>
+<% end %>

@@ -1,0 +1,324 @@
+<div class="page-header">
+  <h1>Net Worth</h1>
+  <div class="page-actions">
+    <%= link_to "Take Snapshot", take_snapshot_budget_reports_path, data: { turbo_method: :post }, class: "btn" %>
+  </div>
+</div>
+
+<% if @net_worth.present? && !@net_worth["error"] %>
+  <%
+    assets = @net_worth["assets"].to_f
+    liabilities = @net_worth["liabilities"].to_f
+    net = @net_worth["net_worth"].to_f
+    asset_ratio = (assets + liabilities) > 0 ? (assets / (assets + liabilities) * 100).round(0) : 0
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Assets</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= number_to_currency(assets) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Liabilities</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(liabilities) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border); border-left: 3px solid <%= net >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net Worth</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= net >= 0 ? 'positive' : 'negative' %>">
+          <%= number_to_currency(net) %>
+        </div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Asset Ratio</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= asset_ratio %>%</div>
+      </div>
+    </div>
+  </div>
+
+  <%# Assets vs Liabilities visual bar %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Assets vs Liabilities</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="display: flex; height: 2rem; border-radius: var(--radius); overflow: hidden; margin-bottom: 0.75rem;">
+        <div style="width: <%= asset_ratio %>%; background: var(--positive); opacity: 0.8; display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 0.6875rem; font-weight: 700; color: white;"><%= asset_ratio %>% Assets</span>
+        </div>
+        <div style="width: <%= 100 - asset_ratio %>%; background: var(--negative); opacity: 0.8; display: flex; align-items: center; justify-content: center;">
+          <% if (100 - asset_ratio) > 15 %>
+            <span style="font-size: 0.6875rem; font-weight: 700; color: white;"><%= 100 - asset_ratio %>% Debt</span>
+          <% end %>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 0.8125rem;">
+        <span class="positive"><%= number_to_currency(assets) %></span>
+        <span class="negative"><%= number_to_currency(liabilities) %></span>
+      </div>
+    </div>
+  </div>
+
+  <% if @timeline.is_a?(Hash) && @timeline["snapshots"].is_a?(Array) && @timeline["snapshots"].size > 1 %>
+    <%
+      snapshots = @timeline["snapshots"]
+      first_nw = snapshots.first["net_worth"].to_f
+      last_nw = snapshots.last["net_worth"].to_f
+      nw_change = last_nw - first_nw
+      nw_change_pct = first_nw != 0 ? (nw_change / first_nw.abs * 100).round(1) : 0
+      max_nw = snapshots.map { |s| s["net_worth"].to_f }.max
+      min_nw = snapshots.map { |s| s["net_worth"].to_f }.min
+    %>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Growth</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="<%= nw_change >= 0 ? 'positive' : 'negative' %>">
+            <%= nw_change >= 0 ? '+' : '' %><%= number_to_currency(nw_change) %> (<%= nw_change_pct %>%)
+          </div>
+        </div>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Peak Net Worth</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(max_nw) %></div>
+        </div>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Snapshots</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= snapshots.count %></div>
+        </div>
+      </div>
+    </div>
+
+    <%# SVG area chart showing assets, liabilities, and net worth %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Net Worth Over Time</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <%
+          chart_w = 700
+          chart_h = 200
+          pad_l = 60
+          pad_r = 20
+          pad_t = 10
+          pad_b = 30
+          inner_w = chart_w - pad_l - pad_r
+          inner_h = chart_h - pad_t - pad_b
+
+          all_vals = snapshots.flat_map { |s| [s["total_assets"].to_f, -s["total_liabilities"].to_f, s["net_worth"].to_f] }
+          y_max = [all_vals.max, 0].max
+          y_min = [all_vals.min, 0].min
+          y_range = y_max - y_min
+          y_range = 1 if y_range == 0
+
+          nw_points = snapshots.each_with_index.map do |s, i|
+            x = pad_l + (i.to_f / (snapshots.count - 1) * inner_w)
+            y = pad_t + ((y_max - s["net_worth"].to_f) / y_range * inner_h)
+            "#{x.round(1)},#{y.round(1)}"
+          end
+
+          zero_y = pad_t + (y_max / y_range * inner_h)
+        %>
+        <svg viewBox="0 0 <%= chart_w %> <%= chart_h %>" style="width: 100%; height: auto;">
+          <%# Grid lines %>
+          <% 5.times do |i| %>
+            <%
+              val = y_max - (i.to_f / 4 * y_range)
+              gy = pad_t + (i.to_f / 4 * inner_h)
+            %>
+            <line x1="<%= pad_l %>" y1="<%= gy.round(1) %>" x2="<%= chart_w - pad_r %>" y2="<%= gy.round(1) %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4,4" />
+            <text x="<%= pad_l - 6 %>" y="<%= gy.round(1) + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="8">
+              $<%= (val / 1000).round(1) %>k
+            </text>
+          <% end %>
+
+          <%# Zero line %>
+          <line x1="<%= pad_l %>" y1="<%= zero_y.round(1) %>" x2="<%= chart_w - pad_r %>" y2="<%= zero_y.round(1) %>" stroke="var(--text-secondary)" stroke-width="1" opacity="0.4" />
+
+          <%# Net worth area fill %>
+          <polygon points="<%= pad_l %>,<%= zero_y.round(1) %> <%= nw_points.join(' ') %> <%= (pad_l + inner_w).round(1) %>,<%= zero_y.round(1) %>"
+                   fill="<%= last_nw >= 0 ? 'var(--positive)' : 'var(--negative)' %>" opacity="0.12" />
+
+          <%# Net worth line %>
+          <polyline points="<%= nw_points.join(' ') %>" fill="none"
+                    stroke="<%= last_nw >= 0 ? 'var(--positive)' : 'var(--negative)' %>" stroke-width="2.5" />
+
+          <%# Data dots %>
+          <% snapshots.each_with_index do |s, i| %>
+            <%
+              x = pad_l + (i.to_f / (snapshots.count - 1) * inner_w)
+              y = pad_t + ((y_max - s["net_worth"].to_f) / y_range * inner_h)
+            %>
+            <circle cx="<%= x.round(1) %>" cy="<%= y.round(1) %>" r="3"
+                    fill="<%= s["net_worth"].to_f >= 0 ? 'var(--positive)' : 'var(--negative)' %>" stroke="var(--surface)" stroke-width="1.5">
+              <title><%= Date.parse(s["date"]).strftime("%b %d, %Y") rescue s["date"] %>: <%= number_to_currency(s["net_worth"]) %></title>
+            </circle>
+          <% end %>
+
+          <%# X-axis labels %>
+          <% label_step = [(snapshots.count / 6.0).ceil, 1].max %>
+          <% snapshots.each_with_index do |s, i| %>
+            <% next unless (i % label_step == 0) || i == snapshots.count - 1 %>
+            <%
+              x = pad_l + (i.to_f / (snapshots.count - 1) * inner_w)
+            %>
+            <text x="<%= x.round(1) %>" y="<%= chart_h - 4 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="7.5">
+              <%= Date.parse(s["date"]).strftime("%b %y") rescue s["date"] %>
+            </text>
+          <% end %>
+        </svg>
+      </div>
+      <div style="padding: 0 1.25rem 0.75rem; display: flex; gap: 1rem; font-size: 0.6875rem; color: var(--text-secondary);">
+        <span style="display: flex; align-items: center; gap: 4px;">
+          <span style="width: 12px; height: 3px; background: var(--positive); border-radius: 2px;"></span> Net Worth
+        </span>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Monthly change analysis if snapshots available %>
+  <% if @timeline.is_a?(Hash) && @timeline["snapshots"].is_a?(Array) && @timeline["snapshots"].size >= 2 %>
+    <%
+      snaps = @timeline["snapshots"]
+      # Compute period-over-period changes
+      changes = []
+      snaps.each_cons(2) do |prev, curr|
+        delta = curr["net_worth"].to_f - prev["net_worth"].to_f
+        pct = prev["net_worth"].to_f != 0 ? (delta / prev["net_worth"].to_f.abs * 100).round(1) : 0
+        changes << {
+          date: curr["date"],
+          net_worth: curr["net_worth"].to_f,
+          delta: delta.round(2),
+          pct: pct
+        }
+      end
+      max_change = changes.map { |c| c[:delta].abs }.max.to_f
+      max_change = 1 if max_change == 0
+      positive_periods = changes.count { |c| c[:delta] > 0 }
+      growth_rate = positive_periods.to_f / changes.count * 100
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>Period Changes</h2>
+        <span class="text-muted"><%= positive_periods %>/<%= changes.count %> positive (<%= growth_rate.round(0) %>%)</span>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <% changes.last(12).each do |ch| %>
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem;">
+            <span style="width: 60px; font-size: 0.75rem; color: var(--text-secondary);">
+              <%= Date.parse(ch[:date]).strftime("%b %y") rescue ch[:date] %>
+            </span>
+            <div style="flex: 1; display: flex; height: 14px;">
+              <% if ch[:delta] >= 0 %>
+                <div style="width: 50%;"></div>
+                <div style="width: 50%; position: relative;">
+                  <div style="position: absolute; left: 0; top: 0; height: 100%; width: <%= (ch[:delta] / max_change * 100).round(1) %>%;
+                              background: var(--positive); opacity: 0.5; border-radius: 0 4px 4px 0;"></div>
+                </div>
+              <% else %>
+                <div style="width: 50%; position: relative;">
+                  <div style="position: absolute; right: 0; top: 0; height: 100%; width: <%= (ch[:delta].abs / max_change * 100).round(1) %>%;
+                              background: var(--negative); opacity: 0.5; border-radius: 4px 0 0 4px;"></div>
+                </div>
+                <div style="width: 50%;"></div>
+              <% end %>
+            </div>
+            <span style="width: 90px; text-align: right; font-size: 0.75rem; font-weight: 600;" class="<%= ch[:delta] >= 0 ? 'positive' : 'negative' %>">
+              <%= ch[:delta] >= 0 ? "+" : "" %><%= number_to_currency(ch[:delta]) %>
+            </span>
+            <span style="width: 45px; text-align: right; font-size: 0.6875rem;" class="<%= ch[:pct] >= 0 ? 'positive' : 'negative' %>">
+              <%= ch[:pct] >= 0 ? "+" : "" %><%= ch[:pct] %>%
+            </span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Net Worth Milestones %>
+  <%
+    milestones = []
+    if net > 0
+      # Show achieved and next milestones
+      thresholds = [1000, 5000, 10000, 25000, 50000, 100000, 250000, 500000, 1000000]
+      achieved = thresholds.select { |t| net >= t }
+      next_milestone = thresholds.find { |t| net < t }
+      milestones = achieved.last(3).map { |t| { amount: t, achieved: true } }
+      if next_milestone
+        progress = (net / next_milestone.to_f * 100).round(0)
+        milestones << { amount: next_milestone, achieved: false, progress: progress }
+      end
+    end
+  %>
+  <% if milestones.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Milestones</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <% milestones.each do |ms| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.625rem;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= ms[:achieved] ? 'var(--positive)' : 'var(--text-secondary)' %>;">
+              <%= ms[:achieved] ? "check_circle" : "flag" %>
+            </span>
+            <span style="width: 90px; font-size: 0.875rem; font-weight: 600;"><%= number_to_currency(ms[:amount], precision: 0) %></span>
+            <div style="flex: 1; height: 12px; background: var(--bg); border-radius: 6px; overflow: hidden;">
+              <div style="height: 100%; width: <%= ms[:achieved] ? 100 : ms[:progress] %>%;
+                          background: <%= ms[:achieved] ? 'var(--positive)' : 'var(--primary)' %>;
+                          opacity: <%= ms[:achieved] ? 0.6 : 0.8 %>;
+                          border-radius: 6px;"></div>
+            </div>
+            <span style="font-size: 0.75rem; font-weight: 600; color: <%= ms[:achieved] ? 'var(--positive)' : 'var(--text-secondary)' %>;">
+              <%= ms[:achieved] ? "Achieved" : "#{ms[:progress]}%" %>
+            </span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="content-grid">
+    <% if @net_worth["funds"].is_a?(Array) && @net_worth["funds"].any? %>
+      <div class="card">
+        <div class="card-header"><h2>Assets (Sinking Funds)</h2></div>
+        <table class="table">
+          <thead><tr><th>Fund</th><th style="text-align: right;">Balance</th></tr></thead>
+          <tbody>
+            <% @net_worth["funds"].each do |f| %>
+              <tr>
+                <td><%= f["name"] %></td>
+                <td style="text-align: right;" class="positive"><%= number_to_currency(f["amount"]) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+          <tfoot>
+            <tr style="font-weight: 600;">
+              <td>Total</td>
+              <td style="text-align: right;"><%= number_to_currency(@net_worth["assets"]) %></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    <% end %>
+
+    <% if @net_worth["debts"].is_a?(Array) && @net_worth["debts"].any? %>
+      <div class="card">
+        <div class="card-header"><h2>Liabilities (Debt)</h2></div>
+        <table class="table">
+          <thead><tr><th>Account</th><th style="text-align: right;">Balance</th></tr></thead>
+          <tbody>
+            <% @net_worth["debts"].each do |d| %>
+              <tr>
+                <td><%= d["name"] %></td>
+                <td style="text-align: right;" class="negative"><%= number_to_currency(d["amount"]) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+          <tfoot>
+            <tr style="font-weight: 600;">
+              <td>Total</td>
+              <td style="text-align: right;"><%= number_to_currency(@net_worth["liabilities"]) %></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>Add sinking funds and debt accounts to track your net worth.</p>
+  </div>
+<% end %>

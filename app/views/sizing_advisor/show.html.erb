@@ -1,0 +1,176 @@
+<% content_for(:title) { "Position Sizing Advisor" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #2e7d32;">tune</span>
+    Position Sizing Advisor
+  </h1>
+</div>
+
+<%# Account Settings Form %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">settings</span> Your Account</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <form method="get" action="<%= sizing_advisor_path %>" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="account_size" style="font-size: 0.75rem;">Account Size ($)</label>
+        <input type="number" id="account_size" name="account_size" class="form-control" value="<%= @account_size.to_i %>" step="1000" min="1000" style="width: 10rem;">
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label for="risk_pct" style="font-size: 0.75rem;">Risk per Trade (%)</label>
+        <input type="number" id="risk_pct" name="risk_pct" class="form-control" value="<%= @risk_per_trade %>" step="0.25" min="0.25" max="10" style="width: 7rem;">
+      </div>
+      <button type="submit" class="btn btn-primary">Calculate</button>
+    </form>
+  </div>
+</div>
+
+<% if @trades.blank? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem;">tune</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Need closed trades for sizing analysis</div>
+  </div>
+<% else %>
+
+<%# Key Metrics %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @win_rate %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@avg_win) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@avg_loss) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Full Kelly</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @kelly_full > 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @kelly_full %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Expectancy</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @expectancy >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@expectancy) %></div>
+    </div>
+  </div>
+</div>
+
+<%# Tips %>
+<% if @tips.any? %>
+  <div style="display: grid; gap: 0.5rem; margin-bottom: 1.5rem;">
+    <% @tips.each do |tip| %>
+      <div class="card" style="padding: 0.75rem 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
+        <span class="material-icons-outlined" style="color: <%= tip[:color] %>;"><%= tip[:icon] %></span>
+        <span style="font-size: 0.875rem;"><%= tip[:text] %></span>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# Sizing Models Comparison %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">compare</span> Sizing Models</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% rating_colors = { "conservative" => "#43a047", "moderate" => "#fdd835", "aggressive" => "#e53935" } %>
+    <% @models.each do |model| %>
+      <% is_recommended = model == @recommended %>
+      <div style="display: flex; align-items: center; gap: 1rem; padding: 0.875rem 1rem; margin-bottom: 0.5rem; border-radius: 8px; background: <%= is_recommended ? 'var(--surface)' : 'transparent' %>; border: <%= is_recommended ? '2px solid var(--primary)' : '1px solid var(--border)' %>;">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--text-secondary);"><%= model[:icon] %></span>
+        <div style="flex: 1;">
+          <div style="font-weight: 600; font-size: 0.875rem;">
+            <%= model[:name] %>
+            <% if is_recommended %>
+              <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--primary); color: white; margin-left: 0.5rem;">RECOMMENDED</span>
+            <% end %>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= model[:description] %></div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-weight: 700; font-size: 1.125rem;"><%= number_to_currency(model[:risk_amount]) %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= model[:pct_of_account] %>% of account</div>
+        </div>
+        <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: <%= rating_colors[model[:rating]] %>20; color: <%= rating_colors[model[:rating]] %>; text-transform: uppercase; font-weight: 600;"><%= model[:rating] %></span>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Per-Symbol Sizing %>
+<% if @symbol_sizing.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">label</span> Optimal Size by Symbol</h2>
+    </div>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.75rem 1rem; text-align: left;">Symbol</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Trades</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Win Rate</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Total P&L</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Kelly</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Suggested Risk</th>
+            <th style="padding: 0.75rem 1rem; text-align: center;">Edge</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @symbol_sizing.first(15).each do |sym| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.75rem 1rem; font-weight: 700;"><%= sym[:symbol] %></td>
+              <td style="padding: 0.75rem 1rem; text-align: right;"><%= sym[:count] %></td>
+              <td style="padding: 0.75rem 1rem; text-align: right;"><%= sym[:win_rate] %>%</td>
+              <td style="padding: 0.75rem 1rem; text-align: right; color: <%= sym[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= number_to_currency(sym[:pnl]) %></td>
+              <td style="padding: 0.75rem 1rem; text-align: right;"><%= sym[:half_kelly] %>%</td>
+              <td style="padding: 0.75rem 1rem; text-align: right; font-weight: 600;"><%= sym[:suggested_risk] %>%</td>
+              <td style="padding: 0.75rem 1rem; text-align: center;">
+                <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: <%= sym[:edge] == :positive ? 'rgba(76,175,80,0.15)' : 'rgba(244,67,54,0.15)' %>; color: <%= sym[:edge] == :positive ? 'var(--positive)' : 'var(--negative)' %>;"><%= sym[:edge] == :positive ? "+" : "-" %></span>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Quick Reference Card %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem; border-left: 4px solid var(--primary);">
+  <div style="font-weight: 600; margin-bottom: 0.5rem;">
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">calculate</span>
+    Quick Reference: $<%= number_with_delimiter(@account_size.to_i) %> Account
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; font-size: 0.8125rem;">
+    <div>
+      <div style="color: var(--text-secondary); font-size: 0.6875rem;">0.5% Risk</div>
+      <div style="font-weight: 600;"><%= number_to_currency(@account_size * 0.005) %> per trade</div>
+    </div>
+    <div>
+      <div style="color: var(--text-secondary); font-size: 0.6875rem;">1% Risk</div>
+      <div style="font-weight: 600;"><%= number_to_currency(@account_size * 0.01) %> per trade</div>
+    </div>
+    <div>
+      <div style="color: var(--text-secondary); font-size: 0.6875rem;">2% Risk</div>
+      <div style="font-weight: 600;"><%= number_to_currency(@account_size * 0.02) %> per trade</div>
+    </div>
+    <div>
+      <div style="color: var(--text-secondary); font-size: 0.6875rem;">Max Daily Loss (6%)</div>
+      <div style="font-weight: 600; color: var(--negative);"><%= number_to_currency(@account_size * 0.06) %></div>
+    </div>
+  </div>
+</div>
+
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Calculator", position_calculator_path, class: "btn" %>
+  <%= link_to "R:R Optimizer", rr_optimizer_path, class: "btn" %>
+  <%= link_to "Position Sizing Report", reports_position_sizing_path, class: "btn" %>
+</div>

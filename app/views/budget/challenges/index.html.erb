@@ -1,0 +1,230 @@
+<div class="page-header">
+  <h1>Savings Challenges</h1>
+  <div class="page-actions">
+    <%= link_to "New Challenge", new_budget_challenge_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<% active = @active.select { |c| c["status"] == "active" } %>
+<%
+  all_challenges = @all || []
+  total_completed = all_challenges.count { |c| c["status"] == "completed" }
+  total_failed = all_challenges.count { |c| c["status"] == "failed" }
+  total_abandoned = all_challenges.count { |c| c["status"] == "abandoned" }
+  success_rate = (total_completed + total_failed) > 0 ? (total_completed.to_f / (total_completed + total_failed) * 100).round(0) : 0
+%>
+
+<%
+  total_saved_from_challenges = all_challenges.select { |c| c["status"] == "completed" }.sum { |c| c["target_amount"].to_f }
+  total_attempted = total_completed + total_failed
+  # Challenge streak - consecutive completed challenges
+  challenge_streak = 0
+  all_challenges.sort_by { |c| c["end_date"] || "" }.reverse.each do |c|
+    break unless %w[completed failed].include?(c["status"])
+    if c["status"] == "completed"
+      challenge_streak += 1
+    else
+      break
+    end
+  end
+%>
+
+<% if active.any? || total_completed > 0 %>
+  <%# Success rate gauge %>
+  <% if total_attempted >= 3 %>
+    <div class="card" style="display: flex; align-items: center; gap: 2rem; padding: 1.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+      <div style="flex-shrink: 0;">
+        <%
+          sr_pct = success_rate / 100.0
+          sr_arc = [sr_pct * 180, 180].min
+          sr_end_rad = (180 - sr_arc) * Math::PI / 180
+          sr_end_x = (70 + 55 * Math.cos(sr_end_rad)).round(1)
+          sr_end_y = (75 - 55 * Math.sin(sr_end_rad)).round(1)
+          sr_color = success_rate >= 70 ? "var(--positive)" : success_rate >= 40 ? "#f9ab00" : "var(--negative)"
+        %>
+        <svg viewBox="0 0 140 85" style="width: 120px;">
+          <path d="M 15 75 A 55 55 0 0 1 125 75" fill="none" stroke="var(--border)" stroke-width="8" stroke-linecap="round" />
+          <% if sr_arc > 0 %>
+            <path d="M 15 75 A 55 55 0 <%= sr_arc > 180 ? 1 : 0 %> 1 <%= sr_end_x %> <%= sr_end_y %>"
+                  fill="none" stroke="<%= sr_color %>" stroke-width="8" stroke-linecap="round" />
+          <% end %>
+          <text x="70" y="60" text-anchor="middle" fill="<%= sr_color %>" font-size="20" font-weight="700"><%= success_rate %>%</text>
+          <text x="70" y="78" text-anchor="middle" fill="var(--text-secondary)" font-size="7">success rate</text>
+        </svg>
+      </div>
+      <div style="flex: 1; min-width: 200px;">
+        <h2 style="margin-bottom: 0.375rem;">Challenge Record</h2>
+        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.875rem;">
+          <div>
+            <span class="text-muted">Won</span>
+            <div style="font-weight: 700;" class="positive"><%= total_completed %></div>
+          </div>
+          <div>
+            <span class="text-muted">Lost</span>
+            <div style="font-weight: 700;" class="negative"><%= total_failed %></div>
+          </div>
+          <% if total_saved_from_challenges > 0 %>
+            <div>
+              <span class="text-muted">Total Saved</span>
+              <div style="font-weight: 700;" class="positive"><%= number_to_currency(total_saved_from_challenges) %></div>
+            </div>
+          <% end %>
+          <% if challenge_streak >= 2 %>
+            <div style="display: flex; align-items: center; gap: 0.25rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; color: var(--positive);">local_fire_department</span>
+              <span style="font-size: 0.875rem; font-weight: 600; color: var(--positive);">
+                <%= challenge_streak %> streak!
+              </span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Active</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);"><%= active.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Completed</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= total_completed %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Failed</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= total_failed %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Success Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= success_rate >= 70 ? 'var(--positive)' : success_rate >= 40 ? '#f9ab00' : 'var(--negative)' %>;"><%= success_rate %>%</div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<% if active.any? %>
+  <h2 style="margin-bottom: 1rem;">Active Challenges</h2>
+  <div class="content-grid" style="margin-bottom: 2rem;">
+    <% active.each do |challenge| %>
+      <%
+        pct = challenge["percentage_complete"].to_f
+        days_elapsed = challenge["days_elapsed"].to_i
+        days_total = challenge["days_total"].to_i
+        days_remaining = challenge["days_remaining"].to_i
+        time_pct = days_total > 0 ? (days_elapsed.to_f / days_total * 100).round(0) : 0
+        type_icons = { "no_spend" => "block", "spending_limit" => "savings", "savings_target" => "flag", "category_limit" => "category" }
+      %>
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -2px; margin-right: 0.25rem;"><%= type_icons[challenge["challenge_type"]] || "emoji_events" %></span>
+            <%= challenge["name"] %>
+          </h2>
+          <span class="badge badge-primary"><%= challenge["challenge_type"]&.titleize %></span>
+        </div>
+        <div style="padding: 0.5rem 1.25rem; display: flex; align-items: center; gap: 1rem;">
+          <%# Circular countdown %>
+          <div style="flex-shrink: 0; position: relative; width: 56px; height: 56px;">
+            <svg viewBox="0 0 36 36" style="transform: rotate(-90deg);">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" stroke-width="2.5" />
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--primary)" stroke-width="2.5"
+                      stroke-dasharray="<%= time_pct %> 100" stroke-linecap="round" />
+            </svg>
+            <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+              <span style="font-size: 0.75rem; font-weight: 700;"><%= days_remaining %></span>
+              <span style="font-size: 0.4375rem; color: var(--text-secondary);">days</span>
+            </div>
+          </div>
+          <div style="flex: 1;">
+            <div class="budget-progress-bar" style="margin-bottom: 0.375rem;">
+              <div class="budget-progress-fill progress-safe" style="width: <%= [pct, 100].min %>%"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary);">
+              <span>Day <%= days_elapsed %> of <%= days_total %></span>
+              <span><%= pct.round(0) %>% complete</span>
+            </div>
+          </div>
+        </div>
+        <% if challenge["target_amount"].to_f > 0 %>
+          <div style="padding: 0.25rem 1.25rem 0.5rem; font-size: 0.8125rem;">
+            <span style="color: var(--text-secondary);">Target:</span> <strong><%= number_to_currency(challenge["target_amount"]) %></strong>
+            <% if challenge["current_amount"].to_f > 0 %>
+              <span style="color: var(--text-secondary);"> · Current:</span> <strong><%= number_to_currency(challenge["current_amount"]) %></strong>
+            <% end %>
+          </div>
+        <% end %>
+        <div style="padding: 0.5rem 1.25rem 0.75rem; display: flex; gap: 0.5rem;">
+          <%= link_to "View", budget_challenge_path(challenge["id"]), class: "btn btn-sm" %>
+          <%= link_to "Evaluate", evaluate_budget_challenge_path(challenge["id"]), data: { turbo_method: :post }, class: "btn btn-sm btn-primary" %>
+          <%= link_to "Abandon", abandon_budget_challenge_path(challenge["id"]), data: { turbo_method: :post, turbo_confirm: "Abandon this challenge?" }, class: "btn btn-sm btn-danger" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<% if @presets.any? %>
+  <h2 style="margin-bottom: 1rem;">Quick Start</h2>
+  <div class="content-grid" style="margin-bottom: 2rem;">
+    <% @presets.each do |preset| %>
+      <div class="card" style="padding: 1.25rem;">
+        <strong><%= preset["name"] %></strong>
+        <p class="text-muted" style="font-size: 0.85rem; margin: 0.25rem 0 0.75rem;"><%= preset["description"] %></p>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="badge badge-info"><%= preset["duration_days"] %> days</span>
+          <%= form_with url: budget_challenges_path, method: :post, style: "display: inline;" do |f| %>
+            <%= f.hidden_field :preset, value: preset["key"] %>
+            <%= f.submit "Start", class: "btn btn-sm btn-primary" %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<% completed = @all.select { |c| %w[completed failed abandoned].include?(c["status"]) } %>
+<% if completed.any? %>
+  <h2 style="margin-bottom: 1rem;">Past Challenges</h2>
+  <div class="card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Challenge</th>
+          <th>Type</th>
+          <th>Period</th>
+          <th style="text-align: right;">Target</th>
+          <th>Result</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% completed.each do |c| %>
+          <tr>
+            <td><strong><%= c["name"] %></strong></td>
+            <td><%= c["challenge_type"]&.titleize %></td>
+            <td>
+              <%= Date.parse(c["start_date"]).strftime("%b %d") rescue c["start_date"] %> -
+              <%= Date.parse(c["end_date"]).strftime("%b %d") rescue c["end_date"] %>
+            </td>
+            <td style="text-align: right;"><%= c["target_amount"].to_f > 0 ? number_to_currency(c["target_amount"]) : "-" %></td>
+            <td>
+              <% color = c["status"] == "completed" ? "success" : (c["status"] == "failed" ? "danger" : "warning") %>
+              <span class="badge badge-<%= color %>"><%= c["status"]&.capitalize %></span>
+            </td>
+            <td>
+              <%= link_to "Delete", budget_challenge_path(c["id"]), data: { turbo_method: :delete, turbo_confirm: "Delete?" }, class: "btn btn-sm btn-danger" %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<% if active.empty? && completed.empty? %>
+  <div class="card empty-state">
+    <p>No challenges yet. Pick a preset above or create a custom challenge to get started.</p>
+  </div>
+<% end %>

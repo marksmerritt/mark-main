@@ -1,0 +1,285 @@
+<% content_for(:title) { "Expense Forecast" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #2196f3;">auto_graph</span>
+    Expense Forecast
+  </h1>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Monthly Spend</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@avg_monthly_spend) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Next Month Forecast</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #2196f3;"><%= number_to_currency(@forecast_1_month) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">3-Month Forecast</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #2196f3;"><%= number_to_currency(@forecast_3_month) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trending Up</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @trending_up_count > 0 ? 'var(--negative)' : 'var(--text)' %>;"><%= @trending_up_count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trending Down</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @trending_down_count > 0 ? 'var(--positive)' : 'var(--text)' %>;"><%= @trending_down_count %></div>
+    </div>
+  </div>
+</div>
+
+<%# Forecast Chart: Last 3 months actual + next 3 months forecast %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2196f3;">bar_chart</span> Spending Forecast</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% all_chart_data = @chart_actual_months + @chart_forecast_months %>
+    <% chart_max = [all_chart_data.map { |d| d[:total] }.max || 1, 1].max %>
+    <svg viewBox="0 0 600 220" style="width: 100%; height: auto; overflow: visible;" xmlns="http://www.w3.org/2000/svg">
+      <%# Grid lines %>
+      <% 5.times do |i| %>
+        <% y = 180 - (i * 40) %>
+        <line x1="60" y1="<%= y %>" x2="580" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4,4" />
+        <text x="55" y="<%= y + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="10"><%= number_to_currency(chart_max * i / 4.0, precision: 0) %></text>
+      <% end %>
+
+      <%# Bars %>
+      <% bar_width = 55 %>
+      <% gap = 25 %>
+      <% start_x = 80 %>
+      <% all_chart_data.each_with_index do |d, i| %>
+        <% bar_height = chart_max > 0 ? (d[:total] / chart_max * 160).round(1) : 0 %>
+        <% x = start_x + i * (bar_width + gap) %>
+        <% y = 180 - bar_height %>
+        <% is_forecast = i >= @chart_actual_months.size %>
+
+        <% if is_forecast %>
+          <%# Forecast bars: lighter color with dashed border %>
+          <rect x="<%= x %>" y="<%= y %>" width="<%= bar_width %>" height="<%= bar_height %>"
+                fill="rgba(33,150,243,0.15)" stroke="#2196f3" stroke-width="1.5" stroke-dasharray="4,3" rx="4" />
+        <% else %>
+          <%# Actual bars: solid color %>
+          <rect x="<%= x %>" y="<%= y %>" width="<%= bar_width %>" height="<%= bar_height %>"
+                fill="rgba(33,150,243,0.6)" stroke="#2196f3" stroke-width="1" rx="4" />
+        <% end %>
+
+        <%# Amount label above bar %>
+        <text x="<%= x + bar_width / 2 %>" y="<%= y - 6 %>" text-anchor="middle" fill="var(--text)" font-size="10" font-weight="600">
+          <%= number_to_currency(d[:total], precision: 0) %>
+        </text>
+
+        <%# Month label below bar %>
+        <text x="<%= x + bar_width / 2 %>" y="198" text-anchor="middle" fill="var(--text-secondary)" font-size="10">
+          <%= Date.parse("#{d[:month]}-01").strftime("%b") rescue d[:month] %>
+        </text>
+
+        <% if is_forecast && i == @chart_actual_months.size %>
+          <%# "Forecast" label %>
+          <text x="<%= x %>" y="215" fill="#2196f3" font-size="9" font-weight="600">FORECAST</text>
+        <% end %>
+      <% end %>
+
+      <%# Divider line between actual and forecast %>
+      <% divider_x = start_x + @chart_actual_months.size * (bar_width + gap) - gap / 2 %>
+      <line x1="<%= divider_x %>" y1="10" x2="<%= divider_x %>" y2="190" stroke="var(--text-secondary)" stroke-width="1" stroke-dasharray="6,3" opacity="0.5" />
+    </svg>
+
+    <div style="display: flex; gap: 1.5rem; justify-content: center; margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+      <div style="display: flex; align-items: center; gap: 0.375rem;">
+        <span style="width: 14px; height: 10px; background: rgba(33,150,243,0.6); border-radius: 2px; display: inline-block;"></span>
+        Actual
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.375rem;">
+        <span style="width: 14px; height: 10px; background: rgba(33,150,243,0.15); border: 1.5px dashed #2196f3; border-radius: 2px; display: inline-block;"></span>
+        Forecast
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# 6-Month Summary %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+    <div style="background: var(--bg); border-radius: 8px; padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">Next Month</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: #2196f3;"><%= number_to_currency(@forecast_1_month) %></div>
+    </div>
+    <div style="background: var(--bg); border-radius: 8px; padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">Next 3 Months</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: #2196f3;"><%= number_to_currency(@forecast_3_month) %></div>
+    </div>
+    <div style="background: var(--bg); border-radius: 8px; padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">Next 6 Months</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: #2196f3;"><%= number_to_currency(@forecast_6_month) %></div>
+    </div>
+  </div>
+</div>
+
+<%# Category Forecast Table %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2196f3;">category</span> Category Forecasts</h2>
+  </div>
+  <div style="overflow-x: auto;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+      <thead>
+        <tr style="border-bottom: 2px solid var(--border);">
+          <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">Category</th>
+          <th style="padding: 0.75rem 1rem; text-align: right; font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">Current Avg</th>
+          <th style="padding: 0.75rem 1rem; text-align: right; font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">Forecast</th>
+          <th style="padding: 0.75rem 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">Trend</th>
+          <th style="padding: 0.75rem 1rem; text-align: right; font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase;">Confidence Range</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @sorted_categories.each do |cat| %>
+          <% avg = @category_averages[cat] || 0 %>
+          <% forecast = @category_forecasts[cat] || 0 %>
+          <% trend = @category_trends[cat] || { direction: :stable, pct_change: 0 } %>
+          <% ci = @confidence_intervals[cat] || { low: 0, high: 0 } %>
+          <% next if forecast < 1 %>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.75rem 1rem; font-weight: 500;"><%= cat %></td>
+            <td style="padding: 0.75rem 1rem; text-align: right;"><%= number_to_currency(avg) %></td>
+            <td style="padding: 0.75rem 1rem; text-align: right; font-weight: 600;"><%= number_to_currency(forecast) %></td>
+            <td style="padding: 0.75rem 1rem; text-align: center;">
+              <% if trend[:direction] == :increasing %>
+                <span style="color: var(--negative); font-weight: 600; font-size: 1.125rem;" title="Increasing <%= trend[:pct_change] %>%">&#8593;</span>
+                <span style="font-size: 0.6875rem; color: var(--negative); font-weight: 500;">+<%= trend[:pct_change] %>%</span>
+              <% elsif trend[:direction] == :decreasing %>
+                <span style="color: var(--positive); font-weight: 600; font-size: 1.125rem;" title="Decreasing <%= trend[:pct_change].abs %>%">&#8595;</span>
+                <span style="font-size: 0.6875rem; color: var(--positive); font-weight: 500;"><%= trend[:pct_change] %>%</span>
+              <% else %>
+                <span style="color: var(--text-secondary); font-weight: 600; font-size: 1.125rem;" title="Stable">&#8594;</span>
+                <span style="font-size: 0.6875rem; color: var(--text-secondary); font-weight: 500;">stable</span>
+              <% end %>
+            </td>
+            <td style="padding: 0.75rem 1rem; text-align: right; font-size: 0.8125rem; color: var(--text-secondary);">
+              <%= number_to_currency(ci[:low]) %> &ndash; <%= number_to_currency(ci[:high]) %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%# Trend Alerts %>
+<% if @trend_alerts.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">trending_up</span> Trend Alerts</h2>
+    </div>
+    <div style="padding: 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+      <% @trend_alerts.each do |alert| %>
+        <div style="background: rgba(234,67,53,0.06); border: 1px solid rgba(234,67,53,0.2); border-radius: 8px; padding: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: var(--negative);">warning</span>
+            <span style="font-weight: 600;"><%= alert[:category] %></span>
+          </div>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+            Spending increased <span style="font-weight: 700; color: var(--negative);">+<%= alert[:pct_change] %>%</span> compared to prior period
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
+            <span style="color: var(--text-secondary);">Avg: <%= number_to_currency(alert[:avg]) %></span>
+            <span style="font-weight: 600;">Forecast: <%= number_to_currency(alert[:forecast]) %></span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Budget Variance Forecast %>
+<% if @budget_variances.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff9800;">account_balance_wallet</span> Budget Variance Forecast</h2>
+    </div>
+    <div style="padding: 0;">
+      <% @budget_variances.sort_by { |v| v[:over_budget] ? -1 : 1 }.each do |v| %>
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 2rem; height: 2rem; border-radius: 50%; background: <%= v[:over_budget] ? 'rgba(234,67,53,0.12)' : 'rgba(52,168,83,0.12)' %>; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: <%= v[:over_budget] ? 'var(--negative)' : 'var(--positive)' %>;"><%= v[:over_budget] ? 'warning' : 'check_circle' %></span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 0.875rem;"><%= v[:category] %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              Budget: <%= number_to_currency(v[:budget_limit]) %>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-weight: 700; color: <%= v[:over_budget] ? 'var(--negative)' : 'var(--positive)' %>;">
+              <%= v[:over_budget] ? '+' : '' %><%= number_to_currency(v[:variance]) %>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">forecast: <%= number_to_currency(v[:forecast]) %></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Seasonal Patterns %>
+<% if @seasonal_patterns.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff9800;">wb_sunny</span> Seasonal Patterns</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+        <% @seasonal_patterns.first(6).each do |sp| %>
+          <div style="background: rgba(255,152,0,0.06); border: 1px solid rgba(255,152,0,0.2); border-radius: 8px; padding: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <span class="material-icons-outlined" style="font-size: 1.125rem; color: #ff9800;">event</span>
+              <span style="font-weight: 600;"><%= sp[:category] %></span>
+            </div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.375rem;">
+              Spiked in <strong><%= sp[:month] %></strong> at <strong><%= sp[:multiplier] %>x</strong> the average
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              <%= number_to_currency(sp[:amount]) %> vs avg <%= number_to_currency(sp[:avg]) %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Empty State %>
+<% if @sorted_categories.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 1rem;">auto_graph</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No Expense Data Available</div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
+      Add some transactions to see your expense forecast and spending trends.
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Navigation %>
+<div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem;">
+  <%= link_to budget_dashboard_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary); display: block; margin-bottom: 0.25rem;">dashboard</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Budget Dashboard</span>
+  <% end %>
+  <%= link_to budget_reports_spending_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #2196f3; display: block; margin-bottom: 0.25rem;">pie_chart</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Spending Report</span>
+  <% end %>
+  <%= link_to budget_spending_anomalies_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--negative); display: block; margin-bottom: 0.25rem;">anomaly_detection</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Anomalies</span>
+  <% end %>
+  <%= link_to budget_savings_projection_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--positive); display: block; margin-bottom: 0.25rem;">savings</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Savings Projection</span>
+  <% end %>
+</div>

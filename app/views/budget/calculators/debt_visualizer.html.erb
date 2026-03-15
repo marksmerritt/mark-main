@@ -1,0 +1,347 @@
+<% content_for(:title) { "Debt Payoff Visualizer" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #d32f2f;">trending_down</span>
+    Debt Payoff Visualizer
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Debt Accounts", budget_debt_accounts_path, class: "btn btn-sm" %>
+    <%= link_to "Debt Freedom", budget_debt_freedom_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<% if @debts.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--positive); opacity: 0.6;">celebration</span>
+    <h3 style="margin-top: 1rem; color: var(--positive);">No Active Debts</h3>
+    <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">You have no outstanding debts to visualize. Great job!</p>
+  </div>
+<% else %>
+
+  <%# Stats Strip %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Debt</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_debt) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Payments</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@total_minimum) %>/mo</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Debt-Free Date</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @base_payoff_date.strftime("%b %Y") %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Interest</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@base_interest) %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Debt Breakdown Bar %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">pie_chart</span> Debt Breakdown</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: flex; height: 32px; border-radius: 6px; overflow: hidden; margin-bottom: 1rem;">
+        <% @debt_details.each_with_index do |d, i| %>
+          <% pct = @total_debt > 0 ? (d[:balance] / @total_debt * 100).round(1) : 0 %>
+          <div style="width: <%= pct %>%; background: <%= @debt_colors[i % @debt_colors.length] %>; opacity: 0.85; display: flex; align-items: center; justify-content: center; min-width: <%= pct > 5 ? '0' : '2px' %>;" title="<%= d[:name] %>: <%= number_to_currency(d[:balance]) %> (<%= pct %>%)">
+            <% if pct > 8 %>
+              <span style="color: white; font-size: 0.625rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 4px;"><%= pct %>%</span>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+        <% @debt_details.each_with_index do |d, i| %>
+          <div style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem;">
+            <div style="width: 10px; height: 10px; border-radius: 2px; background: <%= @debt_colors[i % @debt_colors.length] %>;"></div>
+            <span><%= d[:name] %> (<%= number_to_currency(d[:balance]) %>)</span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Payoff Timeline Chart (SVG) %>
+  <% if @timeline_data.any? && @timeline_data.first[:history].length > 1 %>
+    <%
+      max_balance = @timeline_data.map { |d| d[:history].max }.max || 1
+      data_points = @timeline_data.first[:history].length
+      chart_w = 700
+      chart_h = 280
+      pad_l = 60
+      pad_r = 20
+      pad_t = 20
+      pad_b = 40
+      usable_w = chart_w - pad_l - pad_r
+      usable_h = chart_h - pad_t - pad_b
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Payoff Timeline</h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">Balance over time at current minimum payments</span>
+      </div>
+      <div style="padding: 1.25rem; overflow-x: auto;">
+        <svg viewBox="0 0 <%= chart_w %> <%= chart_h %>" style="width: 100%; max-width: 700px; height: auto; font-family: Inter, sans-serif;">
+          <%# Grid lines %>
+          <% 5.times do |i| %>
+            <% y = pad_t + (usable_h * i / 4.0) %>
+            <line x1="<%= pad_l %>" y1="<%= y %>" x2="<%= chart_w - pad_r %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3"/>
+            <text x="<%= pad_l - 8 %>" y="<%= y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="8">
+              <%= number_to_currency(max_balance * (4 - i) / 4.0, precision: 0) %>
+            </text>
+          <% end %>
+
+          <%# X-axis labels %>
+          <% step = [(data_points / 6.0).ceil, 1].max %>
+          <% data_points.times do |j| %>
+            <% if j % step == 0 || j == data_points - 1 %>
+              <% x = pad_l + (usable_w * j / [data_points - 1, 1].max.to_f) %>
+              <text x="<%= x %>" y="<%= chart_h - pad_b + 16 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8">
+                Mo <%= j * [(@base_months / [data_points - 1, 1].max.to_f).round, 1].max %>
+              </text>
+            <% end %>
+          <% end %>
+
+          <%# Debt lines %>
+          <% @timeline_data.each_with_index do |debt, i| %>
+            <% color = @debt_colors[i % @debt_colors.length] %>
+            <% points = debt[:history].each_with_index.map { |val, j|
+              x = pad_l + (usable_w * j / [debt[:history].length - 1, 1].max.to_f)
+              y = pad_t + usable_h - (max_balance > 0 ? (val / max_balance * usable_h) : 0)
+              "#{x.round(1)},#{y.round(1)}"
+            }.join(" ") %>
+            <polyline points="<%= points %>" fill="none" stroke="<%= color %>" stroke-width="2" stroke-linejoin="round"/>
+            <%# Label at start %>
+            <% if debt[:history].first > 0 %>
+              <text x="<%= pad_l + 4 %>" y="<%= pad_t + usable_h - (debt[:history].first / max_balance * usable_h) - 4 %>" fill="<%= color %>" font-size="7" font-weight="600"><%= debt[:name].truncate(15) %></text>
+            <% end %>
+          <% end %>
+        </svg>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Snowball vs Avalanche Comparison %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">compare_arrows</span> Snowball vs Avalanche</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Which strategy works best for you?</span>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0;">
+      <%# Snowball side %>
+      <div style="padding: 1.25rem; border-right: 1px solid var(--border);">
+        <div style="text-align: center; margin-bottom: 1rem;">
+          <span class="material-icons-outlined" style="font-size: 1.5rem; color: #1e88e5;">ac_unit</span>
+          <h3 style="font-size: 0.9375rem; margin-top: 0.25rem;">Snowball</h3>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Smallest balance first</div>
+        </div>
+        <div style="text-align: center; margin-bottom: 0.75rem;">
+          <div style="font-size: 2rem; font-weight: 700;"><%= @snowball_months %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">months to freedom</div>
+        </div>
+        <div style="text-align: center; margin-bottom: 0.75rem;">
+          <div style="font-size: 1.25rem; font-weight: 600; color: var(--negative);"><%= number_to_currency(@snowball_interest) %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">total interest paid</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 0.875rem; font-weight: 600;"><%= (Date.current >> @snowball_months).strftime("%b %Y") %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">debt-free date</div>
+        </div>
+        <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-secondary); border-top: 1px solid var(--border); padding-top: 0.75rem;">
+          <strong>Order:</strong>
+          <ol style="margin: 0.375rem 0 0 1rem; padding: 0;">
+            <% @snowball_order.each do |d| %>
+              <li><%= d[:name] %> (<%= number_to_currency(d[:balance]) %>)</li>
+            <% end %>
+          </ol>
+        </div>
+      </div>
+      <%# Avalanche side %>
+      <div style="padding: 1.25rem;">
+        <div style="text-align: center; margin-bottom: 1rem;">
+          <span class="material-icons-outlined" style="font-size: 1.5rem; color: #e53935;">local_fire_department</span>
+          <h3 style="font-size: 0.9375rem; margin-top: 0.25rem;">Avalanche</h3>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Highest rate first</div>
+        </div>
+        <div style="text-align: center; margin-bottom: 0.75rem;">
+          <div style="font-size: 2rem; font-weight: 700;"><%= @avalanche_months %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">months to freedom</div>
+        </div>
+        <div style="text-align: center; margin-bottom: 0.75rem;">
+          <div style="font-size: 1.25rem; font-weight: 600; color: var(--negative);"><%= number_to_currency(@avalanche_interest) %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">total interest paid</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 0.875rem; font-weight: 600;"><%= (Date.current >> @avalanche_months).strftime("%b %Y") %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">debt-free date</div>
+        </div>
+        <div style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-secondary); border-top: 1px solid var(--border); padding-top: 0.75rem;">
+          <strong>Order:</strong>
+          <ol style="margin: 0.375rem 0 0 1rem; padding: 0;">
+            <% @avalanche_order.each do |d| %>
+              <li><%= d[:name] %> (<%= d[:rate] %>% APR)</li>
+            <% end %>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <% if @avalanche_interest < @snowball_interest %>
+      <div style="padding: 0.75rem 1.25rem; background: var(--bg); border-top: 1px solid var(--border); font-size: 0.8125rem; text-align: center;">
+        Avalanche saves <strong style="color: var(--positive);"><%= number_to_currency(@snowball_interest - @avalanche_interest) %></strong> in interest vs Snowball
+      </div>
+    <% elsif @snowball_interest < @avalanche_interest %>
+      <div style="padding: 0.75rem 1.25rem; background: var(--bg); border-top: 1px solid var(--border); font-size: 0.8125rem; text-align: center;">
+        Snowball saves <strong style="color: var(--positive);"><%= number_to_currency(@avalanche_interest - @snowball_interest) %></strong> in interest vs Avalanche
+      </div>
+    <% else %>
+      <div style="padding: 0.75rem 1.25rem; background: var(--bg); border-top: 1px solid var(--border); font-size: 0.8125rem; text-align: center;">
+        Both strategies result in the same total interest
+      </div>
+    <% end %>
+  </div>
+
+  <%# Acceleration Scenarios %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">speed</span> Acceleration Scenarios</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Impact of extra monthly payments</span>
+    </div>
+    <div style="overflow-x: auto;">
+      <table class="table" style="font-size: 0.8125rem;">
+        <thead>
+          <tr>
+            <th>Extra/Month</th>
+            <th>New Payoff Date</th>
+            <th style="text-align: center;">Months</th>
+            <th style="text-align: center;">Months Saved</th>
+            <th style="text-align: right;">Total Interest</th>
+            <th style="text-align: right;">Interest Saved</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background: var(--bg);">
+            <td><span style="color: var(--text-secondary);">Current (minimums)</span></td>
+            <td><%= @base_payoff_date.strftime("%b %Y") %></td>
+            <td style="text-align: center;"><%= @base_months %></td>
+            <td style="text-align: center; color: var(--text-secondary);">--</td>
+            <td style="text-align: right;"><%= number_to_currency(@base_interest) %></td>
+            <td style="text-align: right; color: var(--text-secondary);">--</td>
+          </tr>
+          <% @aggregate_scenarios.each do |s| %>
+            <tr>
+              <td><strong style="color: var(--positive);">+<%= number_to_currency(s[:extra]) %></strong></td>
+              <td><%= s[:payoff_date].strftime("%b %Y") %></td>
+              <td style="text-align: center;"><%= s[:months] %></td>
+              <td style="text-align: center; color: var(--positive); font-weight: 600;"><%= s[:months_saved] %></td>
+              <td style="text-align: right;"><%= number_to_currency(s[:interest]) %></td>
+              <td style="text-align: right; color: var(--positive); font-weight: 600;"><%= number_to_currency(s[:interest_saved]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# Motivation Timeline %>
+  <% milestones = @avalanche_interest <= @snowball_interest ? @avalanche_milestones : @snowball_milestones %>
+  <% if milestones.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">flag</span> Motivation Milestones</h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">When each debt gets paid off</span>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="position: relative; padding-left: 24px;">
+          <% milestones.each_with_index do |m, i| %>
+            <div style="position: relative; padding-bottom: <%= i < milestones.length - 1 ? '1.5rem' : '0' %>;">
+              <%# Vertical line %>
+              <% if i < milestones.length - 1 %>
+                <div style="position: absolute; left: -18px; top: 12px; width: 2px; height: 100%; background: var(--border);"></div>
+              <% end %>
+              <%# Dot %>
+              <div style="position: absolute; left: -22px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: <%= i == milestones.length - 1 ? 'var(--positive)' : '#1e88e5' %>; border: 2px solid var(--card-bg);"></div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div>
+                  <strong style="font-size: 0.875rem;"><%= m[:name] %></strong>
+                  <% if i == milestones.length - 1 %>
+                    <span style="font-size: 0.6875rem; color: var(--positive); margin-left: 0.375rem; font-weight: 600;">DEBT FREE!</span>
+                  <% end %>
+                </div>
+                <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                  <strong><%= m[:date].strftime("%b %Y") %></strong>
+                  <span style="font-size: 0.6875rem; margin-left: 0.375rem;">(month <%= m[:month] %>)</span>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Individual Debt Cards %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">credit_card</span> Individual Debt Details</h2>
+    </div>
+    <% @debt_details.each_with_index do |d, i| %>
+      <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="width: 10px; height: 10px; border-radius: 2px; background: <%= @debt_colors[i % @debt_colors.length] %>;"></div>
+            <strong style="font-size: 0.9375rem;"><%= d[:name] %></strong>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary);"><%= d[:debt_type] %></span>
+          </div>
+          <span style="font-weight: 700; font-size: 1.125rem; color: var(--negative);"><%= number_to_currency(d[:balance]) %></span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem;">
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Rate</div>
+            <div style="font-size: 0.9375rem; font-weight: 600;"><%= d[:rate] %>%</div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Min Payment</div>
+            <div style="font-size: 0.9375rem; font-weight: 600;"><%= number_to_currency(d[:min_payment]) %>/mo</div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Payoff Date</div>
+            <div style="font-size: 0.9375rem; font-weight: 600;"><%= d[:base_date].strftime("%b %Y") %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Interest Cost</div>
+            <div style="font-size: 0.9375rem; font-weight: 600; color: var(--negative);"><%= number_to_currency(d[:base_interest]) %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Months</div>
+            <div style="font-size: 0.9375rem; font-weight: 600;"><%= d[:base_months] %></div>
+          </div>
+        </div>
+        <%# Per-debt acceleration %>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.375rem;">Acceleration scenarios:</div>
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <% d[:scenarios].each do |s| %>
+            <div style="background: var(--bg); padding: 0.375rem 0.625rem; border-radius: 6px; font-size: 0.75rem; flex: 1; min-width: 120px;">
+              <div style="font-weight: 600; color: var(--positive);">+<%= number_to_currency(s[:extra]) %>/mo</div>
+              <div><%= s[:payoff_date].strftime("%b %Y") %> (<%= s[:months_saved] %> mo saved)</div>
+              <div style="color: var(--positive);">Save <%= number_to_currency(s[:interest_saved]) %></div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Debt Freedom", budget_debt_freedom_path, class: "btn" %>
+  <%= link_to "Debt Accounts", budget_debt_accounts_path, class: "btn" %>
+  <%= link_to "Budget Dashboard", budget_dashboard_path, class: "btn" %>
+</div>

@@ -1,0 +1,100 @@
+<%
+  n_items = @notifications || []
+  n_by_severity = n_items.group_by { |n| n[:severity] }
+  n_danger = n_by_severity["danger"]&.count || 0
+  n_warning = n_by_severity["warning"]&.count || 0
+  n_success = n_by_severity["success"]&.count || 0
+  n_info = n_by_severity["info"]&.count || 0
+%>
+
+<div class="page-header">
+  <h1>Notifications</h1>
+  <div class="page-actions">
+    <%= link_to root_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">home</span> Dashboard
+    <% end %>
+  </div>
+</div>
+
+<% if n_items.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0;">
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= n_items.count %></div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Critical</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= n_danger > 0 ? 'var(--negative)' : 'var(--positive)' %>;"><%= n_danger %></div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Warnings</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= n_warning > 0 ? '#f9ab00' : 'var(--text)' %>;"><%= n_warning %></div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Positive</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= n_success %></div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Info</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);"><%= n_info %></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="entries-list">
+    <% n_items.each do |item| %>
+      <%
+        sev = item[:severity]
+        sev_color = case sev
+                    when "danger" then "var(--negative)"
+                    when "warning" then "#f9ab00"
+                    when "success" then "var(--positive)"
+                    else "var(--primary)"
+                    end
+        sev_bg = case sev
+                 when "danger" then "rgba(234,67,53,0.1)"
+                 when "warning" then "rgba(249,171,0,0.1)"
+                 when "success" then "rgba(52,168,83,0.1)"
+                 else "rgba(26,115,232,0.1)"
+                 end
+      %>
+      <div class="card entry-card" style="border-left: 3px solid <%= sev_color %>;">
+        <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem 1rem;">
+          <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 8px; background: <%= sev_bg %>; display: flex; align-items: center; justify-content: center;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= sev_color %>;"><%= item[:icon] %></span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.125rem;"><%= item[:title] %></div>
+            <% if item[:message].present? %>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary);"><%= item[:message] %></div>
+            <% end %>
+          </div>
+          <div style="flex-shrink: 0; display: flex; align-items: center; gap: 0.5rem;">
+            <% type_label = case item[:type]
+                            when "budget_alert" then "Budget"
+                            when "bill_due" then "Bills"
+                            when "review" then "Trading"
+                            when "streak" then "Trading"
+                            when "reminder" then "Notes"
+                            else "System"
+                            end
+            %>
+            <span class="badge" style="font-size: 0.625rem;"><%= type_label %></span>
+            <% if item[:url].present? %>
+              <%= link_to item[:url], class: "btn btn-sm" do %>
+                <span class="material-icons-outlined" style="font-size: 0.875rem;">arrow_forward</span>
+              <% end %>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card empty-state" style="text-align: center; padding: 3rem;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--positive); margin-bottom: 0.5rem;">check_circle</span>
+    <h2>All Clear</h2>
+    <p style="color: var(--text-secondary);">No notifications right now. You're on top of everything!</p>
+  </div>
+<% end %>

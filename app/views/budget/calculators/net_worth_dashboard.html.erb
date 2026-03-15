@@ -1,0 +1,416 @@
+<% content_for(:title) { "Net Worth Dashboard" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #2e7d32;">account_balance</span>
+    Net Worth Dashboard
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Net Worth Forecast", budget_net_worth_forecast_path, class: "btn btn-sm" %>
+    <%= link_to "Debt Visualizer", budget_debt_visualizer_path, class: "btn btn-sm" %>
+    <%= link_to "Dashboard", budget_dashboard_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<%# Large Net Worth Display %>
+<div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid <%= @net_worth >= 0 ? '#2e7d32' : 'var(--negative)' %>;">
+  <div style="padding: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Net Worth</div>
+      <div style="font-size: 2.5rem; font-weight: 700; color: <%= @net_worth >= 0 ? '#2e7d32' : 'var(--negative)' %>;">
+        <%= number_to_currency(@net_worth) %>
+      </div>
+    </div>
+    <div style="text-align: right;">
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Monthly Change</div>
+      <div style="font-size: 1.25rem; font-weight: 600; color: <%= @monthly_change >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;"><%= @monthly_change >= 0 ? 'trending_up' : 'trending_down' %></span>
+        <%= @monthly_change >= 0 ? '+' : '' %><%= number_to_currency(@monthly_change) %>/mo
+      </div>
+      <% if @growth_rate != 0 %>
+        <div style="font-size: 0.75rem; color: <%= @growth_rate >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @growth_rate >= 0 ? '+' : '' %><%= @growth_rate %>% month-over-month
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Assets</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@total_assets) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Liabilities</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_liabilities) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net Worth</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: <%= @net_worth >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@net_worth) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Asset/Debt Ratio</div>
+      <div style="font-size: 1.25rem; font-weight: 700;">
+        <% if @asset_debt_ratio == Float::INFINITY %>
+          <span style="color: var(--positive);">Debt Free</span>
+        <% else %>
+          <%= @asset_debt_ratio %>x
+        <% end %>
+      </div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Change</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: <%= @monthly_change >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <%= @monthly_change >= 0 ? '+' : '' %><%= number_to_currency(@monthly_change) %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+  <%# Asset Allocation Donut %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">donut_large</span> Asset Allocation</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% if @asset_allocation.any? %>
+        <%
+          ring_size = 180
+          cx = ring_size / 2
+          cy = ring_size / 2
+          radius = 70
+          stroke_w = 28
+          circumference = 2 * Math::PI * radius
+          offset = 0
+        %>
+        <div style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+          <svg width="<%= ring_size %>" height="<%= ring_size %>" viewBox="0 0 <%= ring_size %> <%= ring_size %>" style="flex-shrink: 0;">
+            <% if @total_assets > 0 %>
+              <% @asset_allocation.each_with_index do |a, i| %>
+                <% pct = a[:amount] / @total_assets %>
+                <% dash = circumference * pct %>
+                <% gap = circumference - dash %>
+                <circle cx="<%= cx %>" cy="<%= cy %>" r="<%= radius %>"
+                  fill="none"
+                  stroke="<%= @asset_colors[i % @asset_colors.length] %>"
+                  stroke-width="<%= stroke_w %>"
+                  stroke-dasharray="<%= dash %> <%= gap %>"
+                  stroke-dashoffset="<%= -offset %>"
+                  transform="rotate(-90 <%= cx %> <%= cy %>)"
+                  opacity="0.85"/>
+                <% offset += dash %>
+              <% end %>
+            <% else %>
+              <circle cx="<%= cx %>" cy="<%= cy %>" r="<%= radius %>" fill="none" stroke="var(--border)" stroke-width="<%= stroke_w %>" opacity="0.3"/>
+            <% end %>
+            <text x="<%= cx %>" y="<%= cy - 6 %>" text-anchor="middle" fill="var(--text-primary)" font-size="14" font-weight="700"><%= number_to_currency(@total_assets, precision: 0) %></text>
+            <text x="<%= cx %>" y="<%= cy + 10 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="9">TOTAL ASSETS</text>
+          </svg>
+          <div style="display: flex; flex-direction: column; gap: 0.375rem; flex: 1; min-width: 120px;">
+            <% @asset_allocation.first(8).each_with_index do |a, i| %>
+              <div style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem;">
+                <div style="width: 10px; height: 10px; border-radius: 2px; background: <%= @asset_colors[i % @asset_colors.length] %>; flex-shrink: 0;"></div>
+                <span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><%= a[:name] %></span>
+                <span style="font-weight: 600;"><%= number_to_currency(a[:amount]) %></span>
+              </div>
+            <% end %>
+          </div>
+        </div>
+
+        <%# Liquid vs Illiquid %>
+        <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">Liquidity Breakdown</div>
+          <div style="display: flex; height: 20px; border-radius: 4px; overflow: hidden; margin-bottom: 0.5rem;">
+            <% liquid_pct = @total_assets > 0 ? (@liquid_assets / @total_assets * 100).round(1) : 0 %>
+            <div style="width: <%= liquid_pct %>%; background: #2e7d32; display: flex; align-items: center; justify-content: center;">
+              <% if liquid_pct > 15 %><span style="color: white; font-size: 0.625rem; font-weight: 600;"><%= liquid_pct %>%</span><% end %>
+            </div>
+            <div style="width: <%= 100 - liquid_pct %>%; background: #1565c0; display: flex; align-items: center; justify-content: center;">
+              <% if (100 - liquid_pct) > 15 %><span style="color: white; font-size: 0.625rem; font-weight: 600;"><%= (100 - liquid_pct).round(1) %>%</span><% end %>
+            </div>
+          </div>
+          <div style="display: flex; gap: 1rem; font-size: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.25rem;">
+              <div style="width: 8px; height: 8px; border-radius: 2px; background: #2e7d32;"></div>
+              Liquid: <%= number_to_currency(@liquid_assets) %>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.25rem;">
+              <div style="width: 8px; height: 8px; border-radius: 2px; background: #1565c0;"></div>
+              Illiquid: <%= number_to_currency(@illiquid_assets) %>
+            </div>
+          </div>
+        </div>
+      <% else %>
+        <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+          <span class="material-icons-outlined" style="font-size: 2rem; opacity: 0.4;">savings</span>
+          <p style="font-size: 0.875rem; margin-top: 0.5rem;">No funds/savings accounts found</p>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Debt Composition %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">credit_card</span> Debt Composition</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% if @debt_composition.any? %>
+        <% max_debt = @debt_composition.map { |d| d[:balance] }.max || 1 %>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <% @debt_composition.each_with_index do |d, i| %>
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">
+                <span><%= d[:name] %> <span style="color: var(--text-secondary);">(<%= d[:debt_type] %>, <%= d[:rate] %>%)</span></span>
+                <span style="font-weight: 600; color: var(--negative);"><%= number_to_currency(d[:balance]) %></span>
+              </div>
+              <div style="height: 18px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden;">
+                <% bar_pct = (d[:balance] / max_debt * 100).round(1) %>
+                <div style="width: <%= bar_pct %>%; height: 100%; background: <%= @debt_colors[i % @debt_colors.length] %>; opacity: 0.85; border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px;">
+                  <% if bar_pct > 20 %>
+                    <span style="color: white; font-size: 0.625rem; font-weight: 600;"><%= number_to_currency(d[:balance], precision: 0) %></span>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+
+        <%# Monthly Payment Summary %>
+        <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+          <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
+            <span style="color: var(--text-secondary);">Total Monthly Minimums</span>
+            <span style="font-weight: 600;"><%= number_to_currency(@debt_composition.sum { |d| d[:min_payment] }) %>/mo</span>
+          </div>
+        </div>
+      <% else %>
+        <div style="text-align: center; padding: 2rem; color: var(--positive);">
+          <span class="material-icons-outlined" style="font-size: 2rem; opacity: 0.6;">celebration</span>
+          <p style="font-size: 0.875rem; margin-top: 0.5rem; font-weight: 600;">Debt Free!</p>
+          <p style="font-size: 0.75rem; color: var(--text-secondary);">No outstanding debts. Great job!</p>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Assets vs Liabilities Comparison %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">compare_arrows</span> Assets vs Liabilities</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <%
+      comparison_max = [@total_assets, @total_liabilities, 1].max
+      asset_pct = (@total_assets / comparison_max * 100).round(1)
+      liability_pct = (@total_liabilities / comparison_max * 100).round(1)
+    %>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem;">
+          <span style="font-size: 0.75rem; font-weight: 600; color: var(--positive);">Assets</span>
+          <span style="font-size: 1rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@total_assets) %></span>
+        </div>
+        <div style="height: 32px; background: var(--bg-secondary); border-radius: 6px; overflow: hidden;">
+          <div style="width: <%= asset_pct %>%; height: 100%; background: #2e7d32; border-radius: 6px; opacity: 0.85;"></div>
+        </div>
+      </div>
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem;">
+          <span style="font-size: 0.75rem; font-weight: 600; color: var(--negative);">Liabilities</span>
+          <span style="font-size: 1rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_liabilities) %></span>
+        </div>
+        <div style="height: 32px; background: var(--bg-secondary); border-radius: 6px; overflow: hidden;">
+          <div style="width: <%= liability_pct %>%; height: 100%; background: #e53935; border-radius: 6px; opacity: 0.85;"></div>
+        </div>
+      </div>
+    </div>
+
+    <%# Net Worth bar spanning full width %>
+    <div style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.375rem;">
+        <span style="font-size: 0.75rem; font-weight: 600;">Net Worth</span>
+        <span style="font-size: 1rem; font-weight: 700; color: <%= @net_worth >= 0 ? '#2e7d32' : 'var(--negative)' %>;"><%= number_to_currency(@net_worth) %></span>
+      </div>
+      <% if comparison_max > 0 %>
+        <% net_pct = (@net_worth.abs / comparison_max * 100).clamp(0, 100).round(1) %>
+        <div style="height: 24px; background: var(--bg-secondary); border-radius: 4px; overflow: hidden;">
+          <div style="width: <%= net_pct %>%; height: 100%; background: <%= @net_worth >= 0 ? '#2e7d32' : '#e53935' %>; border-radius: 4px; opacity: 0.7;"></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+  <%# Milestones Achieved %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #f9a825;">emoji_events</span> Milestones Achieved</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% if @milestones_reached.any? %>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+          <% @milestones_reached.each do |m| %>
+            <div style="display: flex; align-items: center; gap: 0.375rem; background: linear-gradient(135deg, #fff8e1, #fff3e0); border: 1px solid #ffe082; border-radius: 8px; padding: 0.5rem 0.75rem;">
+              <span class="material-icons-outlined" style="font-size: 1.1rem; color: #f9a825;">emoji_events</span>
+              <span style="font-size: 0.8125rem; font-weight: 600; color: #e65100;"><%= number_to_currency(m, precision: 0) %></span>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
+          <span class="material-icons-outlined" style="font-size: 2rem; opacity: 0.4;">flag</span>
+          <p style="font-size: 0.875rem; margin-top: 0.5rem;">Keep building -- your first milestone is ahead!</p>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Next Milestone %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1565c0;">flag</span> Next Milestone</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% if @next_milestone %>
+        <div style="text-align: center; margin-bottom: 1rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Target</div>
+          <div style="font-size: 1.75rem; font-weight: 700; color: #1565c0;"><%= number_to_currency(@next_milestone, precision: 0) %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            <%= number_to_currency(@milestone_gap, precision: 0) %> to go
+          </div>
+        </div>
+
+        <%# Progress Bar %>
+        <div style="margin-bottom: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+            <span><%= @milestone_progress %>% complete</span>
+            <% if @milestone_eta_months %>
+              <span>~<%= @milestone_eta_months %> month<%= @milestone_eta_months == 1 ? '' : 's' %></span>
+            <% end %>
+          </div>
+          <div style="height: 16px; background: var(--bg-secondary); border-radius: 8px; overflow: hidden;">
+            <div style="width: <%= @milestone_progress %>%; height: 100%; background: linear-gradient(90deg, #1565c0, #42a5f5); border-radius: 8px; transition: width 0.3s;"></div>
+          </div>
+        </div>
+
+        <% if @milestone_eta_months %>
+          <div style="text-align: center; font-size: 0.75rem; color: var(--text-secondary);">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">schedule</span>
+            Estimated: <strong><%= (Date.current >> @milestone_eta_months).strftime("%B %Y") %></strong>
+            <% if @monthly_change > 0 %>
+              at <%= number_to_currency(@monthly_change, precision: 0) %>/mo savings
+            <% end %>
+          </div>
+        <% elsif @monthly_change <= 0 %>
+          <div style="text-align: center; font-size: 0.75rem; color: var(--text-secondary);">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--negative);">warning</span>
+            Increase monthly savings to reach this milestone
+          </div>
+        <% end %>
+      <% else %>
+        <div style="text-align: center; padding: 1.5rem; color: var(--positive);">
+          <span class="material-icons-outlined" style="font-size: 2rem;">star</span>
+          <p style="font-size: 0.875rem; margin-top: 0.5rem; font-weight: 600;">All milestones reached!</p>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Monthly Change Trend %>
+<% if @monthly_trend.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Monthly Cash Flow Trend</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        chart_w = 680
+        chart_h = 200
+        pad_l = 60
+        pad_r = 20
+        pad_t = 15
+        pad_b = 40
+        usable_w = chart_w - pad_l - pad_r
+        usable_h = chart_h - pad_t - pad_b
+
+        all_vals = @monthly_trend.flat_map { |m| [m[:income], m[:expenses], m[:net].abs] }
+        chart_max = [all_vals.max.to_f, 1].max
+        bar_group_w = usable_w.to_f / [@monthly_trend.length, 1].max
+        bar_w = (bar_group_w * 0.3).clamp(8, 40)
+      %>
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h %>" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <%# Grid lines %>
+        <% 5.times do |i| %>
+          <% val = chart_max * i / 4.0 %>
+          <% y = pad_t + usable_h - (val / chart_max * usable_h) %>
+          <line x1="<%= pad_l %>" y1="<%= y %>" x2="<%= chart_w - pad_r %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5"/>
+          <text x="<%= pad_l - 5 %>" y="<%= y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="8">$<%= (val / 1000.0).round(1) %>k</text>
+        <% end %>
+
+        <%# Bars %>
+        <% @monthly_trend.each_with_index do |m, idx| %>
+          <% group_x = pad_l + idx * bar_group_w + bar_group_w / 2 %>
+
+          <%# Income bar %>
+          <% inc_h = m[:income] / chart_max * usable_h %>
+          <rect x="<%= group_x - bar_w - 1 %>" y="<%= pad_t + usable_h - inc_h %>"
+            width="<%= bar_w %>" height="<%= inc_h %>"
+            fill="#2e7d32" opacity="0.8" rx="2"/>
+
+          <%# Expense bar %>
+          <% exp_h = m[:expenses] / chart_max * usable_h %>
+          <rect x="<%= group_x + 1 %>" y="<%= pad_t + usable_h - exp_h %>"
+            width="<%= bar_w %>" height="<%= exp_h %>"
+            fill="#e53935" opacity="0.8" rx="2"/>
+
+          <%# Month label %>
+          <text x="<%= group_x %>" y="<%= chart_h - 8 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8">
+            <%= Date.parse(m[:month] + "-01").strftime("%b") rescue m[:month] %>
+          </text>
+        <% end %>
+      </svg>
+      <div style="display: flex; justify-content: center; gap: 1.5rem; margin-top: 0.5rem; font-size: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.25rem;">
+          <div style="width: 10px; height: 10px; border-radius: 2px; background: #2e7d32;"></div>
+          Income
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.25rem;">
+          <div style="width: 10px; height: 10px; border-radius: 2px; background: #e53935;"></div>
+          Expenses
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Nav %>
+<div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+  <%= link_to budget_net_worth_forecast_path, class: "card", style: "flex: 1; min-width: 180px; padding: 1rem; text-decoration: none; display: flex; align-items: center; gap: 0.75rem; transition: box-shadow 0.2s;" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary);">show_chart</span>
+    <div>
+      <div style="font-weight: 600; font-size: 0.875rem;">Net Worth Forecast</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Project future growth</div>
+    </div>
+  <% end %>
+  <%= link_to budget_debt_visualizer_path, class: "card", style: "flex: 1; min-width: 180px; padding: 1rem; text-decoration: none; display: flex; align-items: center; gap: 0.75rem; transition: box-shadow 0.2s;" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #d32f2f;">trending_down</span>
+    <div>
+      <div style="font-weight: 600; font-size: 0.875rem;">Debt Visualizer</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Payoff strategies</div>
+    </div>
+  <% end %>
+  <%= link_to budget_dashboard_path, class: "card", style: "flex: 1; min-width: 180px; padding: 1rem; text-decoration: none; display: flex; align-items: center; gap: 0.75rem; transition: box-shadow 0.2s;" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #1565c0;">dashboard</span>
+    <div>
+      <div style="font-weight: 600; font-size: 0.875rem;">Dashboard</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Budget overview</div>
+    </div>
+  <% end %>
+</div>

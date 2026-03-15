@@ -1,0 +1,153 @@
+<% content_for(:title) { "Trading Cost Analysis" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #ff5722;">payments</span>
+    Trading Cost Analysis
+  </h1>
+</div>
+
+<% if @trades.blank? || @trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem;">payments</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No trades to analyze</div>
+  </div>
+<% else %>
+
+  <%# Cost Overview %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+      <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Fees</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_fees) %></div>
+      </div>
+      <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Fee/Trade</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@avg_fee) %></div>
+      </div>
+      <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Fee Impact</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= @fee_impact_pct %>%</div>
+      </div>
+      <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= @total_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= number_to_currency(@total_pnl) %>
+        </div>
+      </div>
+      <div style="padding: 1.25rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Gross P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= @gross_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= number_to_currency(@gross_pnl) %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Fee Impact Warnings %>
+  <% if @flipped_by_fees.any? || @fee_exceeded.any? %>
+    <div style="display: grid; gap: 0.5rem; margin-bottom: 1.5rem;">
+      <% if @flipped_by_fees.any? %>
+        <div class="card" style="padding: 0.75rem 1.25rem; border-left: 4px solid var(--negative); display: flex; align-items: center; gap: 0.75rem;">
+          <span class="material-icons-outlined" style="color: var(--negative);">warning</span>
+          <span style="font-size: 0.875rem;"><strong><%= @flipped_by_fees.count %></strong> trades were profitable before fees but lost money after. Total impact: <strong style="color: var(--negative);"><%= number_to_currency(@flipped_by_fees.sum { |t| t["pnl"].to_f.abs }) %></strong></span>
+        </div>
+      <% end %>
+      <% if @fee_exceeded.any? %>
+        <div class="card" style="padding: 0.75rem 1.25rem; border-left: 4px solid #fbbc04; display: flex; align-items: center; gap: 0.75rem;">
+          <span class="material-icons-outlined" style="color: #fbbc04;">info</span>
+          <span style="font-size: 0.875rem;"><strong><%= @fee_exceeded.count %></strong> winning trades had fees exceeding their profit.</span>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# What-If: Lower Fees %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">lightbulb</span> Fee Reduction Scenarios</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Current</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: <%= @total_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@total_pnl) %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">fees: <%= number_to_currency(@total_fees) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">50% Less Fees</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: <%= @half_fee_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@half_fee_pnl) %></div>
+        <div style="font-size: 0.6875rem; color: var(--positive);">+<%= number_to_currency(@fee_savings_opportunity) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Zero Fees</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: <%= @zero_fee_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@zero_fee_pnl) %></div>
+        <div style="font-size: 0.6875rem; color: var(--positive);">+<%= number_to_currency(@total_fees) %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Monthly Fees Chart %>
+  <% if @monthly_fees.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Monthly Fee Trend</h2>
+      </div>
+      <div style="padding: 1.25rem; overflow-x: auto;">
+        <%
+          sorted_months = @monthly_fees.sort_by { |k, _| k }
+          fee_max = sorted_months.map { |_, v| v[:fees] }.max.to_f
+          fee_max = 1 if fee_max == 0
+        %>
+        <svg viewBox="0 0 <%= sorted_months.count * 52 + 60 %> 160" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+          <% sorted_months.each_with_index do |(month, data), i| %>
+            <% bar_h = data[:fees] / fee_max * 110 %>
+            <% x = 35 + i * 52 %>
+            <rect x="<%= x %>" y="<%= 130 - bar_h %>" width="38" height="<%= bar_h %>"
+                  fill="var(--negative)" opacity="0.5" rx="3"/>
+            <text x="<%= x + 19 %>" y="<%= 130 - bar_h - 4 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="7">$<%= data[:fees].round(0) %></text>
+            <text x="<%= x + 19 %>" y="145" text-anchor="middle" fill="var(--text-secondary)" font-size="6"><%= month[-5..] %></text>
+          <% end %>
+        </svg>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Fees by Symbol %>
+  <% if @by_symbol.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">label</span> Fees by Symbol</h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% sym_max = @by_symbol.values.map { |v| v[:fees] }.max.to_f; sym_max = 1 if sym_max == 0 %>
+        <% @by_symbol.each do |sym, data| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+            <span style="width: 3rem; font-weight: 700; text-align: right;"><%= sym %></span>
+            <div style="flex: 1; height: 1rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+              <div style="height: 100%; width: <%= (data[:fees] / sym_max * 100).round(1) %>%; background: var(--negative); opacity: 0.5; border-radius: 4px;"></div>
+            </div>
+            <span style="min-width: 4rem; text-align: right; font-size: 0.8125rem; font-weight: 600;"><%= number_to_currency(data[:fees]) %></span>
+            <span style="min-width: 4rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary);"><%= data[:trades] %> trades</span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Capture Efficiency %>
+  <% if @avg_capture_pct %>
+    <div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem; border-left: 4px solid var(--primary);">
+      <div style="font-weight: 600;">Profit Capture Efficiency</div>
+      <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+        On average, you capture <strong><%= @avg_capture_pct %>%</strong> of the maximum favorable excursion (MFE).
+        Total left on the table: <strong><%= number_to_currency(@left_on_table) %></strong>.
+      </div>
+    </div>
+  <% end %>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Fee Analysis", reports_fee_analysis_path, class: "btn" %>
+  <%= link_to "Report Card", trading_grades_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+</div>

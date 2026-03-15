@@ -1,0 +1,126 @@
+<% content_for(:title) { "Cross-Product Insights" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #6a1b9a;">hub</span>
+    Cross-Product Insights
+  </h1>
+</div>
+
+<%# 7-Day & 30-Day Activity Summary %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">dashboard</span> Activity Overview</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+      <thead>
+        <tr style="border-bottom: 2px solid var(--border);">
+          <th style="padding: 0.5rem 0.75rem; text-align: left;">Product</th>
+          <th style="padding: 0.5rem 0.75rem; text-align: center;">Last 7 Days</th>
+          <th style="padding: 0.5rem 0.75rem; text-align: center;">Last 30 Days</th>
+          <th style="padding: 0.5rem 0.75rem; text-align: right;">Key Metric</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding: 0.5rem 0.75rem;"><span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">trending_up</span> Trading</td>
+          <td style="padding: 0.5rem 0.75rem; text-align: center;"><%= @health[:trading][:active_days_7] %> days</td>
+          <td style="padding: 0.5rem 0.75rem; text-align: center;"><%= @health[:trading][:active_days_30] %> days</td>
+          <td style="padding: 0.5rem 0.75rem; text-align: right; color: <%= @health[:trading][:total_pnl_30] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= number_to_currency(@health[:trading][:total_pnl_30]) %></td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding: 0.5rem 0.75rem;"><span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">auto_stories</span> Journal</td>
+          <td style="padding: 0.5rem 0.75rem; text-align: center;"><%= @health[:journal][:active_days_7] %>/7</td>
+          <td style="padding: 0.5rem 0.75rem; text-align: center;"><%= @health[:journal][:active_days_30] %>/30</td>
+          <td style="padding: 0.5rem 0.75rem; text-align: right;"><%= (@health[:journal][:active_days_30].to_f / 30 * 100).round(0) %>% consistency</td>
+        </tr>
+        <tr style="border-bottom: 1px solid var(--border);">
+          <td style="padding: 0.5rem 0.75rem;"><span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">description</span> Notes</td>
+          <td style="padding: 0.5rem 0.75rem; text-align: center;"><%= @health[:notes][:active_days_7] %> days</td>
+          <td style="padding: 0.5rem 0.75rem; text-align: center;"><%= @health[:notes][:active_days_30] %> days</td>
+          <td style="padding: 0.5rem 0.75rem; text-align: right;"><%= number_with_delimiter(@health[:notes][:words_30]) %> words</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.5rem 0.75rem;"><span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">account_balance</span> Budget</td>
+          <td style="padding: 0.5rem 0.75rem; text-align: center;"><%= @health[:budget][:active_days_7] %> days</td>
+          <td style="padding: 0.5rem 0.75rem; text-align: center;"><%= @health[:budget][:active_days_30] %> days</td>
+          <td style="padding: 0.5rem 0.75rem; text-align: right;"><%= number_to_currency(@health[:budget][:spending_30]) %> spent</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%# Patterns %>
+<% if @patterns.any? %>
+  <div style="display: grid; gap: 0.5rem; margin-bottom: 1.5rem;">
+    <% @patterns.each do |pattern| %>
+      <div class="card" style="padding: 0.75rem 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
+        <span class="material-icons-outlined" style="color: <%= pattern[:color] %>;"><%= pattern[:icon] %></span>
+        <span style="font-size: 0.875rem;"><%= pattern[:text] %></span>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# Correlation Cards %>
+<% @correlations.each do |corr| %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;"><%= corr[:icon] %></span> <%= corr[:title] %></h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+        <% corr[:findings].each do |finding| %>
+          <div style="text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;"><%= finding[:label] %></div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: <%= finding[:positive] ? 'var(--positive)' : 'var(--text-secondary)' %>;">
+              <%= finding[:value] %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# 90-Day Activity Heatmap %>
+<% if @daily.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">grid_on</span> 90-Day Activity Heatmap</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(16px, 1fr)); gap: 2px;">
+        <% (Date.today - 89..Date.today).each do |date| %>
+          <%
+            day = @daily[date] || { trades: 0, pnl: 0.0, wins: 0, journaled: false, mood: nil, notes: 0, words: 0, spending: 0.0 }
+            activity_count = [day[:trades] > 0, day[:journaled], day[:notes] > 0, day[:spending] > 0].count(true)
+            opacity = case activity_count
+                      when 0 then 0.1
+                      when 1 then 0.3
+                      when 2 then 0.5
+                      when 3 then 0.75
+                      else 1.0
+                      end
+            bg_color = day[:pnl] > 0 ? "var(--positive)" : (day[:pnl] < 0 ? "var(--negative)" : "var(--text-secondary)")
+          %>
+          <div style="aspect-ratio: 1; border-radius: 2px; background: <%= bg_color %>; opacity: <%= opacity %>;"
+               title="<%= date.strftime('%b %d') %> — <%= activity_count %> products active<%= day[:trades] > 0 ? ', P&L: ' + number_to_currency(day[:pnl]) : '' %>"></div>
+        <% end %>
+      </div>
+      <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 0.5rem; font-size: 0.625rem; color: var(--text-secondary);">
+        <span>Less active <span style="display: inline-block; width: 8px; height: 8px; background: var(--text-secondary); opacity: 0.1; border-radius: 1px;"></span> → <span style="display: inline-block; width: 8px; height: 8px; background: var(--text-secondary); opacity: 1; border-radius: 1px;"></span> More active</span>
+        <span><span style="display: inline-block; width: 8px; height: 8px; background: var(--positive); border-radius: 1px;"></span> Profitable <span style="display: inline-block; width: 8px; height: 8px; background: var(--negative); border-radius: 1px;"></span> Loss</span>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Financial Pulse", financial_pulse_path, class: "btn" %>
+  <%= link_to "Mood Analysis", mood_performance_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+</div>
+

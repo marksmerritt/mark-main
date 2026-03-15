@@ -1,0 +1,793 @@
+<% content_for(:title) { "Period Comparison" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px;">compare_arrows</span>
+    Period Comparison
+  </h1>
+  <div class="page-actions">
+    <button class="btn" onclick="window.print()">
+      <span class="material-icons-outlined">print</span> Print
+    </button>
+  </div>
+</div>
+
+<%# ---- Date pickers ---- %>
+<div class="card">
+  <%= form_with url: reports_period_comparison_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :period1_start, "Period 1 Start" %>
+        <%= f.date_field :period1_start, value: @period1_start, class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :period1_end, "Period 1 End" %>
+        <%= f.date_field :period1_end, value: @period1_end, class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :period2_start, "Period 2 Start" %>
+        <%= f.date_field :period2_start, value: @period2_start, class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :period2_end, "Period 2 End" %>
+        <%= f.date_field :period2_end, value: @period2_end, class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Compare", class: "btn btn-primary" %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Quick-select buttons %>
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; padding: 0 1.25rem 1rem;">
+    <% today = Date.current %>
+    <%= link_to "This Month vs Last Month",
+        reports_period_comparison_path(
+          period1_start: today.beginning_of_month.to_s, period1_end: today.to_s,
+          period2_start: (today - 1.month).beginning_of_month.to_s, period2_end: (today - 1.month).end_of_month.to_s),
+        class: "btn btn-sm" %>
+    <%= link_to "This Week vs Last Week",
+        reports_period_comparison_path(
+          period1_start: today.beginning_of_week(:monday).to_s, period1_end: today.to_s,
+          period2_start: (today - 1.week).beginning_of_week(:monday).to_s, period2_end: (today - 1.week).end_of_week(:monday).to_s),
+        class: "btn btn-sm" %>
+    <%= link_to "This Quarter vs Last Quarter",
+        reports_period_comparison_path(
+          period1_start: today.beginning_of_quarter.to_s, period1_end: today.to_s,
+          period2_start: (today - 3.months).beginning_of_quarter.to_s, period2_end: (today - 3.months).end_of_quarter.to_s),
+        class: "btn btn-sm" %>
+    <%= link_to "Last 30d vs Prior 30d",
+        reports_period_comparison_path(
+          period1_start: (today - 30).to_s, period1_end: today.to_s,
+          period2_start: (today - 60).to_s, period2_end: (today - 31).to_s),
+        class: "btn btn-sm" %>
+    <%= link_to "This Year vs Last Year",
+        reports_period_comparison_path(
+          period1_start: today.beginning_of_year.to_s, period1_end: today.to_s,
+          period2_start: (today - 1.year).beginning_of_year.to_s, period2_end: (today - 1.year).end_of_year.to_s),
+        class: "btn btn-sm" %>
+  </div>
+</div>
+
+<% if @period1[:trade_count] > 0 || @period2[:trade_count] > 0 %>
+  <%
+    p1_label = "#{Date.parse(@period1_start).strftime('%b %d')} - #{Date.parse(@period1_end).strftime('%b %d, %Y')}"
+    p2_label = "#{Date.parse(@period2_start).strftime('%b %d')} - #{Date.parse(@period2_end).strftime('%b %d, %Y')}"
+  %>
+
+  <%# ---- Hero metrics strip ---- %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+      <%# P&L delta %>
+      <% pnl_diff = @period1[:total_pnl] - @period2[:total_pnl] %>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">P&L Change</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(pnl_diff) %>">
+          <%= pnl_diff >= 0 ? "+" : "" %><%= number_to_currency(pnl_diff) %>
+        </div>
+        <div style="font-size: 0.75rem;">
+          <span class="<%= pnl_class(@period1[:total_pnl]) %>"><%= number_to_currency(@period1[:total_pnl]) %></span>
+          vs
+          <span class="<%= pnl_class(@period2[:total_pnl]) %>"><%= number_to_currency(@period2[:total_pnl]) %></span>
+        </div>
+      </div>
+
+      <%# Win Rate %>
+      <% wr_diff = @period1[:win_rate] - @period2[:win_rate] %>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;">
+          <%= @period1[:win_rate] %>%
+          <span style="font-size: 0.75rem; color: var(--text-secondary);">vs</span>
+          <%= @period2[:win_rate] %>%
+        </div>
+        <div style="font-size: 0.75rem;" class="<%= wr_diff >= 0 ? 'positive' : 'negative' %>">
+          <%= wr_diff >= 0 ? "+" : "" %><%= wr_diff.round(1) %>pp
+        </div>
+      </div>
+
+      <%# Profit Factor %>
+      <% pf_diff = @period1[:profit_factor] - @period2[:profit_factor] %>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profit Factor</div>
+        <div style="font-size: 1.5rem; font-weight: 700;">
+          <%= @period1[:profit_factor] %>
+          <span style="font-size: 0.75rem; color: var(--text-secondary);">vs</span>
+          <%= @period2[:profit_factor] %>
+        </div>
+        <div style="font-size: 0.75rem;" class="<%= pf_diff >= 0 ? 'positive' : 'negative' %>">
+          <%= pf_diff >= 0 ? "+" : "" %><%= pf_diff.round(2) %>
+        </div>
+      </div>
+
+      <%# Trade Volume %>
+      <% vol_diff = @period1[:trade_count] - @period2[:trade_count] %>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trade Volume</div>
+        <div style="font-size: 1.5rem; font-weight: 700;">
+          <%= @period1[:trade_count] %>
+          <span style="font-size: 0.75rem; color: var(--text-secondary);">vs</span>
+          <%= @period2[:trade_count] %>
+        </div>
+        <div style="font-size: 0.75rem;">
+          <%= vol_diff >= 0 ? "+" : "" %><%= vol_diff %> trades
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ---- Side-by-side metric comparison cards ---- %>
+  <div class="content-grid" style="margin-top: 1.5rem;">
+    <div class="card">
+      <div class="card-header">
+        <h2 style="color: var(--primary);">
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">looks_one</span>
+          Period 1
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= p1_label %></span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0;">
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Total P&L</div>
+          <div style="font-size: 1.125rem; font-weight: 700;" class="<%= pnl_class(@period1[:total_pnl]) %>"><%= number_to_currency(@period1[:total_pnl]) %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Win Rate</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= @period1[:win_rate] %>%</div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg Win</div>
+          <div style="font-weight: 600;" class="positive"><%= number_to_currency(@period1[:avg_win]) %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg Loss</div>
+          <div style="font-weight: 600;" class="negative"><%= number_to_currency(@period1[:avg_loss]) %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Best Trade</div>
+          <div style="font-weight: 600;" class="positive"><%= number_to_currency(@period1[:best_trade]) %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Worst Trade</div>
+          <div style="font-weight: 600;" class="negative"><%= number_to_currency(@period1[:worst_trade]) %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Profit Factor</div>
+          <div style="font-weight: 600;"><%= @period1[:profit_factor] %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Max Drawdown</div>
+          <div style="font-weight: 600; color: var(--negative);"><%= @period1[:max_drawdown] %>%</div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Top Symbol</div>
+          <div style="font-weight: 600;"><%= @period1[:most_traded_symbol] %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg Hold</div>
+          <% mins = @period1[:avg_hold_minutes] %>
+          <div style="font-weight: 600;">
+            <% if mins >= 1440 %>
+              <%= (mins / 1440.0).round(1) %>d
+            <% elsif mins >= 60 %>
+              <%= (mins / 60.0).round(1) %>h
+            <% else %>
+              <%= mins %>m
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2 style="color: #f9ab00;">
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">looks_two</span>
+          Period 2
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= p2_label %></span>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0;">
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Total P&L</div>
+          <div style="font-size: 1.125rem; font-weight: 700;" class="<%= pnl_class(@period2[:total_pnl]) %>"><%= number_to_currency(@period2[:total_pnl]) %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Win Rate</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= @period2[:win_rate] %>%</div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg Win</div>
+          <div style="font-weight: 600;" class="positive"><%= number_to_currency(@period2[:avg_win]) %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg Loss</div>
+          <div style="font-weight: 600;" class="negative"><%= number_to_currency(@period2[:avg_loss]) %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Best Trade</div>
+          <div style="font-weight: 600;" class="positive"><%= number_to_currency(@period2[:best_trade]) %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Worst Trade</div>
+          <div style="font-weight: 600;" class="negative"><%= number_to_currency(@period2[:worst_trade]) %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Profit Factor</div>
+          <div style="font-weight: 600;"><%= @period2[:profit_factor] %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Max Drawdown</div>
+          <div style="font-weight: 600; color: var(--negative);"><%= @period2[:max_drawdown] %>%</div>
+        </div>
+        <div style="padding: 0.75rem 1rem; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Top Symbol</div>
+          <div style="font-weight: 600;"><%= @period2[:most_traded_symbol] %></div>
+        </div>
+        <div style="padding: 0.75rem 1rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg Hold</div>
+          <% mins = @period2[:avg_hold_minutes] %>
+          <div style="font-weight: 600;">
+            <% if mins >= 1440 %>
+              <%= (mins / 1440.0).round(1) %>d
+            <% elsif mins >= 60 %>
+              <%= (mins / 60.0).round(1) %>h
+            <% else %>
+              <%= mins %>m
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ---- Head-to-Head comparison bars ---- %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">swap_horiz</span>
+        Head-to-Head
+      </h2>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <%
+        bar_items = [
+          { label: "P&L",           a: @period1[:total_pnl],     b: @period2[:total_pnl],     format: :currency, positive_better: true },
+          { label: "Win Rate",      a: @period1[:win_rate],      b: @period2[:win_rate],      format: :percent,  positive_better: true },
+          { label: "Profit Factor", a: @period1[:profit_factor], b: @period2[:profit_factor], format: :decimal,  positive_better: true },
+          { label: "Avg Win",       a: @period1[:avg_win],       b: @period2[:avg_win],       format: :currency, positive_better: true },
+          { label: "Avg Loss",      a: @period1[:avg_loss].abs,  b: @period2[:avg_loss].abs,  format: :currency, positive_better: false },
+          { label: "Avg P&L",       a: @period1[:avg_pnl],       b: @period2[:avg_pnl],       format: :currency, positive_better: true }
+        ]
+      %>
+      <% bar_items.each do |item| %>
+        <%
+          max_val = [item[:a].abs, item[:b].abs].max
+          max_val = 1 if max_val == 0
+          a_pct = (item[:a].abs / max_val * 40).round(1)
+          b_pct = (item[:b].abs / max_val * 40).round(1)
+          a_wins = item[:positive_better] ? item[:a] > item[:b] : item[:a] < item[:b]
+          formatted_a = case item[:format]
+                        when :currency then number_to_currency(item[:a])
+                        when :percent  then "#{item[:a]}%"
+                        else item[:a].round(2)
+                        end
+          formatted_b = case item[:format]
+                        when :currency then number_to_currency(item[:b])
+                        when :percent  then "#{item[:b]}%"
+                        else item[:b].round(2)
+                        end
+        %>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <div style="width: 90px; text-align: right; font-size: 0.75rem; font-weight: <%= a_wins ? '700' : '400' %>; color: <%= a_wins ? 'var(--primary)' : 'var(--text-secondary)' %>;">
+            <%= formatted_a %>
+          </div>
+          <div style="flex: 1; position: relative; height: 18px;">
+            <div style="position: absolute; right: 50%; top: 1px; bottom: 1px; width: <%= a_pct %>%;
+                        background: var(--primary); opacity: 0.6; border-radius: 3px 0 0 3px;"></div>
+            <div style="position: absolute; left: 50%; top: 1px; bottom: 1px; width: <%= b_pct %>%;
+                        background: #f9ab00; opacity: 0.6; border-radius: 0 3px 3px 0;"></div>
+            <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border);"></div>
+          </div>
+          <div style="width: 90px; font-size: 0.75rem; font-weight: <%= !a_wins ? '700' : '400' %>; color: <%= !a_wins ? '#f9ab00' : 'var(--text-secondary)' %>;">
+            <%= formatted_b %>
+          </div>
+        </div>
+        <div style="text-align: center; font-size: 0.625rem; color: var(--text-secondary); margin-top: -0.375rem; margin-bottom: 0.75rem;">
+          <%= item[:label] %>
+        </div>
+      <% end %>
+      <div style="display: flex; justify-content: space-between; margin-top: 0.25rem; font-size: 0.6875rem; color: var(--text-secondary);">
+        <span style="color: var(--primary);">Period 1</span>
+        <span style="color: #f9ab00;">Period 2</span>
+      </div>
+    </div>
+  </div>
+
+  <%# ---- SVG overlay bar chart comparing key metrics ---- %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">bar_chart</span>
+        Metrics Comparison Chart
+      </h2>
+    </div>
+    <div style="padding: 1rem 1.25rem; overflow-x: auto;">
+      <%
+        chart_metrics = [
+          { label: "Win Rate",  v1: @period1[:win_rate],      v2: @period2[:win_rate] },
+          { label: "PF",        v1: @period1[:profit_factor] * 10, v2: @period2[:profit_factor] * 10 },
+          { label: "Trades",    v1: @period1[:trade_count],   v2: @period2[:trade_count] },
+          { label: "Avg P&L",   v1: @period1[:avg_pnl],       v2: @period2[:avg_pnl] }
+        ]
+        chart_w = 600
+        chart_h = 220
+        chart_pad_top = 20
+        chart_pad_bottom = 40
+        chart_pad_left = 40
+        chart_pad_right = 20
+        usable_w = chart_w - chart_pad_left - chart_pad_right
+        usable_h = chart_h - chart_pad_top - chart_pad_bottom
+        all_vals = chart_metrics.flat_map { |m| [m[:v1], m[:v2]] }
+        chart_max = [all_vals.max.to_f, 1].max
+        chart_min = [all_vals.min.to_f, 0].min
+        chart_range = chart_max - chart_min
+        chart_range = 1 if chart_range == 0
+        group_w = usable_w / chart_metrics.count.to_f
+        bar_w = group_w * 0.3
+      %>
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h %>" style="width: 100%; max-width: <%= chart_w %>px; height: auto;">
+        <%# Grid lines %>
+        <% 5.times do |i| %>
+          <%
+            y = chart_pad_top + (usable_h * i / 4.0)
+            val = chart_max - (chart_range * i / 4.0)
+          %>
+          <line x1="<%= chart_pad_left %>" y1="<%= y %>" x2="<%= chart_w - chart_pad_right %>" y2="<%= y %>"
+                stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3" />
+          <text x="<%= chart_pad_left - 5 %>" y="<%= y + 3 %>" text-anchor="end"
+                fill="var(--text-secondary)" font-size="9"><%= val.round(0) %></text>
+        <% end %>
+
+        <%# Zero line if needed %>
+        <% if chart_min < 0 %>
+          <% zero_y = chart_pad_top + (chart_max / chart_range * usable_h) %>
+          <line x1="<%= chart_pad_left %>" y1="<%= zero_y %>" x2="<%= chart_w - chart_pad_right %>" y2="<%= zero_y %>"
+                stroke="var(--text-secondary)" stroke-width="1" />
+        <% end %>
+
+        <%# Bars %>
+        <% chart_metrics.each_with_index do |m, i| %>
+          <%
+            group_x = chart_pad_left + (group_w * i)
+            bar1_x = group_x + (group_w - bar_w * 2 - 4) / 2.0
+            bar2_x = bar1_x + bar_w + 4
+
+            v1_h = ((m[:v1] - chart_min) / chart_range * usable_h).abs
+            v2_h = ((m[:v2] - chart_min) / chart_range * usable_h).abs
+            baseline_y = chart_pad_top + (chart_max / chart_range * usable_h)
+
+            bar1_y = m[:v1] >= 0 ? baseline_y - v1_h : baseline_y
+            bar2_y = m[:v2] >= 0 ? baseline_y - v2_h : baseline_y
+            bar1_actual_h = [v1_h, 2].max
+            bar2_actual_h = [v2_h, 2].max
+          %>
+          <rect x="<%= bar1_x %>" y="<%= bar1_y %>" width="<%= bar_w %>" height="<%= bar1_actual_h %>"
+                fill="var(--primary)" opacity="0.7" rx="2" />
+          <rect x="<%= bar2_x %>" y="<%= bar2_y %>" width="<%= bar_w %>" height="<%= bar2_actual_h %>"
+                fill="#f9ab00" opacity="0.7" rx="2" />
+          <text x="<%= group_x + group_w / 2.0 %>" y="<%= chart_h - chart_pad_bottom + 15 %>" text-anchor="middle"
+                fill="var(--text-secondary)" font-size="10"><%= m[:label] %></text>
+        <% end %>
+
+        <%# Legend %>
+        <rect x="<%= chart_w - 150 %>" y="5" width="10" height="10" fill="var(--primary)" opacity="0.7" rx="2" />
+        <text x="<%= chart_w - 135 %>" y="14" fill="var(--text-secondary)" font-size="10">Period 1</text>
+        <rect x="<%= chart_w - 80 %>" y="5" width="10" height="10" fill="#f9ab00" opacity="0.7" rx="2" />
+        <text x="<%= chart_w - 65 %>" y="14" fill="var(--text-secondary)" font-size="10">Period 2</text>
+      </svg>
+    </div>
+  </div>
+
+  <%# ---- Full metric comparison table with deltas ---- %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">table_chart</span>
+        Detailed Comparison
+      </h2>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th style="text-align: right;">
+            Period 1<br>
+            <span class="text-muted" style="font-weight: normal; font-size: 0.75rem;"><%= p1_label %></span>
+          </th>
+          <th style="text-align: right;">
+            Period 2<br>
+            <span class="text-muted" style="font-weight: normal; font-size: 0.75rem;"><%= p2_label %></span>
+          </th>
+          <th style="text-align: center;">Change</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @deltas.each do |key, d| %>
+          <%
+            formatted_v1 = case d[:format]
+                           when :currency then number_to_currency(d[:v1])
+                           when :percent  then "#{d[:v1]}%"
+                           when :decimal  then d[:v1].round(2)
+                           when :minutes
+                             if d[:v1] >= 1440 then "#{(d[:v1] / 1440.0).round(1)}d"
+                             elsif d[:v1] >= 60 then "#{(d[:v1] / 60.0).round(1)}h"
+                             else "#{d[:v1].round(0)}m"
+                             end
+                           else d[:v1].round(0).to_i
+                           end
+            formatted_v2 = case d[:format]
+                           when :currency then number_to_currency(d[:v2])
+                           when :percent  then "#{d[:v2]}%"
+                           when :decimal  then d[:v2].round(2)
+                           when :minutes
+                             if d[:v2] >= 1440 then "#{(d[:v2] / 1440.0).round(1)}d"
+                             elsif d[:v2] >= 60 then "#{(d[:v2] / 60.0).round(1)}h"
+                             else "#{d[:v2].round(0)}m"
+                             end
+                           else d[:v2].round(0).to_i
+                           end
+            css = if d[:improved].nil? then ""
+                  elsif d[:diff] == 0 then ""
+                  elsif d[:improved] then "positive"
+                  else "negative"
+                  end
+          %>
+          <tr>
+            <td><strong><%= d[:label] %></strong></td>
+            <td style="text-align: right;"><%= formatted_v1 %></td>
+            <td style="text-align: right;"><%= formatted_v2 %></td>
+            <td style="text-align: center;">
+              <% if d[:diff] != 0 && !d[:improved].nil? %>
+                <span class="comparison-change <%= css %>">
+                  <span class="material-icons-outlined" style="font-size: 0.875rem;">
+                    <%= d[:improved] ? "arrow_upward" : "arrow_downward" %>
+                  </span>
+                  <%= d[:pct_change].abs %>%
+                </span>
+              <% elsif d[:diff] != 0 %>
+                <span style="font-size: 0.75rem; color: var(--text-secondary);">
+                  <%= d[:diff] >= 0 ? "+" : "" %><%= d[:diff].round(1) %>
+                </span>
+              <% else %>
+                <span class="text-muted">&mdash;</span>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <%# ---- Overlay equity curves ---- %>
+  <% if @period1[:equity_curve].any? || @period2[:equity_curve].any? %>
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">show_chart</span>
+          Equity Curves Overlay
+        </h2>
+      </div>
+      <div style="padding: 1rem 1.25rem; overflow-x: auto;">
+        <%
+          eq_w = 700
+          eq_h = 250
+          eq_pad_l = 60
+          eq_pad_r = 20
+          eq_pad_t = 20
+          eq_pad_b = 30
+          eq_usable_w = eq_w - eq_pad_l - eq_pad_r
+          eq_usable_h = eq_h - eq_pad_t - eq_pad_b
+
+          all_eq = (@period1[:equity_curve] + @period2[:equity_curve]).map { |p| p[:equity] }
+          eq_max = all_eq.any? ? all_eq.max : 1
+          eq_min = all_eq.any? ? all_eq.min : 0
+          eq_range = eq_max - eq_min
+          eq_range = 1 if eq_range == 0
+
+          max_trades = [@period1[:equity_curve].count, @period2[:equity_curve].count].max
+          max_trades = [max_trades, 1].max
+        %>
+        <svg viewBox="0 0 <%= eq_w %> <%= eq_h %>" style="width: 100%; max-width: <%= eq_w %>px; height: auto;">
+          <%# Grid lines %>
+          <% 5.times do |i| %>
+            <%
+              y = eq_pad_t + (eq_usable_h * i / 4.0)
+              val = eq_max - (eq_range * i / 4.0)
+            %>
+            <line x1="<%= eq_pad_l %>" y1="<%= y %>" x2="<%= eq_w - eq_pad_r %>" y2="<%= y %>"
+                  stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3" />
+            <text x="<%= eq_pad_l - 5 %>" y="<%= y + 3 %>" text-anchor="end"
+                  fill="var(--text-secondary)" font-size="9">$<%= val.round(0) %></text>
+          <% end %>
+
+          <%# Zero line %>
+          <% zero_y = eq_pad_t + ((eq_max - 0) / eq_range * eq_usable_h) %>
+          <line x1="<%= eq_pad_l %>" y1="<%= zero_y %>" x2="<%= eq_w - eq_pad_r %>" y2="<%= zero_y %>"
+                stroke="var(--text-secondary)" stroke-width="0.5" />
+
+          <%# Period 1 curve %>
+          <% if @period1[:equity_curve].any? %>
+            <%
+              p1_points = @period1[:equity_curve].map { |pt|
+                x = eq_pad_l + (pt[:trade].to_f / max_trades * eq_usable_w)
+                y = eq_pad_t + ((eq_max - pt[:equity]) / eq_range * eq_usable_h)
+                "#{x.round(1)},#{y.round(1)}"
+              }.join(" ")
+            %>
+            <polyline points="<%= p1_points %>" fill="none" stroke="var(--primary)" stroke-width="2" opacity="0.8" />
+          <% end %>
+
+          <%# Period 2 curve %>
+          <% if @period2[:equity_curve].any? %>
+            <%
+              p2_points = @period2[:equity_curve].map { |pt|
+                x = eq_pad_l + (pt[:trade].to_f / max_trades * eq_usable_w)
+                y = eq_pad_t + ((eq_max - pt[:equity]) / eq_range * eq_usable_h)
+                "#{x.round(1)},#{y.round(1)}"
+              }.join(" ")
+            %>
+            <polyline points="<%= p2_points %>" fill="none" stroke="#f9ab00" stroke-width="2" opacity="0.8" />
+          <% end %>
+
+          <%# X-axis %>
+          <text x="<%= eq_pad_l %>" y="<%= eq_h - 5 %>" fill="var(--text-secondary)" font-size="9">Trade 1</text>
+          <text x="<%= eq_w - eq_pad_r %>" y="<%= eq_h - 5 %>" text-anchor="end" fill="var(--text-secondary)" font-size="9">Trade <%= max_trades %></text>
+
+          <%# Legend %>
+          <line x1="<%= eq_w - 200 %>" y1="10" x2="<%= eq_w - 180 %>" y2="10" stroke="var(--primary)" stroke-width="2" />
+          <text x="<%= eq_w - 175 %>" y="14" fill="var(--text-secondary)" font-size="10">Period 1</text>
+          <line x1="<%= eq_w - 115 %>" y1="10" x2="<%= eq_w - 95 %>" y2="10" stroke="#f9ab00" stroke-width="2" />
+          <text x="<%= eq_w - 90 %>" y="14" fill="var(--text-secondary)" font-size="10">Period 2</text>
+        </svg>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ---- Daily P&L charts side by side ---- %>
+  <% if @period1[:daily_pnl].any? || @period2[:daily_pnl].any? %>
+    <div class="content-grid" style="margin-top: 1.5rem;">
+      <% if @period1[:daily_pnl].any? %>
+        <div class="card">
+          <div class="card-header">
+            <h2>Period 1 Daily P&L</h2>
+          </div>
+          <div style="padding: 1rem 1.25rem; overflow-x: auto;">
+            <%
+              dpnl = @period1[:daily_pnl]
+              dpnl_w = 340
+              dpnl_h = 150
+              dpnl_pad_l = 45
+              dpnl_pad_r = 10
+              dpnl_pad_t = 10
+              dpnl_pad_b = 25
+              dpnl_uw = dpnl_w - dpnl_pad_l - dpnl_pad_r
+              dpnl_uh = dpnl_h - dpnl_pad_t - dpnl_pad_b
+              dpnl_max = [dpnl.values.map(&:to_f).max, 1].max
+              dpnl_min = [dpnl.values.map(&:to_f).min, 0].min
+              dpnl_range = dpnl_max - dpnl_min
+              dpnl_range = 1 if dpnl_range == 0
+              dpnl_bar_w = [dpnl_uw / [dpnl.count, 1].max.to_f * 0.7, 20].min
+            %>
+            <svg viewBox="0 0 <%= dpnl_w %> <%= dpnl_h %>" style="width: 100%; max-width: <%= dpnl_w %>px; height: auto;">
+              <% dpnl_zero_y = dpnl_pad_t + (dpnl_max / dpnl_range * dpnl_uh) %>
+              <line x1="<%= dpnl_pad_l %>" y1="<%= dpnl_zero_y %>" x2="<%= dpnl_w - dpnl_pad_r %>" y2="<%= dpnl_zero_y %>"
+                    stroke="var(--text-secondary)" stroke-width="0.5" />
+              <% dpnl.each_with_index do |(date, val), idx| %>
+                <%
+                  x = dpnl_pad_l + (idx.to_f / [dpnl.count - 1, 1].max * dpnl_uw) - dpnl_bar_w / 2
+                  val_f = val.to_f
+                  bar_h = (val_f.abs / dpnl_range * dpnl_uh)
+                  bar_y = val_f >= 0 ? dpnl_zero_y - bar_h : dpnl_zero_y
+                %>
+                <rect x="<%= x %>" y="<%= bar_y %>" width="<%= dpnl_bar_w %>" height="<%= [bar_h, 1].max %>"
+                      fill="<%= val_f >= 0 ? 'var(--positive)' : 'var(--negative)' %>" opacity="0.7" rx="1" />
+              <% end %>
+            </svg>
+          </div>
+        </div>
+      <% end %>
+
+      <% if @period2[:daily_pnl].any? %>
+        <div class="card">
+          <div class="card-header">
+            <h2>Period 2 Daily P&L</h2>
+          </div>
+          <div style="padding: 1rem 1.25rem; overflow-x: auto;">
+            <%
+              dpnl = @period2[:daily_pnl]
+              dpnl_w = 340
+              dpnl_h = 150
+              dpnl_pad_l = 45
+              dpnl_pad_r = 10
+              dpnl_pad_t = 10
+              dpnl_pad_b = 25
+              dpnl_uw = dpnl_w - dpnl_pad_l - dpnl_pad_r
+              dpnl_uh = dpnl_h - dpnl_pad_t - dpnl_pad_b
+              dpnl_max = [dpnl.values.map(&:to_f).max, 1].max
+              dpnl_min = [dpnl.values.map(&:to_f).min, 0].min
+              dpnl_range = dpnl_max - dpnl_min
+              dpnl_range = 1 if dpnl_range == 0
+              dpnl_bar_w = [dpnl_uw / [dpnl.count, 1].max.to_f * 0.7, 20].min
+            %>
+            <svg viewBox="0 0 <%= dpnl_w %> <%= dpnl_h %>" style="width: 100%; max-width: <%= dpnl_w %>px; height: auto;">
+              <% dpnl_zero_y = dpnl_pad_t + (dpnl_max / dpnl_range * dpnl_uh) %>
+              <line x1="<%= dpnl_pad_l %>" y1="<%= dpnl_zero_y %>" x2="<%= dpnl_w - dpnl_pad_r %>" y2="<%= dpnl_zero_y %>"
+                    stroke="var(--text-secondary)" stroke-width="0.5" />
+              <% dpnl.each_with_index do |(date, val), idx| %>
+                <%
+                  x = dpnl_pad_l + (idx.to_f / [dpnl.count - 1, 1].max * dpnl_uw) - dpnl_bar_w / 2
+                  val_f = val.to_f
+                  bar_h = (val_f.abs / dpnl_range * dpnl_uh)
+                  bar_y = val_f >= 0 ? dpnl_zero_y - bar_h : dpnl_zero_y
+                %>
+                <rect x="<%= x %>" y="<%= bar_y %>" width="<%= dpnl_bar_w %>" height="<%= [bar_h, 1].max %>"
+                      fill="<%= val_f >= 0 ? 'var(--positive)' : 'var(--negative)' %>" opacity="0.7" rx="1" />
+              <% end %>
+            </svg>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# ---- Verdict section ---- %>
+  <%
+    improvements = @deltas.select { |_, d| !d[:improved].nil? && d[:diff] != 0 }
+    improved_list = improvements.select { |_, d| d[:improved] }
+    declined_list = improvements.select { |_, d| !d[:improved] }
+    improved_count = improved_list.count
+    total_compared = improvements.count
+
+    biggest_improvement = improved_list.max_by { |_, d| d[:pct_change].abs }
+    biggest_decline     = declined_list.max_by { |_, d| d[:pct_change].abs }
+  %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">insights</span>
+        Verdict
+      </h2>
+    </div>
+    <div style="padding: 0.5rem 1.25rem 1.25rem;">
+      <%# Overall assessment %>
+      <div style="padding: 0.75rem; border-radius: 8px; margin-bottom: 1rem;
+                  background: <%= improved_count > total_compared / 2 ? 'rgba(76,175,80,0.08)' : improved_count == total_compared / 2 ? 'rgba(255,193,7,0.08)' : 'rgba(244,67,54,0.08)' %>;">
+        <div style="font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">
+          <% if total_compared > 0 %>
+            <span class="<%= improved_count > total_compared / 2 ? 'positive' : improved_count == total_compared / 2 ? '' : 'negative' %>">
+              <%= improved_count %>/<%= total_compared %> metrics improved
+            </span>
+            <% if improved_count > total_compared / 2 %>
+              &mdash; Performance is trending positively.
+            <% elsif improved_count == total_compared / 2 %>
+              &mdash; Performance is relatively stable.
+            <% else %>
+              &mdash; Several metrics declined. Review your strategy.
+            <% end %>
+          <% else %>
+            No comparable changes detected.
+          <% end %>
+        </div>
+      </div>
+
+      <%# Biggest improvement %>
+      <% if biggest_improvement %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border-radius: 8px; background: rgba(76,175,80,0.06); margin-bottom: 0.75rem;">
+          <span class="material-icons-outlined positive" style="font-size: 1.5rem;">trending_up</span>
+          <div>
+            <div style="font-weight: 600; font-size: 0.875rem;">Biggest Improvement: <%= biggest_improvement[1][:label] %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              Changed by <%= biggest_improvement[1][:pct_change].abs %>%
+              (<%=
+                case biggest_improvement[1][:format]
+                when :currency then "#{number_to_currency(biggest_improvement[1][:v2])} -> #{number_to_currency(biggest_improvement[1][:v1])}"
+                when :percent  then "#{biggest_improvement[1][:v2]}% -> #{biggest_improvement[1][:v1]}%"
+                else "#{biggest_improvement[1][:v2].round(2)} -> #{biggest_improvement[1][:v1].round(2)}"
+                end
+              %>)
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <%# Biggest concern %>
+      <% if biggest_decline %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border-radius: 8px; background: rgba(244,67,54,0.06); margin-bottom: 0.75rem;">
+          <span class="material-icons-outlined negative" style="font-size: 1.5rem;">trending_down</span>
+          <div>
+            <div style="font-weight: 600; font-size: 0.875rem;">Area of Concern: <%= biggest_decline[1][:label] %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              Changed by <%= biggest_decline[1][:pct_change].abs %>%
+              (<%=
+                case biggest_decline[1][:format]
+                when :currency then "#{number_to_currency(biggest_decline[1][:v2])} -> #{number_to_currency(biggest_decline[1][:v1])}"
+                when :percent  then "#{biggest_decline[1][:v2]}% -> #{biggest_decline[1][:v1]}%"
+                else "#{biggest_decline[1][:v2].round(2)} -> #{biggest_decline[1][:v1].round(2)}"
+                end
+              %>)
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <%# Badge wall %>
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem;">
+        <% improvements.each do |key, d| %>
+          <span class="badge badge-<%= d[:improved] ? 'success' : 'danger' %>" style="font-size: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 0.75rem;"><%= d[:improved] ? "arrow_upward" : "arrow_downward" %></span>
+            <%= d[:label] %>
+          </span>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# ---- Related Reports ---- %>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem;">
+    <%= link_to reports_weekly_summary_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">date_range</span> Weekly Summary
+    <% end %>
+    <%= link_to reports_monthly_performance_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">calendar_month</span> Monthly Performance
+    <% end %>
+    <%= link_to reports_equity_curve_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">show_chart</span> Equity Curve
+    <% end %>
+    <%= link_to reports_scorecard_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">assessment</span> Scorecard
+    <% end %>
+    <%= link_to reports_what_if_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">science</span> What-If
+    <% end %>
+    <%= link_to reports_habits_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">psychology</span> Habits
+    <% end %>
+  </div>
+
+<% else %>
+  <div class="card empty-state" style="margin-top: 1.5rem;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 0.5rem;">compare_arrows</span>
+    <p>No closed trades found in the selected periods. Adjust the date ranges above to compare your performance across different time periods.</p>
+  </div>
+<% end %>
+
+<style>
+  @media print {
+    .page-actions, .filter-form, .btn-sm, .page-header .btn { display: none !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+    .content-grid { grid-template-columns: 1fr 1fr !important; }
+    body { font-size: 11pt !important; }
+    .page-header h1 { font-size: 18pt !important; }
+  }
+</style>

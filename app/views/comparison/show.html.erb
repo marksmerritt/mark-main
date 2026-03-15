@@ -1,0 +1,921 @@
+<% content_for(:title) { "Trade Comparison" } %>
+
+<style>
+  /* Trade Comparison Styles */
+  .tc-selector { position: relative; margin-bottom: 1.5rem; }
+  .tc-search-wrap { position: relative; }
+  .tc-search-wrap input {
+    width: 100%; padding: 0.625rem 0.75rem 0.625rem 2.25rem;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: 0.875rem; background: var(--surface); color: var(--text);
+    outline: none; transition: border-color 0.15s;
+  }
+  .tc-search-wrap input:focus { border-color: var(--primary); }
+  .tc-search-icon {
+    position: absolute; left: 0.625rem; top: 50%; transform: translateY(-50%);
+    font-size: 1.125rem; color: var(--text-secondary);
+  }
+  .tc-results-dropdown {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 0 0 var(--radius) var(--radius);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-height: 280px; overflow-y: auto;
+  }
+  .tc-result-item {
+    display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem;
+    cursor: pointer; font-size: 0.8125rem; transition: background 0.1s;
+  }
+  .tc-result-item:hover { background: var(--bg); }
+  .tc-result-symbol { font-weight: 600; min-width: 60px; }
+  .tc-result-side { color: var(--text-secondary); min-width: 40px; }
+  .tc-result-pnl { font-weight: 600; min-width: 70px; text-align: right; }
+  .tc-result-date { color: var(--text-secondary); margin-left: auto; font-size: 0.75rem; }
+  .tc-no-results { padding: 0.75rem; color: var(--text-secondary); font-size: 0.8125rem; text-align: center; }
+
+  .tc-selected-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+  .tc-selected-chip {
+    display: inline-flex; align-items: center; gap: 0.375rem;
+    padding: 0.25rem 0.5rem; border-radius: 2rem;
+    background: var(--bg); border: 1px solid var(--border); font-size: 0.8125rem;
+  }
+  .tc-chip-symbol { font-weight: 600; }
+  .tc-chip-pnl { font-size: 0.75rem; }
+  .tc-chip-remove {
+    display: inline-flex; align-items: center; justify-content: center;
+    background: none; border: none; cursor: pointer; padding: 0;
+    color: var(--text-secondary); border-radius: 50%; width: 18px; height: 18px;
+    transition: background 0.1s, color 0.1s;
+  }
+  .tc-chip-remove:hover { background: var(--negative); color: #fff; }
+
+  .tc-empty-hint {
+    display: flex; align-items: center; gap: 0.5rem; padding: 1rem;
+    color: var(--text-secondary); font-size: 0.8125rem;
+  }
+
+  .tc-submit-bar { margin-top: 0.75rem; display: flex; gap: 0.75rem; align-items: center; }
+  .tc-submit-bar .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Trade cards */
+  .tc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .tc-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; position: relative;
+  }
+  .tc-card-winner { border-color: #f9ab00; box-shadow: 0 0 0 1px #f9ab00; }
+  .tc-card-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 0.5rem; }
+  .tc-card-symbol { font-size: 1.125rem; font-weight: 700; }
+  .tc-card-side { font-size: 0.6875rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 500; }
+  .tc-card-body { padding: 0.75rem 1rem; }
+  .tc-card-row { display: flex; justify-content: space-between; align-items: center; padding: 0.25rem 0; font-size: 0.8125rem; }
+  .tc-card-label { color: var(--text-secondary); }
+  .tc-card-value { font-weight: 600; text-align: right; }
+  .tc-card-pnl { font-size: 1.25rem; font-weight: 700; }
+  .tc-card-divider { border: none; border-top: 1px solid var(--border); margin: 0.5rem 0; }
+
+  .tc-winner-badge {
+    position: absolute; top: -1px; right: 12px;
+    background: #f9ab00; color: #000; font-size: 0.625rem; font-weight: 700;
+    padding: 2px 8px 4px; border-radius: 0 0 4px 4px; text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .tc-price-bar {
+    position: relative; height: 20px; background: var(--bg); border-radius: 3px;
+    margin: 0.375rem 0; overflow: hidden;
+  }
+  .tc-price-bar-fill {
+    position: absolute; top: 0; bottom: 0; border-radius: 3px; min-width: 2px;
+  }
+  .tc-price-labels { display: flex; justify-content: space-between; font-size: 0.625rem; color: var(--text-secondary); }
+
+  .tc-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.375rem; }
+  .tc-tag {
+    font-size: 0.625rem; padding: 1px 6px; border-radius: 2rem;
+    background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary);
+  }
+
+  .tc-notes-excerpt {
+    font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.375rem;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Sparkline */
+  .tc-sparkline { margin: 0.375rem 0; }
+
+  /* Comparison matrix */
+  .tc-matrix { overflow-x: auto; }
+  .tc-matrix table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+  .tc-matrix th, .tc-matrix td { padding: 0.5rem 0.75rem; text-align: center; border-bottom: 1px solid var(--border); }
+  .tc-matrix th:first-child, .tc-matrix td:first-child { text-align: left; font-weight: 500; }
+  .tc-matrix thead th { background: var(--bg); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); }
+  .tc-best-cell { background: rgba(13,144,79,0.06); font-weight: 700; }
+  .tc-worst-cell { background: rgba(217,48,37,0.04); }
+</style>
+
+<div class="page-header">
+  <h1>Trade Comparison</h1>
+  <div class="page-actions">
+    <%= link_to "Back to Trades", trades_path, class: "btn" %>
+    <% if @trades&.any? %>
+      <button class="btn" onclick="window.print()">
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">print</span> Print
+      </button>
+    <% end %>
+  </div>
+</div>
+
+<%# ===================== TRADE SELECTOR ===================== %>
+<div class="card tc-selector"
+     data-controller="trade-comparison"
+     data-trade-comparison-trades-value="<%= (@search_trades || []).to_json %>"
+     data-trade-comparison-max-trades-value="4">
+
+  <div class="card-header"><h2>Select Trades to Compare</h2></div>
+  <div style="padding: 1rem 1.25rem;">
+    <div class="tc-search-wrap">
+      <span class="material-icons-outlined tc-search-icon">search</span>
+      <input type="text"
+             placeholder="Search by symbol, side, or ID..."
+             data-trade-comparison-target="searchInput"
+             data-action="input->trade-comparison#search keydown->trade-comparison#keydown"
+             autocomplete="off">
+      <div class="tc-results-dropdown hidden" data-trade-comparison-target="searchResults"></div>
+    </div>
+
+    <div class="tc-selected-chips" data-trade-comparison-target="selectedList"></div>
+
+    <div class="tc-empty-hint" data-trade-comparison-target="emptyState">
+      <span class="material-icons-outlined" style="font-size: 1.125rem;">compare_arrows</span>
+      Search and select 2-4 trades to compare side by side
+    </div>
+
+    <input type="hidden" data-trade-comparison-target="hiddenIds">
+
+    <div class="tc-submit-bar">
+      <button class="btn btn-primary" disabled
+              data-trade-comparison-target="submitBtn"
+              data-action="click->trade-comparison#submit">
+        Select at least 2 trades
+      </button>
+      <button class="btn" data-action="click->trade-comparison#clearAll" style="font-size: 0.8125rem;">Clear</button>
+    </div>
+  </div>
+</div>
+
+<% if @trades.present? && @trade_metrics.present? %>
+  <% trades = @trades %>
+  <% metrics = @trade_metrics %>
+  <% aggregate = @comparison.is_a?(Hash) ? (@comparison["aggregate"] || {}) : {} %>
+  <% trade_colors = ["#1a73e8", "#0d904f", "#e8710a", "#d93025", "#9334e6", "#f9ab00"] %>
+
+  <%# ===================== SUMMARY STATS BAR ===================== %>
+  <% win_count = metrics.count { |m| m[:pnl] > 0 } %>
+  <% total_pnl = metrics.sum { |m| m[:pnl] } %>
+  <% avg_pnl = metrics.any? ? total_pnl / metrics.length : 0 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Compared</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= metrics.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(total_pnl) %>"><%= number_to_currency(total_pnl) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(avg_pnl) %>"><%= number_to_currency(avg_pnl) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= metrics.count > 0 ? "#{(win_count.to_f / metrics.count * 100).round(0)}%" : "---" %></div>
+      </div>
+      <% best = metrics.max_by { |m| m[:pnl] } %>
+      <% worst = metrics.min_by { |m| m[:pnl] } %>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(best[:pnl]) %></div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= best[:symbol] %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(worst[:pnl]) %></div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= worst[:symbol] %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# ===================== SIDE-BY-SIDE TRADE CARDS ===================== %>
+  <div class="tc-cards">
+    <% metrics.each_with_index do |m, i| %>
+      <% is_winner = m[:id] == @winner_id && metrics.length > 1 %>
+      <div class="tc-card <%= 'tc-card-winner' if is_winner %>">
+        <% if is_winner %>
+          <div class="tc-winner-badge">
+            <span class="material-icons-outlined" style="font-size: 10px; vertical-align: middle;">emoji_events</span>
+            Winner
+          </div>
+        <% end %>
+
+        <div class="tc-card-header">
+          <span style="width: 10px; height: 10px; border-radius: 50%; background: <%= trade_colors[i % trade_colors.length] %>; flex-shrink: 0;"></span>
+          <span class="tc-card-symbol"><%= link_to m[:symbol], trade_path(m[:id]) %></span>
+          <span class="tc-card-side"><%= m[:side]&.capitalize %></span>
+          <span style="margin-left: auto;"><%= badge_for(m[:status]) %></span>
+        </div>
+
+        <div class="tc-card-body">
+          <%# P&L %>
+          <div class="tc-card-row">
+            <span class="tc-card-label">P&L</span>
+            <span class="tc-card-pnl <%= pnl_class(m[:pnl]) %>"><%= number_to_currency(m[:pnl]) %></span>
+          </div>
+          <% if m[:return_pct] != 0 %>
+            <div class="tc-card-row">
+              <span class="tc-card-label">Return</span>
+              <span class="tc-card-value <%= pnl_class(m[:return_pct]) %>"><%= m[:return_pct] %>%</span>
+            </div>
+          <% end %>
+
+          <%# Visual price bar (entry to exit) %>
+          <% if m[:entry_price] > 0 && m[:exit_price] > 0 %>
+            <%
+              prices = [m[:entry_price], m[:exit_price]]
+              prices << m[:stop_loss] if m[:stop_loss] > 0
+              prices << m[:take_profit] if m[:take_profit] > 0
+              prices << m[:low] if m[:low] > 0
+              prices << m[:high] if m[:high] > 0
+              bar_min = prices.min
+              bar_max = prices.max
+              bar_range = bar_max - bar_min
+              bar_range = 1 if bar_range == 0
+
+              entry_pct = ((m[:entry_price] - bar_min) / bar_range * 100).round(1)
+              exit_pct = ((m[:exit_price] - bar_min) / bar_range * 100).round(1)
+              left_pct = [entry_pct, exit_pct].min
+              width_pct = (entry_pct - exit_pct).abs
+              width_pct = [width_pct, 2].max
+              is_gain = m[:pnl] >= 0
+            %>
+            <div class="tc-price-bar">
+              <div class="tc-price-bar-fill" style="left: <%= left_pct %>%; width: <%= width_pct %>%; background: <%= is_gain ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.6;"></div>
+              <% if m[:stop_loss] > 0 %>
+                <% sl_pct = ((m[:stop_loss] - bar_min) / bar_range * 100).round(1) %>
+                <div style="position: absolute; left: <%= sl_pct %>%; top: 0; bottom: 0; width: 2px; background: var(--negative); opacity: 0.4;" title="Stop Loss: <%= number_to_currency(m[:stop_loss]) %>"></div>
+              <% end %>
+              <% if m[:take_profit] > 0 %>
+                <% tp_pct = ((m[:take_profit] - bar_min) / bar_range * 100).round(1) %>
+                <div style="position: absolute; left: <%= tp_pct %>%; top: 0; bottom: 0; width: 2px; background: var(--positive); opacity: 0.4;" title="Take Profit: <%= number_to_currency(m[:take_profit]) %>"></div>
+              <% end %>
+            </div>
+            <div class="tc-price-labels">
+              <span>Entry: <%= number_to_currency(m[:entry_price]) %></span>
+              <span>Exit: <%= number_to_currency(m[:exit_price]) %></span>
+            </div>
+          <% end %>
+
+          <%# SVG mini sparkline %>
+          <% if m[:entry_price] > 0 && m[:exit_price] > 0 %>
+            <%
+              # Build a simple 5-point sparkline: entry -> (simulated mid-points using stop/high/low) -> exit
+              sp_points = [m[:entry_price]]
+              if m[:side]&.downcase == "long" || m[:side]&.downcase == "buy"
+                sp_points << (m[:low] > 0 ? m[:low] : m[:entry_price] * 0.998)
+                mid = m[:high] > 0 ? m[:high] : [m[:entry_price], m[:exit_price]].max * 1.001
+                sp_points << mid
+              else
+                sp_points << (m[:high] > 0 ? m[:high] : m[:entry_price] * 1.002)
+                mid = m[:low] > 0 ? m[:low] : [m[:entry_price], m[:exit_price]].min * 0.999
+                sp_points << mid
+              end
+              sp_points << m[:exit_price]
+
+              sp_min = sp_points.min
+              sp_max = sp_points.max
+              sp_range = sp_max - sp_min
+              sp_range = 1 if sp_range == 0
+              sp_w = 120
+              sp_h = 28
+              sp_step = sp_w.to_f / (sp_points.length - 1)
+              sp_coords = sp_points.each_with_index.map { |p, j|
+                x = (j * sp_step).round(1)
+                y = (sp_h - ((p - sp_min) / sp_range * (sp_h - 4) + 2)).round(1)
+                "#{x},#{y}"
+              }
+              sp_color = m[:pnl] >= 0 ? "var(--positive)" : "var(--negative)"
+              sp_path = "M#{sp_coords.join(' L')}"
+              sp_fill_path = "#{sp_path} L#{sp_w},#{sp_h} L0,#{sp_h} Z"
+            %>
+            <div class="tc-sparkline">
+              <svg viewBox="0 0 <%= sp_w %> <%= sp_h %>" style="width: 100%; height: 28px;">
+                <path d="<%= sp_fill_path %>" fill="<%= sp_color %>" fill-opacity="0.08" />
+                <path d="<%= sp_path %>" fill="none" stroke="<%= sp_color %>" stroke-width="1.5" />
+                <circle cx="<%= sp_coords.first.split(',')[0] %>" cy="<%= sp_coords.first.split(',')[1] %>" r="2" fill="<%= sp_color %>" />
+                <circle cx="<%= sp_coords.last.split(',')[0] %>" cy="<%= sp_coords.last.split(',')[1] %>" r="2" fill="<%= sp_color %>" />
+              </svg>
+            </div>
+          <% end %>
+
+          <hr class="tc-card-divider">
+
+          <%# Dates %>
+          <div class="tc-card-row">
+            <span class="tc-card-label">Entry</span>
+            <span class="tc-card-value" style="font-size: 0.75rem;">
+              <%= m[:entry_time] ? Time.parse(m[:entry_time]).strftime("%b %d %l:%M%P") : "---" %>
+            </span>
+          </div>
+          <div class="tc-card-row">
+            <span class="tc-card-label">Exit</span>
+            <span class="tc-card-value" style="font-size: 0.75rem;">
+              <%= m[:exit_time] ? Time.parse(m[:exit_time]).strftime("%b %d %l:%M%P") : "---" %>
+            </span>
+          </div>
+
+          <%# Hold time %>
+          <div class="tc-card-row">
+            <span class="tc-card-label">Hold Time</span>
+            <span class="tc-card-value"><%= m[:hold_display] || "---" %></span>
+          </div>
+
+          <%# R-multiple %>
+          <% if m[:r_multiple] %>
+            <div class="tc-card-row">
+              <span class="tc-card-label">R-Multiple</span>
+              <span class="tc-card-value <%= pnl_class(m[:r_multiple]) %>"><%= m[:r_multiple] %>R</span>
+            </div>
+          <% end %>
+
+          <%# Risk/Reward %>
+          <% if m[:risk_reward] %>
+            <div class="tc-card-row">
+              <span class="tc-card-label">Risk/Reward</span>
+              <span class="tc-card-value"><%= m[:risk_reward] %>:1</span>
+            </div>
+          <% end %>
+
+          <%# Execution efficiency %>
+          <% if m[:execution_efficiency] %>
+            <div class="tc-card-row">
+              <span class="tc-card-label">Exec Efficiency</span>
+              <span class="tc-card-value"><%= m[:execution_efficiency] %>%</span>
+            </div>
+          <% end %>
+
+          <%# P&L per hour %>
+          <% if m[:pnl_per_hour] %>
+            <div class="tc-card-row">
+              <span class="tc-card-label">P&L/Hour</span>
+              <span class="tc-card-value <%= pnl_class(m[:pnl_per_hour]) %>"><%= number_to_currency(m[:pnl_per_hour]) %></span>
+            </div>
+          <% end %>
+
+          <%# Position size %>
+          <% if m[:position_pct] %>
+            <div class="tc-card-row">
+              <span class="tc-card-label">Position Size</span>
+              <span class="tc-card-value"><%= m[:position_pct] %>% of acct</span>
+            </div>
+          <% end %>
+
+          <%# Fees %>
+          <% if m[:fees] > 0 %>
+            <div class="tc-card-row">
+              <span class="tc-card-label">Fees</span>
+              <span class="tc-card-value"><%= number_to_currency(m[:fees]) %></span>
+            </div>
+          <% end %>
+
+          <%# Tags %>
+          <% if m[:tags].is_a?(Array) && m[:tags].any? %>
+            <div class="tc-tags">
+              <% m[:tags].each do |tag| %>
+                <span class="tc-tag"><%= tag.is_a?(Hash) ? tag["name"] : tag %></span>
+              <% end %>
+            </div>
+          <% end %>
+
+          <%# Notes excerpt %>
+          <% if m[:notes].present? %>
+            <div class="tc-notes-excerpt"><%= truncate(m[:notes].to_s, length: 100) %></div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <%# ===================== P&L COMPARISON BAR CHART ===================== %>
+  <% if metrics.count >= 2 %>
+    <%
+      max_abs_pnl = metrics.map { |m| m[:pnl].abs }.max
+      max_abs_pnl = 1 if max_abs_pnl == 0
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>P&L Comparison</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <% metrics.each_with_index do |m, i| %>
+          <%
+            pnl = m[:pnl]
+            width_pct = (pnl.abs / max_abs_pnl * 45).round(1)
+            is_pos = pnl >= 0
+          %>
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+            <div style="width: 80px; text-align: right; font-size: 0.8125rem; font-weight: 600;">
+              <%= link_to m[:symbol], trade_path(m[:id]) %>
+            </div>
+            <div style="flex: 1; position: relative; height: 24px;">
+              <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border);"></div>
+              <% if is_pos %>
+                <div style="position: absolute; left: 50%; top: 2px; bottom: 2px; width: <%= width_pct %>%;
+                            background: <%= trade_colors[i % trade_colors.length] %>; border-radius: 0 3px 3px 0; opacity: 0.8;"
+                     title="<%= number_to_currency(pnl) %>"></div>
+              <% else %>
+                <div style="position: absolute; right: 50%; top: 2px; bottom: 2px; width: <%= width_pct %>%;
+                            background: <%= trade_colors[i % trade_colors.length] %>; border-radius: 3px 0 0 3px; opacity: 0.8;"
+                     title="<%= number_to_currency(pnl) %>"></div>
+              <% end %>
+            </div>
+            <div style="width: 80px; font-size: 0.8125rem; font-weight: 600;" class="<%= pnl_class(pnl) %>">
+              <%= number_to_currency(pnl) %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# ===================== RADAR / SPIDER CHART ===================== %>
+    <%
+      all_pnls = metrics.map { |m| m[:pnl] }
+      all_returns = metrics.map { |m| m[:return_pct] }
+      all_hold = metrics.map { |m| m[:hold_hours] || 0 }
+      all_fees = metrics.map { |m| m[:fees] }
+      all_position = metrics.map { |m| m[:position_pct] || 0 }
+
+      radar_dims = ["P&L", "Return %", "Hold Time", "Position Size", "Fee Efficiency"]
+      radar_angle_step = 360.0 / radar_dims.length
+      radar_cx = 140
+      radar_cy = 130
+      radar_r = 90
+    %>
+    <% if metrics.count <= 6 %>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header"><h2>Trade Profile Overlay</h2></div>
+        <div style="padding: 1rem 1.25rem; display: flex; flex-wrap: wrap; align-items: center; gap: 2rem;">
+          <svg viewBox="0 0 280 260" style="width: 280px; height: 260px; flex-shrink: 0;">
+            <%# Grid rings %>
+            <% [20, 40, 60, 80, 100].each do |pct| %>
+              <polygon points="<%= radar_dims.each_with_index.map { |_, j|
+                angle = (radar_angle_step * j - 90) * Math::PI / 180
+                x = radar_cx + radar_r * pct / 100.0 * Math.cos(angle)
+                y = radar_cy + radar_r * pct / 100.0 * Math.sin(angle)
+                "#{x.round(1)},#{y.round(1)}"
+              }.join(' ') %>"
+              fill="none" stroke="var(--border)" stroke-width="0.5" opacity="0.5" />
+            <% end %>
+            <%# Axis lines and labels %>
+            <% radar_dims.each_with_index do |label, j| %>
+              <%
+                angle = (radar_angle_step * j - 90) * Math::PI / 180
+                ex = radar_cx + radar_r * Math.cos(angle)
+                ey = radar_cy + radar_r * Math.sin(angle)
+                lx = radar_cx + (radar_r + 14) * Math.cos(angle)
+                ly = radar_cy + (radar_r + 14) * Math.sin(angle)
+              %>
+              <line x1="<%= radar_cx %>" y1="<%= radar_cy %>" x2="<%= ex.round(1) %>" y2="<%= ey.round(1) %>"
+                    stroke="var(--border)" stroke-width="0.5" />
+              <text x="<%= lx.round(1) %>" y="<%= ly.round(1) %>" text-anchor="middle" dominant-baseline="middle"
+                    fill="var(--text-secondary)" font-size="8"><%= label %></text>
+            <% end %>
+            <%# Trade polygons %>
+            <% metrics.each_with_index do |m, i| %>
+              <%
+                scores = [
+                  normalize_val(m[:pnl], all_pnls),
+                  normalize_val(m[:return_pct], all_returns),
+                  normalize_val(m[:hold_hours] || 0, all_hold),
+                  normalize_val(m[:position_pct] || 0, all_position),
+                  100 - normalize_val(m[:fees], all_fees) # lower fees = better
+                ]
+                points = scores.each_with_index.map { |s, j|
+                  angle = (radar_angle_step * j - 90) * Math::PI / 180
+                  x = radar_cx + radar_r * [s, 5].max / 100.0 * Math.cos(angle)
+                  y = radar_cy + radar_r * [s, 5].max / 100.0 * Math.sin(angle)
+                  "#{x.round(1)},#{y.round(1)}"
+                }.join(' ')
+                color = trade_colors[i % trade_colors.length]
+              %>
+              <polygon points="<%= points %>" fill="<%= color %>" fill-opacity="0.12"
+                       stroke="<%= color %>" stroke-width="1.5" />
+            <% end %>
+          </svg>
+          <div style="display: flex; flex-direction: column; gap: 0.375rem;">
+            <% metrics.each_with_index do |m, i| %>
+              <span style="display: flex; align-items: center; gap: 6px; font-size: 0.8125rem;">
+                <span style="width: 10px; height: 10px; border-radius: 50%; background: <%= trade_colors[i % trade_colors.length] %>;"></span>
+                <strong><%= m[:symbol] %></strong> -- <%= m[:side]&.capitalize %>
+                <span class="<%= pnl_class(m[:pnl]) %>" style="margin-left: auto;"><%= number_to_currency(m[:pnl]) %></span>
+              </span>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <%# ===================== COMPARISON MATRIX TABLE ===================== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Comparison Matrix</h2></div>
+    <div class="tc-matrix">
+      <table>
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <% metrics.each_with_index do |m, i| %>
+              <th>
+                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: <%= trade_colors[i % trade_colors.length] %>; vertical-align: middle; margin-right: 4px;"></span>
+                <%= link_to m[:symbol], trade_path(m[:id]) %>
+                <% if m[:id] == @winner_id && metrics.length > 1 %>
+                  <span class="material-icons-outlined" style="font-size: 12px; color: #f9ab00; vertical-align: middle;">emoji_events</span>
+                <% end %>
+              </th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody>
+          <%# Side %>
+          <tr>
+            <td><strong>Side</strong></td>
+            <% metrics.each do |m| %><td><%= m[:side]&.capitalize || "---" %></td><% end %>
+          </tr>
+          <%# Entry Price %>
+          <tr>
+            <td><strong>Entry Price</strong></td>
+            <% metrics.each do |m| %><td><%= m[:entry_price] > 0 ? number_to_currency(m[:entry_price]) : "---" %></td><% end %>
+          </tr>
+          <%# Exit Price %>
+          <tr>
+            <td><strong>Exit Price</strong></td>
+            <% metrics.each do |m| %><td><%= m[:exit_price] > 0 ? number_to_currency(m[:exit_price]) : "---" %></td><% end %>
+          </tr>
+          <%# Quantity %>
+          <tr>
+            <td><strong>Quantity</strong></td>
+            <% metrics.each do |m| %><td><%= m[:quantity] > 0 ? number_with_delimiter(m[:quantity]) : "---" %></td><% end %>
+          </tr>
+          <%# P&L with best/worst highlighting %>
+          <%
+            pnl_vals = metrics.map { |m| m[:pnl] }
+            best_pnl = pnl_vals.max
+            worst_pnl = pnl_vals.min
+          %>
+          <tr>
+            <td><strong>P&L</strong></td>
+            <% metrics.each do |m| %>
+              <td class="<%= m[:pnl] == best_pnl && metrics.length > 1 ? 'tc-best-cell' : (m[:pnl] == worst_pnl && metrics.length > 1 ? 'tc-worst-cell' : '') %> <%= pnl_class(m[:pnl]) %>">
+                <strong><%= number_to_currency(m[:pnl]) %></strong>
+              </td>
+            <% end %>
+          </tr>
+          <%# Return % %>
+          <%
+            ret_vals = metrics.map { |m| m[:return_pct] }
+            best_ret = ret_vals.max
+            worst_ret = ret_vals.min
+          %>
+          <tr>
+            <td><strong>Return %</strong></td>
+            <% metrics.each do |m| %>
+              <td class="<%= m[:return_pct] == best_ret && metrics.length > 1 ? 'tc-best-cell' : (m[:return_pct] == worst_ret && metrics.length > 1 ? 'tc-worst-cell' : '') %> <%= pnl_class(m[:return_pct]) %>">
+                <%= m[:return_pct] != 0 ? "#{m[:return_pct]}%" : "---" %>
+              </td>
+            <% end %>
+          </tr>
+          <%# Fees %>
+          <tr>
+            <td><strong>Fees</strong></td>
+            <% metrics.each do |m| %><td><%= m[:fees] > 0 ? number_to_currency(m[:fees]) : "---" %></td><% end %>
+          </tr>
+          <%# Hold Time %>
+          <%
+            hold_vals = metrics.map { |m| m[:hold_hours] || Float::INFINITY }
+            best_hold = hold_vals.reject { |h| h == Float::INFINITY }.min
+          %>
+          <tr>
+            <td><strong>Hold Time</strong></td>
+            <% metrics.each do |m| %>
+              <td class="<%= m[:hold_hours] && m[:hold_hours] == best_hold && metrics.length > 1 ? 'tc-best-cell' : '' %>">
+                <%= m[:hold_display] || "---" %>
+              </td>
+            <% end %>
+          </tr>
+          <%# R-Multiple %>
+          <%
+            r_vals = metrics.select { |m| m[:r_multiple] }.map { |m| m[:r_multiple] }
+            best_r = r_vals.max if r_vals.any?
+          %>
+          <tr>
+            <td><strong>R-Multiple</strong></td>
+            <% metrics.each do |m| %>
+              <td class="<%= m[:r_multiple] && best_r && m[:r_multiple] == best_r && metrics.length > 1 ? 'tc-best-cell' : '' %> <%= m[:r_multiple] ? pnl_class(m[:r_multiple]) : '' %>">
+                <%= m[:r_multiple] ? "#{m[:r_multiple]}R" : "---" %>
+              </td>
+            <% end %>
+          </tr>
+          <%# Risk/Reward %>
+          <%
+            rr_vals = metrics.select { |m| m[:risk_reward] }.map { |m| m[:risk_reward] }
+            best_rr = rr_vals.max if rr_vals.any?
+          %>
+          <tr>
+            <td><strong>Risk/Reward</strong></td>
+            <% metrics.each do |m| %>
+              <td class="<%= m[:risk_reward] && best_rr && m[:risk_reward] == best_rr && metrics.length > 1 ? 'tc-best-cell' : '' %>">
+                <%= m[:risk_reward] ? "#{m[:risk_reward]}:1" : "---" %>
+              </td>
+            <% end %>
+          </tr>
+          <%# Execution Efficiency %>
+          <%
+            eff_vals = metrics.select { |m| m[:execution_efficiency] }.map { |m| m[:execution_efficiency] }
+            best_eff = eff_vals.max if eff_vals.any?
+          %>
+          <tr>
+            <td><strong>Exec Efficiency</strong></td>
+            <% metrics.each do |m| %>
+              <td class="<%= m[:execution_efficiency] && best_eff && m[:execution_efficiency] == best_eff && metrics.length > 1 ? 'tc-best-cell' : '' %>">
+                <%= m[:execution_efficiency] ? "#{m[:execution_efficiency]}%" : "---" %>
+              </td>
+            <% end %>
+          </tr>
+          <%# P&L per Hour %>
+          <%
+            pph_vals = metrics.select { |m| m[:pnl_per_hour] }.map { |m| m[:pnl_per_hour] }
+            best_pph = pph_vals.max if pph_vals.any?
+            worst_pph = pph_vals.min if pph_vals.any?
+          %>
+          <tr>
+            <td><strong>P&L / Hour</strong></td>
+            <% metrics.each do |m| %>
+              <td class="<%= m[:pnl_per_hour] && best_pph && m[:pnl_per_hour] == best_pph && metrics.length > 1 ? 'tc-best-cell' : (m[:pnl_per_hour] && worst_pph && m[:pnl_per_hour] == worst_pph && metrics.length > 1 ? 'tc-worst-cell' : '') %> <%= m[:pnl_per_hour] ? pnl_class(m[:pnl_per_hour]) : '' %>">
+                <%= m[:pnl_per_hour] ? number_to_currency(m[:pnl_per_hour]) : "---" %>
+              </td>
+            <% end %>
+          </tr>
+          <%# Position Size %>
+          <tr>
+            <td><strong>Position Size</strong></td>
+            <% metrics.each do |m| %>
+              <td><%= m[:position_pct] ? "#{m[:position_pct]}%" : "---" %></td>
+            <% end %>
+          </tr>
+          <%# Stop Loss %>
+          <tr>
+            <td><strong>Stop Loss</strong></td>
+            <% metrics.each do |m| %><td><%= m[:stop_loss] > 0 ? number_to_currency(m[:stop_loss]) : "---" %></td><% end %>
+          </tr>
+          <%# Take Profit %>
+          <tr>
+            <td><strong>Take Profit</strong></td>
+            <% metrics.each do |m| %><td><%= m[:take_profit] > 0 ? number_to_currency(m[:take_profit]) : "---" %></td><% end %>
+          </tr>
+          <%# Entry Time %>
+          <tr>
+            <td><strong>Entry Time</strong></td>
+            <% metrics.each do |m| %>
+              <td style="font-size: 0.75rem;"><%= m[:entry_time] ? Time.parse(m[:entry_time]).strftime("%b %d, %Y %l:%M %p") : "---" %></td>
+            <% end %>
+          </tr>
+          <%# Exit Time %>
+          <tr>
+            <td><strong>Exit Time</strong></td>
+            <% metrics.each do |m| %>
+              <td style="font-size: 0.75rem;"><%= m[:exit_time] ? Time.parse(m[:exit_time]).strftime("%b %d, %Y %l:%M %p") : "---" %></td>
+            <% end %>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# ===================== EXECUTION QUALITY ===================== %>
+  <% if @execution_metrics&.any? %>
+    <%
+      with_mfe_mae = @execution_metrics.select { |m| m[:mfe] > 0 || m[:mae] > 0 }
+    %>
+    <% if with_mfe_mae.length >= 2 %>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header"><h2>Execution Quality</h2></div>
+        <div style="padding: 1rem 1.25rem;">
+          <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
+            <% with_mfe_mae.each_with_index do |m, i| %>
+              <%
+                mfe_mae_max = [m[:mfe], m[:mae]].max
+                mfe_mae_max = 1 if mfe_mae_max == 0
+                mfe_pct = (m[:mfe] / mfe_mae_max * 100).round(1)
+                mae_pct = (m[:mae] / mfe_mae_max * 100).round(1)
+                capture_ratio = m[:mfe] > 0 && m[:pnl] > 0 ? (m[:pnl] / m[:mfe] * 100).round(0) : 0
+              %>
+              <div style="flex: 1; min-width: 150px; padding: 0.75rem; border-radius: var(--radius); background: var(--bg);">
+                <div style="font-weight: 600; margin-bottom: 0.5rem;"><%= m[:symbol] %></div>
+                <div style="display: flex; gap: 0.25rem; align-items: flex-end; height: 48px; margin-bottom: 0.25rem;">
+                  <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                    <div style="width: 100%; height: <%= mfe_pct * 0.48 %>px; background: var(--positive); border-radius: 2px 2px 0 0; min-height: 2px;"></div>
+                    <span style="font-size: 0.5625rem; color: var(--text-secondary); margin-top: 2px;">MFE</span>
+                  </div>
+                  <div style="flex: 1; display: flex; flex-direction: column; align-items: center;">
+                    <div style="width: 100%; height: <%= mae_pct * 0.48 %>px; background: var(--negative); border-radius: 2px 2px 0 0; min-height: 2px;"></div>
+                    <span style="font-size: 0.5625rem; color: var(--text-secondary); margin-top: 2px;">MAE</span>
+                  </div>
+                </div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                  MFE: <%= number_to_currency(m[:mfe]) %> / MAE: <%= number_to_currency(m[:mae]) %>
+                </div>
+                <% if capture_ratio > 0 %>
+                  <div style="font-size: 0.75rem; margin-top: 0.25rem;">
+                    Profit captured: <strong class="<%= capture_ratio >= 50 ? 'positive' : 'negative' %>"><%= capture_ratio %>%</strong> of MFE
+                  </div>
+                <% end %>
+                <% if m[:fee_drag] > 0 %>
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+                    Fee drag: <%= m[:fee_drag] %>%
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <%# ===================== PATTERN ANALYSIS ===================== %>
+  <%
+    symbols = metrics.map { |m| m[:symbol] }.uniq
+    sides = metrics.map { |m| m[:side] }.compact.uniq
+    all_tags = metrics.flat_map { |m| (m[:tags] || []).map { |t| t.is_a?(Hash) ? t["name"] : t } }.compact.reject(&:blank?)
+    tag_counts = all_tags.tally.sort_by { |_, c| -c }
+
+    winners = metrics.select { |m| m[:pnl] > 0 }
+    losers = metrics.select { |m| m[:pnl] <= 0 }
+    avg_winner = winners.any? ? (winners.sum { |m| m[:pnl] } / winners.count).round(2) : 0
+    avg_loser = losers.any? ? (losers.sum { |m| m[:pnl] } / losers.count).round(2) : 0
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Pattern Analysis</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.875rem;">
+        <div>
+          <div style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.25rem;">Symbols</div>
+          <strong><%= symbols.length == 1 ? "All #{symbols.first}" : symbols.join(', ') %></strong>
+        </div>
+        <div>
+          <div style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.25rem;">Direction</div>
+          <strong><%= sides.length == 1 ? "All #{sides.first&.capitalize}" : "Mixed (#{sides.map { |s| s&.capitalize }.join(', ')})" %></strong>
+        </div>
+        <div>
+          <div style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.25rem;">Win/Loss Split</div>
+          <strong><span class="positive"><%= winners.count %>W</span> / <span class="negative"><%= losers.count %>L</span></strong>
+        </div>
+        <% if tag_counts.any? %>
+          <div>
+            <div style="color: var(--text-secondary); font-size: 0.75rem; margin-bottom: 0.25rem;">Common Tags</div>
+            <strong><%= tag_counts.first(3).map { |name, count| "#{name} (#{count})" }.join(', ') %></strong>
+          </div>
+        <% end %>
+      </div>
+
+      <% if winners.any? && losers.any? %>
+        <div style="margin-top: 1rem; padding: 0.75rem; border-radius: var(--radius); background: var(--bg);">
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Win vs Loss Profile</div>
+          <div style="display: flex; gap: 2rem; font-size: 0.875rem;">
+            <div>
+              <span style="color: var(--text-secondary);">Avg Winner:</span>
+              <strong class="positive"><%= number_to_currency(avg_winner) %></strong>
+            </div>
+            <div>
+              <span style="color: var(--text-secondary);">Avg Loser:</span>
+              <strong class="negative"><%= number_to_currency(avg_loser) %></strong>
+            </div>
+            <div>
+              <span style="color: var(--text-secondary);">Payoff Ratio:</span>
+              <strong><%= avg_loser != 0 ? (avg_winner / avg_loser.abs).round(2) : "n/a" %>:1</strong>
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <%# Insights %>
+      <% insights = [] %>
+      <% if symbols.length == 1 && winners.count > losers.count %>
+        <% insights << "Same symbol (#{symbols.first}) with more winners than losers -- this ticker shows consistent edge." %>
+      <% end %>
+      <% if metrics.all? { |m| m[:r_multiple] && m[:r_multiple] > 0 } %>
+        <% insights << "All trades achieved positive R-multiples -- disciplined risk management across the board." %>
+      <% end %>
+      <% if avg_loser.abs > avg_winner * 2 && losers.any? %>
+        <% insights << "Average loser is 2x+ the average winner -- consider tighter stops or smaller sizing on losses." %>
+      <% end %>
+      <% if avg_winner > avg_loser.abs * 2 && winners.any? %>
+        <% insights << "Average winner is 2x+ the average loser -- excellent risk management on this set." %>
+      <% end %>
+      <% avg_hold = metrics.select { |m| m[:hold_hours] }.map { |m| m[:hold_hours] } %>
+      <% if avg_hold.any? && avg_hold.max > avg_hold.min * 3 %>
+        <% insights << "Hold times vary significantly (#{metrics.map { |m| m[:hold_display] }.compact.join(' vs ')}) -- different trade styles being compared." %>
+      <% end %>
+
+      <% if insights.any? %>
+        <div style="margin-top: 1rem;">
+          <% insights.each do |insight| %>
+            <div style="display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.5rem; font-size: 0.8125rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; color: var(--primary); flex-shrink: 0; margin-top: 1px;">lightbulb</span>
+              <span><%= insight %></span>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ===================== TIMELINE ===================== %>
+  <% dated_metrics = metrics.select { |m| m[:entry_time].present? }.sort_by { |m| m[:entry_time] } %>
+  <% if dated_metrics.length >= 2 %>
+    <%
+      first_date = Date.parse(dated_metrics.first[:entry_time])
+      last_date = Date.parse(dated_metrics.last[:entry_time])
+      span_days = (last_date - first_date).to_i
+      span_days = 1 if span_days == 0
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>Timeline</h2>
+        <span class="text-muted"><%= span_days %> day span</span>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="position: relative; height: 60px; border-bottom: 2px solid var(--border); margin-bottom: 1.5rem;">
+          <% dated_metrics.each_with_index do |m, i| %>
+            <%
+              trade_date = Date.parse(m[:entry_time])
+              x_pct = ((trade_date - first_date).to_f / span_days * 90 + 5).round(1)
+              is_win = m[:pnl] > 0
+            %>
+            <div style="position: absolute; left: <%= x_pct %>%; bottom: -6px; transform: translateX(-50%);">
+              <div style="width: 12px; height: 12px; border-radius: 50%;
+                          background: <%= is_win ? 'var(--positive)' : 'var(--negative)' %>;
+                          border: 2px solid var(--surface);"
+                   title="<%= m[:symbol] %> -- <%= number_to_currency(m[:pnl]) %> -- <%= trade_date.strftime("%b %d") %>"></div>
+              <div style="position: absolute; top: -28px; left: 50%; transform: translateX(-50%); white-space: nowrap; font-size: 0.625rem; color: var(--text-secondary);">
+                <strong><%= m[:symbol] %></strong>
+              </div>
+            </div>
+          <% end %>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary);">
+          <span><%= first_date.strftime("%b %d, %Y") %></span>
+          <span><%= last_date.strftime("%b %d, %Y") %></span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ===================== TRADE NOTES ===================== %>
+  <% trades_with_notes = metrics.select { |m| m[:notes].present? } %>
+  <% if trades_with_notes.any? %>
+    <div class="card">
+      <div class="card-header"><h2>Trade Notes</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <% trades_with_notes.each do |m| %>
+          <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem;">
+              <strong><%= m[:symbol] %></strong>
+              <span class="<%= pnl_class(m[:pnl]) %>" style="font-size: 0.8125rem;"><%= number_to_currency(m[:pnl]) %></span>
+            </div>
+            <p style="font-size: 0.875rem; color: var(--text-secondary); margin: 0;"><%= m[:notes] %></p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+<% else %>
+  <%# No comparison data yet -- just the selector is shown above %>
+  <% if @trades && @trades.empty? && params[:trade_ids].present? %>
+    <div class="card empty-state">
+      <p>No trades found for the given IDs.</p>
+      <p class="text-muted" style="margin-top: 0.5rem;">The trades may have been deleted or the IDs are invalid.</p>
+    </div>
+  <% elsif !params[:trade_ids].present? %>
+    <div class="card empty-state" style="text-align: center; padding: 3rem;">
+      <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 1rem;">compare_arrows</span>
+      <h2 style="margin-bottom: 0.5rem;">Compare Your Trades</h2>
+      <p class="text-muted">Use the search above to select 2-4 trades and analyze them side by side.</p>
+      <p class="text-muted" style="margin-top: 0.5rem;">You can also select trades from the <a href="<%= trades_path %>">trades list</a> using the compare checkboxes.</p>
+    </div>
+  <% else %>
+    <div class="card empty-state">
+      <p><%= @comparison.is_a?(Hash) ? (@comparison["error"] || @comparison["message"]) : "Could not load comparison data." %></p>
+      <p class="text-muted" style="margin-top: 0.5rem;">Select at least 2 trades from the <a href="<%= trades_path %>">trades list</a> to compare.</p>
+    </div>
+  <% end %>
+<% end %>

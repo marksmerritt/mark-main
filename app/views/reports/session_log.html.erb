@@ -1,0 +1,180 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">view_timeline</span>
+    Session Log
+  </h1>
+  <div class="page-actions">
+    <%= link_to reports_session_log_path(week: @week_offset + 1), class: "btn btn-sm", title: "Previous week" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">chevron_left</span>
+    <% end %>
+    <span style="font-weight: 600; padding: 0 0.5rem; font-size: 0.875rem;">
+      <%= @week_start.strftime("%b %d") %> – <%= @week_end.strftime("%b %d, %Y") %>
+    </span>
+    <% if @week_offset > 0 %>
+      <%= link_to reports_session_log_path(week: @week_offset - 1), class: "btn btn-sm", title: "Next week" do %>
+        <span class="material-icons-outlined" style="font-size: 1rem;">chevron_right</span>
+      <% end %>
+    <% end %>
+    <% if @week_offset > 0 %>
+      <%= link_to "This Week", reports_session_log_path, class: "btn btn-sm btn-primary" %>
+    <% end %>
+  </div>
+</div>
+
+<%# Week Summary %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Week P&L</div>
+      <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @week_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(@week_pnl) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @week_trades %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @week_win_rate >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @week_win_rate %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Record</div>
+      <div style="font-size: 1.5rem; font-weight: 700;">
+        <span class="positive"><%= @week_wins %>W</span> <span class="negative"><%= @week_losses %>L</span>
+      </div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Sessions</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @sessions.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Green/Red</div>
+      <div style="font-size: 1.5rem; font-weight: 700;">
+        <span class="positive"><%= @green_days %></span>/<span class="negative"><%= @red_days %></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if @sessions.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary);">event_busy</span>
+    <h2 style="margin: 1rem 0 0.5rem;">No Trading Sessions</h2>
+    <p style="color: var(--text-secondary);">No trades found for this week.</p>
+  </div>
+<% else %>
+
+  <%# Daily Session Cards %>
+  <% @sessions.each do |date, session| %>
+    <%
+      grade_colors = { "A" => "var(--positive)", "B" => "#34a853", "C" => "#f9ab00", "D" => "#ea8600", "F" => "var(--negative)" }
+      grade_color = grade_colors[session[:grade]] || "var(--text-secondary)"
+      day_name = Date.parse(date).strftime("%A") rescue date
+    %>
+    <div class="card" style="margin-bottom: 1rem; border-left: 4px solid <%= session[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+      <%# Session Header %>
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 42px; height: 42px; border-radius: 50%; background: <%= grade_color %>; color: white; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; font-weight: 700;">
+            <%= session[:grade] %>
+          </div>
+          <div>
+            <div style="font-weight: 600; font-size: 1rem;"><%= day_name %>, <%= Date.parse(date).strftime("%B %d") rescue date %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              <%= session[:trade_count] %> trades · <%= session[:wins] %>W <%= session[:losses] %>L · <%= session[:win_rate] %>% WR
+            </div>
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 1.375rem; font-weight: 700;" class="<%= session[:pnl] >= 0 ? 'positive' : 'negative' %>">
+            <%= number_to_currency(session[:pnl]) %>
+          </div>
+        </div>
+      </div>
+
+      <%# Mini cumulative P&L chart %>
+      <% if session[:running_pnl].count >= 2 %>
+        <%
+          max_cum = session[:running_pnl].map { |r| r[:cumulative].abs }.max.to_f
+          max_cum = 1 if max_cum == 0
+          chart_w = 600
+          chart_h = 60
+          mid_y = chart_h / 2.0 + 5
+          step = (chart_w - 40).to_f / [session[:running_pnl].count - 1, 1].max
+          points = session[:running_pnl].each_with_index.map { |r, i|
+            x = 20 + i * step
+            y = mid_y - (r[:cumulative] / max_cum * (chart_h / 2.0 - 5))
+            [x, y.clamp(2, chart_h + 8)]
+          }
+        %>
+        <div style="padding: 0.5rem 1.25rem;">
+          <svg viewBox="0 0 <%= chart_w %> <%= chart_h + 10 %>" style="width: 100%; height: 50px; font-family: Inter, sans-serif;">
+            <line x1="20" y1="<%= mid_y %>" x2="<%= chart_w - 20 %>" y2="<%= mid_y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3"/>
+            <polyline points="<%= points.map { |p| "#{p[0].round(1)},#{p[1].round(1)}" }.join(' ') %>"
+                      fill="none" stroke="<%= session[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>" stroke-width="2"/>
+            <% points.each_with_index do |(x, y), i| %>
+              <circle cx="<%= x %>" cy="<%= y %>" r="3"
+                      fill="<%= session[:running_pnl][i][:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>"/>
+            <% end %>
+          </svg>
+        </div>
+      <% end %>
+
+      <%# Trade list %>
+      <table class="table" style="font-size: 0.8125rem;">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Symbol</th>
+            <th>Side</th>
+            <th style="text-align: right;">P&L</th>
+            <th style="text-align: right;">Cumulative</th>
+            <th>Time</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% session[:running_pnl].each_with_index do |r, i| %>
+            <% trade = session[:trades].sort_by { |t| t["entry_time"].to_s }[i] %>
+            <tr>
+              <td style="color: var(--text-secondary);"><%= i + 1 %></td>
+              <td><strong><%= link_to r[:symbol], trade_path(trade["id"]) %></strong></td>
+              <td><%= trade["side"]&.capitalize %></td>
+              <td style="text-align: right;" class="<%= r[:pnl] >= 0 ? 'positive' : 'negative' %>">
+                <strong><%= number_to_currency(r[:pnl]) %></strong>
+              </td>
+              <td style="text-align: right; color: <%= r[:cumulative] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                <%= number_to_currency(r[:cumulative]) %>
+              </td>
+              <td style="color: var(--text-secondary); font-size: 0.75rem;">
+                <%= Time.parse(r[:time]).strftime("%l:%M %p") rescue "" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+
+      <%# Journal note if present %>
+      <% if session[:journal] %>
+        <div style="padding: 0.75rem 1.25rem; background: rgba(26,115,232,0.04); border-top: 1px solid var(--border);">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--primary);">auto_stories</span>
+            <span style="font-size: 0.75rem; font-weight: 500; color: var(--primary);">Journal Entry</span>
+            <% if session[:journal]["mood"].present? %>
+              <span class="badge" style="font-size: 0.5625rem;"><%= session[:journal]["mood"] %></span>
+            <% end %>
+          </div>
+          <p style="font-size: 0.8125rem; color: var(--text-secondary); margin: 0; line-height: 1.5;">
+            <%= truncate(session[:journal]["content"].to_s, length: 200) %>
+          </p>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+  <%= link_to "Weekly Summary", reports_weekly_summary_path, class: "btn" %>
+  <%= link_to "Habits", reports_habits_path, class: "btn" %>
+  <%= link_to "P&L Calendar", reports_pnl_calendar_path, class: "btn" %>
+</div>

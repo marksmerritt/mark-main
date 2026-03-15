@@ -1,0 +1,137 @@
+<% content_for(:title) { "Reports" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px;">assessment</span>
+    Reports Hub
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Export Data", data_export_index_path, class: "btn" %>
+  </div>
+</div>
+
+<%
+  report_sections = [
+    {
+      title: "Performance",
+      icon: "trending_up",
+      color: "#0d904f",
+      reports: [
+        { name: "Overview", path: reports_overview_path, icon: "dashboard", desc: "Key metrics, win rate, P&L, and profit factor at a glance" },
+        { name: "Equity Curve", path: reports_equity_curve_path, icon: "show_chart", desc: "Cumulative P&L over time with per-symbol breakdown" },
+        { name: "Monthly P&L", path: reports_monthly_performance_path, icon: "calendar_month", desc: "Month-by-month performance summary and trends" },
+        { name: "P&L Calendar", path: reports_pnl_calendar_path, icon: "event_note", desc: "Daily P&L heatmap on a calendar view" },
+        { name: "Weekly Summary", path: reports_weekly_summary_path, icon: "date_range", desc: "Week-over-week comparison with trade details" },
+        { name: "Scorecard", path: reports_scorecard_path, icon: "score", desc: "Composite performance grade with key ratios" },
+        { name: "Period Comparison", path: reports_period_comparison_path, icon: "compare_arrows", desc: "Compare any two date ranges side by side" },
+        { name: "Session Log", path: reports_session_log_path, icon: "view_timeline", desc: "Day-by-day session breakdown with running P&L" },
+        { name: "Leaderboard", path: reports_leaderboard_path, icon: "emoji_events", desc: "Hall of fame: best wins, worst losses, top symbols" }
+      ]
+    },
+    {
+      title: "Analysis",
+      icon: "analytics",
+      color: "#1a73e8",
+      reports: [
+        { name: "By Symbol", path: reports_by_symbol_path, icon: "label", desc: "Performance breakdown per ticker symbol" },
+        { name: "By Tag", path: reports_by_tag_path, icon: "sell", desc: "Performance by trade tags and categories" },
+        { name: "Setup Analysis", path: reports_setup_analysis_path, icon: "architecture", desc: "Which setups are working and which aren't" },
+        { name: "Playbook Perf", path: reports_playbook_performance_path, icon: "menu_book", desc: "Compare playbook strategies by expectancy and P&L" },
+        { name: "Comparison", path: comparison_path, icon: "compare", desc: "Side-by-side trade comparison and analysis" },
+        { name: "Correlation", path: reports_correlation_path, icon: "hub", desc: "How your symbols' P&L moves together" },
+        { name: "Distribution", path: reports_distribution_path, icon: "bar_chart", desc: "P&L distribution histogram and statistics" },
+        { name: "Streaks", path: reports_streak_analysis_path, icon: "local_fire_department", desc: "Win/loss streak patterns and after-streak behavior" },
+        { name: "By Time", path: reports_by_time_path, icon: "schedule", desc: "Performance by hour and day with session analysis" },
+        { name: "By Duration", path: reports_by_duration_path, icon: "timer", desc: "How trade hold time affects outcomes" }
+      ]
+    },
+    {
+      title: "Risk & Sizing",
+      icon: "shield",
+      color: "#e91e63",
+      reports: [
+        { name: "Risk Analysis", path: reports_risk_analysis_path, icon: "security", desc: "Drawdowns, Sharpe ratio, and risk-adjusted returns" },
+        { name: "Risk/Reward", path: reports_risk_reward_path, icon: "swap_vert", desc: "R:R ratios per trade with scatter analysis" },
+        { name: "Risk of Ruin", path: reports_risk_of_ruin_path, icon: "dangerous", desc: "Monte Carlo ruin probability and Kelly criterion" },
+        { name: "Expectancy", path: reports_expectancy_path, icon: "functions", desc: "Expected value per trade and edge by setup" },
+        { name: "Position Sizing", path: reports_position_sizing_path, icon: "tune", desc: "Backtest sizing strategies against your history" },
+        { name: "Monte Carlo", path: reports_monte_carlo_path, icon: "casino", desc: "Simulated future outcomes based on your stats" },
+        { name: "Fee Analysis", path: reports_fee_analysis_path, icon: "payments", desc: "Trading costs, fee drag, and trades killed by fees" },
+        { name: "Equity Breakdown", path: reports_equity_breakdown_path, icon: "donut_large", desc: "Equity curves by side, asset class, and month" },
+        { name: "What-If Simulator", path: reports_what_if_path, icon: "science", desc: "Hypothetical scenario analysis on your trading history" }
+      ]
+    },
+    {
+      title: "Discipline & Psychology",
+      icon: "psychology",
+      color: "#9c27b0",
+      reports: [
+        { name: "Discipline", path: reports_discipline_path, icon: "rule", desc: "Trade journaling completeness and plan adherence" },
+        { name: "Execution Quality", path: reports_execution_quality_path, icon: "verified", desc: "Stop discipline, target capture, and MFE efficiency" },
+        { name: "Mood Analytics", path: reports_mood_analytics_path, icon: "mood", desc: "How your emotional state affects trading results" },
+        { name: "Review Analytics", path: review_stats_trades_path, icon: "rate_review", desc: "Trade review completion and quality grades" },
+        { name: "Heatmap", path: reports_heatmap_path, icon: "grid_on", desc: "Daily P&L intensity across the year" },
+        { name: "Habits", path: reports_habits_path, icon: "psychology", desc: "Behavioral patterns: time of day, day of week, position size impact" }
+      ]
+    },
+    {
+      title: "Advanced Tools",
+      icon: "build_circle",
+      color: "#00897b",
+      reports: [
+        { name: "Benchmarks", path: performance_benchmarks_path, icon: "leaderboard", desc: "Tier ranking, percentile scores, and industry comparison" },
+        { name: "Trend Analyzer", path: trend_analyzer_path, icon: "insights", desc: "Rolling averages, behavioral trends, and regime detection" },
+        { name: "Mood & P&L", path: mood_performance_path, icon: "psychology_alt", desc: "Correlate journal moods with trading outcomes" },
+        { name: "Sizing Advisor", path: sizing_advisor_path, icon: "tune", desc: "Kelly criterion, volatility-based, and optimal position sizing" },
+        { name: "Smart Alerts", path: smart_alerts_path, icon: "notifications_active", desc: "Automated alerts for drawdowns, streaks, and risk thresholds" },
+        { name: "Goal Tracker", path: goal_tracker_path, icon: "flag", desc: "Set and track profit, consistency, and discipline targets" },
+        { name: "Habit Tracker", path: habit_tracker_path, icon: "self_improvement", desc: "Trading routine tracking with streak gamification" },
+        { name: "Portfolio View", path: portfolio_overview_path, icon: "account_balance", desc: "Consolidated portfolio with allocation and concentration analysis" },
+        { name: "Cross-Product", path: cross_product_insights_path, icon: "hub", desc: "Activity correlations across trading, journal, notes, and budget" },
+        { name: "Weekly Planner", path: weekly_planner_path, icon: "event_note", desc: "Plan your trading week with goals and focus areas" },
+        { name: "Drawdown Tracker", path: drawdown_tracker_path, icon: "trending_down", desc: "Track drawdowns, recovery progress, and risk rules" },
+        { name: "Attribution", path: performance_attribution_path, icon: "pie_chart", desc: "Break down P&L by symbol, time, side, and more" },
+        { name: "Profit Targets", path: profit_targets_path, icon: "track_changes", desc: "Set and track daily, weekly, and monthly P&L targets" },
+        { name: "Achievements", path: achievements_path, icon: "emoji_events", desc: "Earn badges and milestones for trading discipline" },
+        { name: "Strategy Builder", path: strategy_builder_path, icon: "architecture", desc: "Define and backtest trading strategies from your data" },
+        { name: "Risk Rules", path: risk_rules_path, icon: "gavel", desc: "Personal risk limits with real-time breach detection" },
+        { name: "Journal Prompts", path: journal_prompts_path, icon: "psychology", desc: "Context-aware prompts based on today's trading" },
+        { name: "Market Session", path: market_session_path, icon: "schedule", desc: "Live market hours clock with countdown timers" },
+        { name: "Morning Briefing", path: morning_briefing_path, icon: "wb_sunny", desc: "Start your day with readiness score and action items" },
+        { name: "Account Health", path: account_health_path, icon: "health_and_safety", desc: "Comprehensive 0-100 health score across all products" }
+      ]
+    }
+  ]
+%>
+
+<% report_sections.each do |section| %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: <%= section[:color] %>;"><%= section[:icon] %></span>
+        <%= section[:title] %>
+      </h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= section[:reports].count %> reports</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0;">
+      <% section[:reports].each_with_index do |report, i| %>
+        <%= link_to report[:path], style: "display: block; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); text-decoration: none; color: inherit; transition: background 0.15s;", class: "report-hub-link" do %>
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= section[:color] %>; margin-top: 2px;"><%= report[:icon] %></span>
+            <div>
+              <div style="font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.125rem;"><%= report[:name] %></div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4;"><%= report[:desc] %></div>
+            </div>
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--text-secondary); margin-left: auto; opacity: 0.5; margin-top: 4px;">chevron_right</span>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<style>
+  .report-hub-link:hover {
+    background: var(--bg) !important;
+  }
+</style>

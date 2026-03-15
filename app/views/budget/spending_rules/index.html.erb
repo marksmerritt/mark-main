@@ -1,0 +1,207 @@
+<%
+  active_rules = @rules.select { |r| r["active"] != false }
+  inactive_rules = @rules.select { |r| r["active"] == false }
+  violations = @violations.is_a?(Hash) ? (@violations["violations"] || []) : []
+  violation_map = violations.each_with_object({}) { |v, h| h[v["rule_id"] || v["spending_rule_id"]] = v }
+  violation_count = violations.count
+  ok_count = active_rules.count - violation_count
+%>
+
+<div class="page-header">
+  <h1>Spending Rules</h1>
+  <div class="page-actions">
+    <%= link_to "New Rule", new_budget_spending_rule_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<% if @rules.any? %>
+  <%# Status summary %>
+  <div class="card" style="display: flex; align-items: center; gap: 2rem; padding: 1.25rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <% if violation_count > 0 %>
+        <span class="material-icons-outlined" style="font-size: 2rem; color: var(--negative);">gpp_bad</span>
+      <% else %>
+        <span class="material-icons-outlined" style="font-size: 2rem; color: var(--positive);">verified_user</span>
+      <% end %>
+      <div>
+        <div style="font-size: 1.125rem; font-weight: 700;">
+          <% if violation_count > 0 %>
+            <span style="color: var(--negative);"><%= violation_count %> violation<%= violation_count == 1 ? "" : "s" %></span>
+          <% else %>
+            <span style="color: var(--positive);">All clear</span>
+          <% end %>
+        </div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+          <%= active_rules.count %> active rule<%= active_rules.count == 1 ? "" : "s" %>
+        </div>
+      </div>
+    </div>
+    <div style="flex: 1; display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: flex-end;">
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Passing</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= [ok_count, 0].max %></div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Violated</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= violation_count %></div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Inactive</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= inactive_rules.count %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Violations alert %>
+  <% if violations.any? %>
+    <div class="card" style="border-left: 4px solid var(--negative); margin-bottom: 1.5rem;">
+      <div style="padding: 1rem 1.25rem;">
+        <h3 style="color: var(--negative); margin-bottom: 0.75rem; font-size: 1rem;">
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">warning</span>
+          Active Violations
+        </h3>
+        <% violations.each do |v| %>
+          <%
+            v_pct = v["threshold"].to_f > 0 ? (v["current_amount"].to_f / v["threshold"].to_f * 100).round(1) : 100
+            v_over = v["over_by"].to_f
+          %>
+          <div style="padding: 0.625rem 0; border-bottom: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.375rem;">
+              <div>
+                <strong><%= v["rule_name"] %></strong>
+                <span class="text-muted" style="font-size: 0.75rem; margin-left: 0.375rem;"><%= v["rule_type"]&.humanize %></span>
+              </div>
+              <span style="font-weight: 700; color: var(--negative);">
+                <%= number_to_currency(v["current_amount"]) %> / <%= number_to_currency(v["threshold"]) %>
+              </span>
+            </div>
+            <div style="position: relative; height: 0.5rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+              <div style="width: 100%; height: 100%; background: var(--negative); opacity: 0.7; border-radius: 4px;"></div>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--negative); margin-top: 0.25rem;">
+              <%= number_to_currency(v_over) %> over limit (<%= v_pct %>%)
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Active rules with visual progress %>
+  <% if active_rules.any? %>
+    <h2 style="margin-bottom: 0.75rem; font-size: 1rem;">Active Rules</h2>
+    <div class="content-grid" style="margin-bottom: 1.5rem;">
+      <% active_rules.each do |rule| %>
+        <%
+          v = violation_map[rule["id"]]
+          current = v ? v["current_amount"].to_f : 0
+          threshold = rule["threshold"].to_f
+          usage_pct = threshold > 0 ? (current / threshold * 100).clamp(0, 150).round(1) : 0
+          is_violated = v.present?
+          is_warning = usage_pct >= 80 && !is_violated
+          bar_color = is_violated ? "var(--negative)" : (is_warning ? "#f9ab00" : "var(--positive)")
+          remaining = threshold - current
+        %>
+        <div class="card">
+          <div style="padding: 1rem 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+              <div>
+                <div style="font-weight: 600;"><%= rule["name"] %></div>
+                <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                  <%= rule["rule_type"]&.humanize %> &middot; <%= rule["period"]&.capitalize %>
+                </div>
+              </div>
+              <% if is_violated %>
+                <span class="badge badge-danger" style="font-size: 0.625rem;">VIOLATED</span>
+              <% elsif is_warning %>
+                <span class="badge" style="font-size: 0.625rem; background: rgba(249,171,0,0.15); color: #f9ab00;">WARNING</span>
+              <% else %>
+                <span class="badge badge-success" style="font-size: 0.625rem;">OK</span>
+              <% end %>
+            </div>
+
+            <%# Usage bar %>
+            <div style="position: relative; height: 0.625rem; background: var(--bg); border-radius: 4px; overflow: hidden; margin-bottom: 0.375rem;">
+              <div style="width: <%= [usage_pct, 100].min %>%; height: 100%; background: <%= bar_color %>; opacity: 0.7; border-radius: 4px;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem;">
+              <span style="color: var(--text-secondary);">
+                <% if v %>
+                  <%= number_to_currency(current) %> spent
+                <% else %>
+                  No spending tracked
+                <% end %>
+              </span>
+              <span style="font-weight: 600;"><%= number_to_currency(threshold) %> limit</span>
+            </div>
+
+            <%# Filter info %>
+            <% if rule["merchant_pattern"].present? || rule["category_name"].present? %>
+              <div style="margin-top: 0.375rem; font-size: 0.6875rem;">
+                <% if rule["merchant_pattern"].present? %>
+                  <span class="badge" style="font-size: 0.625rem;">Merchant: <%= rule["merchant_pattern"] %></span>
+                <% end %>
+                <% if rule["category_name"].present? %>
+                  <span class="badge" style="font-size: 0.625rem;">Category: <%= rule["category_name"] %></span>
+                <% end %>
+              </div>
+            <% end %>
+
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+              <%= link_to "Edit", edit_budget_spending_rule_path(rule["id"]), class: "btn btn-sm" %>
+              <%= link_to "Delete", budget_spending_rule_path(rule["id"]), data: { turbo_method: :delete, turbo_confirm: "Delete this rule?" }, class: "btn btn-sm btn-danger" %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if inactive_rules.any? %>
+    <h2 style="margin-bottom: 0.75rem; font-size: 1rem; color: var(--text-secondary);">Inactive Rules</h2>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Period</th>
+            <th style="text-align: right;">Threshold</th>
+            <th>Filter</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% inactive_rules.each do |rule| %>
+            <tr class="text-muted">
+              <td><%= rule["name"] %></td>
+              <td><%= rule["rule_type"]&.humanize %></td>
+              <td><%= rule["period"]&.capitalize %></td>
+              <td style="text-align: right;"><%= number_to_currency(rule["threshold"]) %></td>
+              <td>
+                <% if rule["merchant_pattern"].present? %>
+                  Merchant: <%= rule["merchant_pattern"] %>
+                <% elsif rule["category_name"].present? %>
+                  Category: <%= rule["category_name"] %>
+                <% else %>
+                  All
+                <% end %>
+              </td>
+              <td style="text-align: right;">
+                <%= link_to "Edit", edit_budget_spending_rule_path(rule["id"]), class: "btn btn-sm" %>
+                <%= link_to "Delete", budget_spending_rule_path(rule["id"]), data: { turbo_method: :delete, turbo_confirm: "Delete this rule?" }, class: "btn btn-sm btn-danger" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p>No spending rules yet. Create rules to get alerts when you exceed spending limits.</p>
+    <div style="margin-top: 1rem;">
+      <%= link_to "Create Your First Rule", new_budget_spending_rule_path, class: "btn btn-primary" %>
+    </div>
+  </div>
+<% end %>

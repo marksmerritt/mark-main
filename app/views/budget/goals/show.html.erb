@@ -1,0 +1,314 @@
+<%
+  g_pct = @goal["percentage_complete"].to_f
+  g_current = @goal["effective_current_amount"].to_f
+  g_target = @goal["effective_target_amount"].to_f
+  g_remaining = @goal["remaining_amount"].to_f
+  g_monthly = @goal["monthly_needed"].to_f
+  g_days = @goal["days_remaining"].to_i
+  g_on_track = @goal["on_track"]
+  g_active = @goal["status"] == "active"
+  g_achieved = @goal["status"] == "achieved"
+%>
+
+<div class="page-header">
+  <h1>
+    <% if @goal["icon"].present? %><span style="margin-right: 0.25rem;"><%= @goal["icon"] %></span><% end %>
+    <%= @goal["name"] %>
+  </h1>
+  <div class="page-actions">
+    <span class="badge badge-<%= g_achieved ? "success" : (@goal["status"] == "abandoned" ? "default" : "primary") %>"><%= @goal["status"]&.capitalize %></span>
+    <% if g_active && (@goal["linked_fund_id"].present? || @goal["linked_debt_id"].present?) %>
+      <%= link_to "Sync", sync_budget_goal_path(@goal["id"]), data: { turbo_method: :post }, class: "btn" %>
+    <% end %>
+    <%= link_to "Edit", edit_budget_goal_path(@goal["id"]), class: "btn" %>
+    <%= link_to "Delete", budget_goal_path(@goal["id"]), data: { turbo_method: :delete, turbo_confirm: "Delete this goal?" }, class: "btn btn-danger" %>
+    <%= link_to "Back", budget_goals_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Progress Hero %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: stretch; flex-wrap: wrap;">
+    <%# Circular progress gauge %>
+    <div style="flex: 0 0 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; border-right: 1px solid var(--border);">
+      <%
+        gr = 70; gcx = 90; gcy = 80
+        g_circum = Math::PI * gr
+        g_filled = g_circum * [g_pct, 100].min / 100.0
+        g_color = g_pct >= 100 ? "var(--positive)" : g_on_track ? "var(--primary)" : "var(--negative)"
+      %>
+      <svg width="180" height="110" viewBox="0 0 180 110">
+        <path d="M <%= gcx - gr %> <%= gcy %> A <%= gr %> <%= gr %> 0 1 1 <%= gcx + gr %> <%= gcy %>"
+              fill="none" stroke="var(--border)" stroke-width="10" stroke-linecap="round" />
+        <path d="M <%= gcx - gr %> <%= gcy %> A <%= gr %> <%= gr %> 0 1 1 <%= gcx + gr %> <%= gcy %>"
+              fill="none" stroke="<%= g_color %>" stroke-width="10" stroke-linecap="round"
+              stroke-dasharray="<%= g_filled.round(1) %> <%= g_circum.round(1) %>" />
+        <text x="<%= gcx %>" y="<%= gcy - 14 %>" text-anchor="middle" font-size="26" font-weight="700" fill="<%= g_color %>"><%= g_pct.round(0) %>%</text>
+        <text x="<%= gcx %>" y="<%= gcy + 2 %>" text-anchor="middle" font-size="9" fill="var(--text-secondary)">
+          <%= g_achieved ? "ACHIEVED" : (g_on_track ? "ON TRACK" : "BEHIND") %>
+        </text>
+      </svg>
+      <% if g_active && g_on_track %>
+        <span class="material-icons-outlined" style="color: var(--positive); font-size: 1.25rem;">trending_up</span>
+      <% elsif g_active %>
+        <span class="material-icons-outlined" style="color: var(--negative); font-size: 1.25rem;">trending_down</span>
+      <% elsif g_achieved %>
+        <span class="material-icons-outlined" style="color: var(--positive); font-size: 1.25rem;">emoji_events</span>
+      <% end %>
+    </div>
+
+    <%# Key amounts %>
+    <div style="flex: 1; min-width: 280px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0;">
+      <div style="padding: 1.25rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Saved</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(g_current) %></div>
+      </div>
+      <div style="padding: 1.25rem; border-bottom: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Target</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(g_target) %></div>
+      </div>
+      <div style="padding: 1.25rem; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Remaining</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(g_remaining) %></div>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% if g_monthly > 0 %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Needed</div>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(g_monthly) %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;">
+            <%= number_to_currency(g_monthly / 4.33) %>/week &middot; <%= number_to_currency(g_monthly / 30.0) %>/day
+          </div>
+        <% elsif g_achieved %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Status</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);">Goal Reached</div>
+        <% else %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Type</div>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= @goal["goal_type"]&.titleize %></div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Full-width progress bar %>
+  <div style="padding: 0.75rem 1.25rem 1rem;">
+    <div style="position: relative; height: 1.5rem; background: var(--bg); border-radius: 0.75rem; overflow: hidden;">
+      <div style="width: <%= [g_pct, 100].min %>%; height: 100%; background: <%= g_color %>; border-radius: 0.75rem; transition: width 0.3s;"></div>
+      <%# Milestone markers %>
+      <% [25, 50, 75].each do |m| %>
+        <div style="position: absolute; left: <%= m %>%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.3);"></div>
+      <% end %>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-top: 0.25rem; font-size: 0.625rem; color: var(--text-secondary);">
+      <span><%= number_to_currency(0) %></span>
+      <span><%= number_to_currency(g_target * 0.25) %></span>
+      <span><%= number_to_currency(g_target * 0.5) %></span>
+      <span><%= number_to_currency(g_target * 0.75) %></span>
+      <span><%= number_to_currency(g_target) %></span>
+    </div>
+  </div>
+</div>
+
+<div class="content-grid">
+  <%# Details card %>
+  <div class="card">
+    <div class="card-header"><h2>Details</h2></div>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <span class="detail-label">Type</span>
+        <span class="detail-value"><%= @goal["goal_type"]&.titleize %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Current Progress</span>
+        <span class="detail-value"><%= number_to_currency(g_current) %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Target Amount</span>
+        <span class="detail-value"><%= number_to_currency(g_target) %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Remaining</span>
+        <span class="detail-value"><%= number_to_currency(g_remaining) %></span>
+      </div>
+      <% if @goal["target_date"].present? %>
+        <div class="detail-item">
+          <span class="detail-label">Target Date</span>
+          <span class="detail-value"><%= Date.parse(@goal["target_date"]).strftime("%B %d, %Y") rescue @goal["target_date"] %></span>
+        </div>
+      <% end %>
+      <% if @goal["days_remaining"].present? %>
+        <div class="detail-item">
+          <span class="detail-label">Days Remaining</span>
+          <span class="detail-value"><%= g_days > 0 ? "#{g_days} days" : "Past due" %></span>
+        </div>
+      <% end %>
+      <% if g_monthly > 0 %>
+        <div class="detail-item">
+          <span class="detail-label">Monthly Needed</span>
+          <span class="detail-value"><%= number_to_currency(g_monthly) %></span>
+        </div>
+      <% end %>
+      <div class="detail-item">
+        <span class="detail-label">Status</span>
+        <span class="detail-value">
+          <% if g_on_track %>
+            <span class="badge badge-success">On Track</span>
+          <% else %>
+            <span class="badge badge-danger">Behind Schedule</span>
+          <% end %>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <%# Projection & Timeline %>
+  <div class="card">
+    <div class="card-header"><h2>Projection</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <% if g_active && g_target > 0 && g_current > 0 %>
+        <%
+          # Project timeline based on monthly needed
+          if @goal["target_date"].present?
+            target_date = Date.parse(@goal["target_date"]) rescue nil
+          end
+          months_left = g_monthly > 0 ? (g_remaining / g_monthly).ceil : 0
+          projected_date = months_left > 0 ? Date.current + months_left.months : nil
+
+          # Savings rate scenarios
+          scenarios = []
+          if g_monthly > 0
+            scenarios << { label: "Current pace", amount: g_monthly, months: months_left }
+            scenarios << { label: "+25% effort", amount: g_monthly * 1.25, months: (g_remaining / (g_monthly * 1.25)).ceil }
+            scenarios << { label: "+50% effort", amount: g_monthly * 1.5, months: (g_remaining / (g_monthly * 1.5)).ceil }
+            scenarios << { label: "Double down", amount: g_monthly * 2, months: (g_remaining / (g_monthly * 2)).ceil }
+          end
+        %>
+
+        <% if target_date && projected_date %>
+          <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; padding: 0.75rem; background: var(--bg); border-radius: var(--radius);">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= projected_date <= target_date ? 'var(--positive)' : 'var(--negative)' %>;">
+              <%= projected_date <= target_date ? "check_circle" : "warning" %>
+            </span>
+            <div style="font-size: 0.8125rem;">
+              <% if projected_date <= target_date %>
+                At your current pace, you'll reach this goal by <strong><%= projected_date.strftime("%B %Y") %></strong> — <strong class="positive"><%= (target_date - projected_date).to_i %> days ahead</strong> of schedule.
+              <% else %>
+                At your current pace, you'll reach this goal by <strong><%= projected_date.strftime("%B %Y") %></strong> — <strong class="negative"><%= (projected_date - target_date).to_i %> days behind</strong> schedule.
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+
+        <% if scenarios.any? %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">Savings Scenarios</div>
+          <% scenarios.each do |s| %>
+            <%
+              s_date = Date.current + s[:months].months
+              on_time = target_date ? s_date <= target_date : true
+            %>
+            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+              <span style="font-size: 0.8125rem; min-width: 6rem;"><%= s[:label] %></span>
+              <span style="font-size: 0.8125rem; font-weight: 600; min-width: 5rem;"><%= number_to_currency(s[:amount]) %>/mo</span>
+              <span style="font-size: 0.8125rem; flex: 1; text-align: right; color: <%= on_time ? 'var(--positive)' : 'var(--text-secondary)' %>;">
+                <%= s[:months] %> months &rarr; <%= s_date.strftime("%b %Y") %>
+              </span>
+            </div>
+          <% end %>
+        <% end %>
+      <% elsif g_achieved %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(13,144,79,0.08); border-radius: var(--radius);">
+          <span class="material-icons-outlined" style="color: var(--positive); font-size: 1.5rem;">celebration</span>
+          <div>
+            <div style="font-weight: 600;">Goal Achieved!</div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">You reached your target of <%= number_to_currency(g_target) %>.</div>
+          </div>
+        </div>
+      <% else %>
+        <p class="text-muted" style="font-size: 0.875rem;">Start saving to see projections for this goal.</p>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Savings breakdown visualization (how far along in relation to common amounts) %>
+<% if g_active && g_target > 0 %>
+  <div class="card" style="margin-top: 1rem;">
+    <div class="card-header"><h2>Savings Breakdown</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <%
+        daily_save = g_remaining > 0 && g_days > 0 ? (g_remaining / g_days) : 0
+        weekly_save = daily_save * 7
+        biweekly_save = daily_save * 14
+        monthly_save = g_monthly > 0 ? g_monthly : daily_save * 30
+        breakdown_items = [
+          { label: "Per Day", amount: daily_save, icon: "today" },
+          { label: "Per Week", amount: weekly_save, icon: "date_range" },
+          { label: "Per Pay Period", amount: biweekly_save, icon: "payments" },
+          { label: "Per Month", amount: monthly_save, icon: "calendar_month" }
+        ]
+      %>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;">
+        <% breakdown_items.each do |item| %>
+          <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: var(--radius);">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: var(--primary); display: block; margin-bottom: 0.25rem;"><%= item[:icon] %></span>
+            <div style="font-size: 1rem; font-weight: 700;"><%= number_to_currency(item[:amount]) %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= item[:label] %></div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div class="content-grid" style="margin-top: 1rem;">
+  <% if @goal["linked_fund_id"].present? || @goal["linked_debt_id"].present? %>
+    <div class="card">
+      <div class="card-header"><h2>Linked Account</h2></div>
+      <div class="detail-grid">
+        <% if @goal["linked_fund_id"].present? %>
+          <div class="detail-item">
+            <span class="detail-label">Linked Fund</span>
+            <span class="detail-value"><%= link_to "View Fund", budget_fund_path(@goal["linked_fund_id"]), class: "btn btn-sm" %></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Fund Balance</span>
+            <span class="detail-value"><%= number_to_currency(g_current) %></span>
+          </div>
+        <% end %>
+        <% if @goal["linked_debt_id"].present? %>
+          <div class="detail-item">
+            <span class="detail-label">Linked Debt</span>
+            <span class="detail-value"><%= link_to "View Debt Account", budget_debt_account_path(@goal["linked_debt_id"]), class: "btn btn-sm" %></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Amount Paid Off</span>
+            <span class="detail-value"><%= number_to_currency(g_current) %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if g_active && @goal["linked_fund_id"].blank? && @goal["linked_debt_id"].blank? %>
+    <div class="card">
+      <div class="card-header"><h2>Update Progress</h2></div>
+      <%= form_with url: budget_goal_path(@goal["id"]), method: :patch, class: "form-container" do |f| %>
+        <div class="form-group">
+          <%= f.label :current_amount, "Current Amount" %>
+          <%= f.number_field :current_amount, value: @goal["current_amount"], step: "0.01", class: "form-control", name: "goal[current_amount]", required: true %>
+        </div>
+        <div class="form-actions">
+          <%= f.submit "Update Progress", class: "btn btn-primary" %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+
+<% if @goal["notes"].present? %>
+  <div class="card" style="margin-top: 1rem;">
+    <div class="card-header"><h2>Notes</h2></div>
+    <div style="padding: 1.25rem;">
+      <%= simple_format(@goal["notes"]) %>
+    </div>
+  </div>
+<% end %>

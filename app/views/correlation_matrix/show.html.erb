@@ -1,0 +1,197 @@
+<% content_for(:title) { "Correlation Matrix" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #7b1fa2;">grid_view</span>
+    Correlation Matrix
+  </h1>
+  <div class="page-actions">
+    <%= link_to "By Symbol", reports_by_symbol_path, class: "btn" %>
+    <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Diversification Score %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="padding: 1.25rem; display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+    <div style="text-align: center;">
+      <%
+        score = @diversification_score[:score]
+        score_color = score >= 70 ? "var(--positive)" : (score >= 40 ? "#f9a825" : "var(--negative)")
+      %>
+      <svg width="80" height="80" viewBox="0 0 80 80">
+        <circle cx="40" cy="40" r="35" fill="none" stroke="var(--border)" stroke-width="6"/>
+        <circle cx="40" cy="40" r="35" fill="none" stroke="<%= score_color %>" stroke-width="6"
+                stroke-dasharray="<%= (score / 100.0 * 220).round %> 220"
+                stroke-linecap="round" transform="rotate(-90 40 40)"/>
+        <text x="40" y="44" text-anchor="middle" font-size="18" font-weight="700" fill="<%= score_color %>"><%= score %></text>
+      </svg>
+    </div>
+    <div>
+      <div style="font-size: 1.125rem; font-weight: 600;">Diversification Score</div>
+      <div style="font-size: 0.875rem; color: var(--text-secondary);"><%= @diversification_score[:assessment] %></div>
+      <% if @diversification_score[:avg_correlation] %>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Avg. correlation: <%= @diversification_score[:avg_correlation] %> &middot;
+          <%= @diversification_score[:symbol_count] %> symbols analyzed
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Correlation Heatmap Matrix %>
+<% if @matrix[:symbols].length >= 2 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">grid_on</span> Correlation Heatmap</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        syms = @matrix[:symbols]
+        cell_size = syms.length <= 8 ? 50 : 40
+      %>
+      <table style="border-collapse: collapse; font-size: 0.6875rem; margin: 0 auto;">
+        <thead>
+          <tr>
+            <th style="padding: 4px 8px;"></th>
+            <% syms.each do |sym| %>
+              <th style="padding: 4px 6px; text-align: center; font-weight: 600; writing-mode: vertical-rl; transform: rotate(180deg); height: 60px;"><%= sym %></th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody>
+          <% syms.each do |s1| %>
+            <tr>
+              <td style="padding: 4px 8px; font-weight: 600; text-align: right;"><%= s1 %></td>
+              <% syms.each do |s2| %>
+                <%
+                  corr = @matrix[:correlations].dig(s1, s2) || 0
+                  # Color: red for positive correlation, blue for negative, white for zero
+                  if corr > 0
+                    intensity = (corr.abs * 255).round.clamp(0, 255)
+                    bg = "rgba(229, 57, 53, #{(corr.abs * 0.6).round(2)})"
+                  elsif corr < 0
+                    intensity = (corr.abs * 255).round.clamp(0, 255)
+                    bg = "rgba(30, 136, 229, #{(corr.abs * 0.6).round(2)})"
+                  else
+                    bg = "transparent"
+                  end
+                  text_color = corr.abs > 0.4 ? "white" : "var(--text)"
+                %>
+                <td style="padding: 0; text-align: center; width: <%= cell_size %>px; height: <%= cell_size %>px; background: <%= bg %>; color: <%= text_color %>; font-weight: <%= s1 == s2 ? '700' : '400' %>; border: 1px solid var(--border);">
+                  <% if s1 == s2 %>
+                    <span style="font-size: 0.75rem;">1.0</span>
+                  <% else %>
+                    <%= corr %>
+                  <% end %>
+                </td>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+      <div style="display: flex; justify-content: center; gap: 1.5rem; margin-top: 0.75rem; font-size: 0.625rem; color: var(--text-secondary);">
+        <span><span style="display: inline-block; width: 12px; height: 12px; background: rgba(30, 136, 229, 0.6); border-radius: 2px;"></span> Negative (diversified)</span>
+        <span><span style="display: inline-block; width: 12px; height: 12px; background: transparent; border: 1px solid var(--border); border-radius: 2px;"></span> No correlation</span>
+        <span><span style="display: inline-block; width: 12px; height: 12px; background: rgba(229, 57, 53, 0.6); border-radius: 2px;"></span> Positive (concentrated)</span>
+      </div>
+    </div>
+  </div>
+<% else %>
+  <div class="card" style="margin-bottom: 1.5rem; padding: 2rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; opacity: 0.3;">grid_on</span>
+    <p style="margin-top: 0.5rem;">Need at least 2 symbols with 3+ trades each to compute correlations.</p>
+  </div>
+<% end %>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+  <%# Top Correlated Pairs %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e53935;">link</span> Most Correlated Pairs</h2>
+    </div>
+    <div style="padding: 0;">
+      <% if @pairwise.any? %>
+        <% @pairwise.each do |pair| %>
+          <%
+            corr = pair[:correlation]
+            bar_color = corr > 0.5 ? "#e53935" : (corr > 0 ? "#ff8a65" : "#42a5f5")
+          %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1.25rem; border-bottom: 1px solid var(--border); font-size: 0.8125rem;">
+            <div style="width: 130px; font-weight: 600;"><%= pair[:sym1] %> / <%= pair[:sym2] %></div>
+            <div style="flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+              <div style="width: <%= (corr.abs * 100).round %>%; height: 100%; background: <%= bar_color %>; border-radius: 3px;"></div>
+            </div>
+            <div style="width: 50px; text-align: right; font-weight: 600; color: <%= bar_color %>;"><%= corr %></div>
+          </div>
+        <% end %>
+      <% else %>
+        <div style="padding: 1.25rem; color: var(--text-secondary); text-align: center; font-size: 0.8125rem;">No data</div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Anti-Correlated (Good for Diversification) %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1e88e5;">shield</span> Best Hedging Pairs</h2>
+    </div>
+    <div style="padding: 0;">
+      <% if @anti_pairs.any? %>
+        <% @anti_pairs.each do |pair| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1.25rem; border-bottom: 1px solid var(--border); font-size: 0.8125rem;">
+            <div style="width: 130px; font-weight: 600;"><%= pair[:sym1] %> / <%= pair[:sym2] %></div>
+            <div style="flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+              <div style="width: <%= (pair[:correlation].abs * 100).round %>%; height: 100%; background: #42a5f5; border-radius: 3px;"></div>
+            </div>
+            <div style="width: 50px; text-align: right; font-weight: 600; color: #1e88e5;"><%= pair[:correlation] %></div>
+          </div>
+        <% end %>
+      <% else %>
+        <div style="padding: 1.25rem; color: var(--text-secondary); text-align: center; font-size: 0.8125rem;">No negatively correlated pairs found</div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Symbol Stats Table %>
+<% if @symbols.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">label</span> Symbol Summary</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @symbols.length %> symbols</span>
+    </div>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.625rem 1rem; text-align: left;">Symbol</th>
+            <th style="padding: 0.625rem 0.75rem; text-align: center;">Trades</th>
+            <th style="padding: 0.625rem 0.75rem; text-align: center;">Win Rate</th>
+            <th style="padding: 0.625rem 0.75rem; text-align: right;">Avg P&L</th>
+            <th style="padding: 0.625rem 1rem; text-align: right;">Total P&L</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @symbols.first(20).each do |sym| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.625rem 1rem; font-weight: 600;"><%= sym[:name] %></td>
+              <td style="padding: 0.625rem 0.75rem; text-align: center;"><%= sym[:count] %></td>
+              <td style="padding: 0.625rem 0.75rem; text-align: center; color: <%= sym[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= sym[:win_rate] %>%</td>
+              <td style="padding: 0.625rem 0.75rem; text-align: right;"><%= number_to_currency(sym[:avg_pnl]) %></td>
+              <td style="padding: 0.625rem 1rem; text-align: right; font-weight: 600; color: <%= sym[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(sym[:total_pnl]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "By Symbol", reports_by_symbol_path, class: "btn" %>
+  <%= link_to "Attribution", performance_attribution_path, class: "btn" %>
+  <%= link_to "Correlation Report", reports_correlation_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+</div>

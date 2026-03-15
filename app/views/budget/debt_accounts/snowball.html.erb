@@ -1,0 +1,144 @@
+<div class="page-header">
+  <h1>Debt Snowball Plan</h1>
+  <div class="page-actions">
+    <%= link_to "Avalanche", avalanche_budget_debt_accounts_path(extra: @extra), class: "btn" %>
+    <%= link_to "All Debts", budget_debt_accounts_path, class: "btn" %>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 1rem;">
+  <%= form_with url: snowball_budget_debt_accounts_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :extra, "Extra Monthly Payment" %>
+        <%= f.number_field :extra, value: @extra, step: "50", min: "0", class: "form-control", placeholder: "0.00" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Recalculate", class: "btn btn-primary" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @plan.present? && !@plan["error"] %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Debt</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(@plan["total_debt"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Interest Cost</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(@plan["total_interest_cost"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Payoff Time</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @plan["payoff_months"] %> months</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-left: 3px solid var(--success, #22c55e);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Debt Free By</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= @plan["payoff_date"] %></div>
+      </div>
+    </div>
+  </div>
+
+  <% if @plan["timeline"].is_a?(Array) && @plan["timeline"].any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Payoff Timeline</h2></div>
+      <div class="chart-container" data-controller="chart"
+           data-chart-type-value="line"
+           data-chart-labels-value="<%= @plan["timeline"].map { |t| "Mo #{t["month"]}" }.to_json %>"
+           data-chart-data-value="<%= @plan["timeline"].map { |t| t["total"] }.to_json %>"
+           data-chart-color-value="var(--primary)"
+           style="height: 250px; padding: 1rem;">
+        <canvas data-chart-target="canvas"></canvas>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>How the Snowball Works</h2></div>
+    <div style="padding: 1rem; font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
+      <p>The <strong>debt snowball</strong> method focuses on paying off your smallest balance first while making minimum payments on everything else. When the smallest debt is paid off, its payment "rolls" into the next smallest debt, creating a snowball effect.</p>
+      <p style="margin-top: 0.5rem;">This strategy prioritizes <strong>quick wins</strong> to build momentum and motivation.</p>
+    </div>
+  </div>
+
+  <% if @accounts.is_a?(Array) && @accounts.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Payoff Order (Smallest to Largest)</h2></div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width: 2rem;">#</th>
+            <th>Account</th>
+            <th>Type</th>
+            <th style="text-align: right;">Balance</th>
+            <th style="text-align: right;">Rate</th>
+            <th style="text-align: right;">Minimum</th>
+            <th style="text-align: right;">Est. Payoff</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @accounts.select { |a| a["status"] == "active" }.each_with_index do |account, idx| %>
+            <tr>
+              <td><span class="badge badge-primary"><%= idx + 1 %></span></td>
+              <td>
+                <strong><%= link_to account["name"], budget_debt_account_path(account["id"]) %></strong>
+              </td>
+              <td><%= debt_type_label(account["debt_type"]) %></td>
+              <td style="text-align: right;" class="negative"><%= number_to_currency(account["balance"]) %></td>
+              <td style="text-align: right;"><%= account["interest_rate"] %>%</td>
+              <td style="text-align: right;"><%= number_to_currency(account["minimum_payment"]) %></td>
+              <td style="text-align: right;">
+                <% if account["payoff_months"].to_i > 0 && account["payoff_months"].to_i < 360 %>
+                  <span class="text-muted"><%= account["payoff_months"] %> mo</span>
+                <% else %>
+                  <span class="text-muted">N/A</span>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
+  <% if @plan["monthly_payments"].is_a?(Array) && @plan["monthly_payments"].any? %>
+    <div class="card">
+      <div class="card-header"><h2>Quarterly Progress Checkpoints</h2></div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th style="text-align: right;">Total Remaining</th>
+            <th>Accounts</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @plan["monthly_payments"].each do |mp| %>
+            <tr>
+              <td><strong>Month <%= mp["month"] %></strong></td>
+              <td style="text-align: right;" class="negative"><%= number_to_currency(mp["total_remaining"]) %></td>
+              <td>
+                <% if mp["balances"].is_a?(Array) %>
+                  <% mp["balances"].select { |b| b["balance"].to_f > 0 }.each do |b| %>
+                    <span class="tag" style="margin-right: 0.25rem;"><%= b["name"] %>: <%= number_to_currency(b["balance"]) %></span>
+                  <% end %>
+                  <% paid_off = mp["balances"].count { |b| b["balance"].to_f <= 0 } %>
+                  <% if paid_off > 0 %>
+                    <span class="badge badge-success"><%= paid_off %> paid off</span>
+                  <% end %>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p>Add debt accounts to generate a snowball payoff plan.</p>
+  </div>
+<% end %>

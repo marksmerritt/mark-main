@@ -1,0 +1,393 @@
+<div class="page-header">
+  <h1>Weekly Summary</h1>
+  <div class="page-actions">
+    <button class="btn" onclick="window.print()">
+      <span class="material-icons-outlined">print</span> Print
+    </button>
+  </div>
+</div>
+
+<div class="week-nav">
+  <% if @week_offset < 52 %>
+    <%= link_to reports_weekly_summary_path(week: @week_offset + 1), class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">chevron_left</span> Previous
+    <% end %>
+  <% end %>
+  <h2 class="week-nav-title">
+    <%= @week_start.strftime("%b %d") %> &ndash; <%= @week_end.strftime("%b %d, %Y") %>
+  </h2>
+  <% if @week_offset > 0 %>
+    <%= link_to reports_weekly_summary_path(week: @week_offset - 1), class: "btn btn-sm" do %>
+      Next <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">chevron_right</span>
+    <% end %>
+  <% else %>
+    <span class="btn btn-sm" style="opacity: 0.3; pointer-events: none;">Next</span>
+  <% end %>
+</div>
+
+<% if @current_week.present? && !@current_week["error"] %>
+  <% cw = @current_week %>
+  <% pw = @previous_week || {} %>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Week P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(cw["total_pnl"]) %>"><%= number_to_currency(cw["total_pnl"]) %></div>
+        <% if pw["total_pnl"] %>
+          <% delta = cw["total_pnl"].to_f - pw["total_pnl"].to_f %>
+          <div style="font-size: 0.75rem;" class="<%= pnl_class(delta) %>"><%= delta >= 0 ? "+" : "" %><%= number_to_currency(delta) %> vs prev</div>
+        <% end %>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= cw["total_trades"] %></div>
+        <% if pw["total_trades"] %>
+          <% delta = cw["total_trades"].to_i - pw["total_trades"].to_i %>
+          <div style="font-size: 0.75rem;"><%= delta >= 0 ? "+" : "" %><%= delta %> vs prev</div>
+        <% end %>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= cw["win_rate"] %>%</div>
+        <% if pw["win_rate"] %>
+          <% delta = cw["win_rate"].to_f - pw["win_rate"].to_f %>
+          <div style="font-size: 0.75rem;" class="<%= delta >= 0 ? 'positive' : 'negative' %>"><%= delta >= 0 ? "+" : "" %><%= delta.round(1) %>% vs prev</div>
+        <% end %>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profit Factor</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= cw["profit_factor"] %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= number_to_currency(cw["avg_win"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(cw["avg_loss"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Largest Win</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= number_to_currency(cw["largest_win"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Largest Loss</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(cw["largest_loss"]) %></div>
+      </div>
+    </div>
+  </div>
+
+  <% daily_pnl = cw["daily_pnl"] || {} %>
+  <% if daily_pnl.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Daily Breakdown</h2>
+      </div>
+      <div class="chart-wrapper"
+           data-controller="chart"
+           data-chart-type-value="bar"
+           data-chart-points-value="<%= daily_pnl.map { |date, pnl| { x: date, y: pnl } }.to_json %>">
+      </div>
+    </div>
+  <% end %>
+
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header">
+        <h2>Daily Detail</h2>
+      </div>
+      <%
+        day_names = %w[Monday Tuesday Wednesday Thursday Friday Saturday Sunday]
+        day_data = (0..6).map do |i|
+          date = @week_start + i.days
+          date_str = date.strftime("%Y-%m-%d")
+          pnl = daily_pnl[date_str]&.to_f
+          day_trades = @week_trades.select { |t| t["entry_time"]&.start_with?(date_str) }
+          wins = day_trades.count { |t| t["pnl"].to_f > 0 }
+          { name: day_names[i], date: date, date_str: date_str, pnl: pnl, trades: day_trades, wins: wins }
+        end
+        max_abs_pnl = day_data.filter_map { |d| d[:pnl]&.abs }.max || 1
+        best_day = day_data.compact.max_by { |d| d[:pnl] || -Float::INFINITY }
+        worst_day = day_data.compact.min_by { |d| d[:pnl] || Float::INFINITY }
+      %>
+
+      <div style="padding: 0.75rem 1.25rem; display: flex; gap: 0.5rem;">
+        <% day_data.first(5).each do |d| %>
+          <div style="flex: 1; text-align: center; padding: 0.5rem; border: 1px solid var(--border); border-radius: var(--radius);
+                      <% if d[:pnl] && d == best_day %>background: rgba(13,144,79,0.05);<% elsif d[:pnl] && d == worst_day %>background: rgba(217,48,37,0.05);<% end %>">
+            <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);"><%= d[:name][0..2] %></div>
+            <div style="font-size: 1rem; font-weight: 700; margin: 0.25rem 0;" class="<%= d[:pnl] ? pnl_class(d[:pnl]) : 'text-muted' %>">
+              <%= d[:pnl] ? number_to_currency(d[:pnl]) : "—" %>
+            </div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+              <%= d[:trades].count %> trade<%= d[:trades].count == 1 ? '' : 's' %>
+              <% if d[:trades].any? %>
+                · <%= d[:wins] %>W
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Day</th>
+            <th>Trades</th>
+            <th>W/L</th>
+            <th>P&L</th>
+            <th style="width: 40%;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% day_data.each do |d| %>
+            <tr class="<%= 'text-muted' unless d[:pnl] %>">
+              <td><strong><%= d[:name] %></strong> <span class="text-muted" style="font-size: 0.8125rem;"><%= d[:date].strftime("%b %d") %></span></td>
+              <td><%= d[:trades].count %></td>
+              <td>
+                <% if d[:trades].any? %>
+                  <span class="positive"><%= d[:wins] %>W</span> / <span class="negative"><%= d[:trades].count - d[:wins] %>L</span>
+                <% else %>
+                  —
+                <% end %>
+              </td>
+              <td>
+                <% if d[:pnl] %>
+                  <span class="<%= pnl_class(d[:pnl]) %>"><%= number_to_currency(d[:pnl]) %></span>
+                <% else %>
+                  <span class="text-muted">—</span>
+                <% end %>
+              </td>
+              <td>
+                <% if d[:pnl] && d[:pnl] != 0 %>
+                  <div style="display: flex; align-items: center; height: 1rem;">
+                    <% bar_pct = (d[:pnl].abs / max_abs_pnl * 100).round(1) %>
+                    <% if d[:pnl] >= 0 %>
+                      <div style="width: 50%;"></div>
+                      <div style="width: 50%;">
+                        <div style="width: <%= bar_pct %>%; height: 0.75rem; background: var(--positive); border-radius: 0 var(--radius) var(--radius) 0;"></div>
+                      </div>
+                    <% else %>
+                      <div style="width: 50%; display: flex; justify-content: flex-end;">
+                        <div style="width: <%= bar_pct %>%; height: 0.75rem; background: var(--negative); border-radius: var(--radius) 0 0 var(--radius);"></div>
+                      </div>
+                      <div style="width: 50%;"></div>
+                    <% end %>
+                  </div>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <% if pw.present? && !pw["error"] %>
+      <div class="card">
+        <div class="card-header">
+          <h2>Week over Week</h2>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>This Week</th>
+              <th>Last Week</th>
+              <th>Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>P&L</strong></td>
+              <td class="<%= pnl_class(cw["total_pnl"]) %>"><%= number_to_currency(cw["total_pnl"]) %></td>
+              <td class="<%= pnl_class(pw["total_pnl"]) %>"><%= number_to_currency(pw["total_pnl"]) %></td>
+              <td>
+                <% d = cw["total_pnl"].to_f - pw["total_pnl"].to_f %>
+                <span class="<%= pnl_class(d) %>"><%= d >= 0 ? "+" : "" %><%= number_to_currency(d) %></span>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Trades</strong></td>
+              <td><%= cw["total_trades"] %></td>
+              <td><%= pw["total_trades"] %></td>
+              <td>
+                <% d = cw["total_trades"].to_i - pw["total_trades"].to_i %>
+                <%= d >= 0 ? "+" : "" %><%= d %>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Win Rate</strong></td>
+              <td><%= cw["win_rate"] %>%</td>
+              <td><%= pw["win_rate"] %>%</td>
+              <td>
+                <% d = cw["win_rate"].to_f - pw["win_rate"].to_f %>
+                <span class="<%= d >= 0 ? 'positive' : 'negative' %>"><%= d >= 0 ? "+" : "" %><%= d.round(1) %>%</span>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Profit Factor</strong></td>
+              <td><%= cw["profit_factor"] %></td>
+              <td><%= pw["profit_factor"] %></td>
+              <td>
+                <% d = cw["profit_factor"].to_f - pw["profit_factor"].to_f %>
+                <span class="<%= d >= 0 ? 'positive' : 'negative' %>"><%= d >= 0 ? "+" : "" %><%= d.round(2) %></span>
+              </td>
+            </tr>
+            <tr>
+              <td><strong>Commissions</strong></td>
+              <td><%= number_to_currency(cw["total_commissions"]) %></td>
+              <td><%= number_to_currency(pw["total_commissions"]) %></td>
+              <td><%= number_to_currency(cw["total_commissions"].to_f - pw["total_commissions"].to_f) %></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Weekly Performance Report Card %>
+  <% if @week_trades.any? %>
+    <%
+      week_wins = @week_trades.count { |t| t["pnl"].to_f > 0 }
+      week_losses = @week_trades.count { |t| t["pnl"].to_f <= 0 }
+      week_wr = @week_trades.count > 0 ? (week_wins.to_f / @week_trades.count * 100).round(0) : 0
+      reviewed_count = @week_trades.count { |t| t["reviewed"] }
+      followed_plan = @week_trades.count { |t| t["followed_plan"] == true }
+      symbols_traded = @week_trades.map { |t| t["symbol"] }.uniq
+      setups_used = @week_trades.map { |t| t["setup"] }.compact.reject(&:blank?).uniq
+      pnls = @week_trades.map { |t| t["pnl"].to_f }
+      avg_pnl = pnls.any? ? (pnls.sum / pnls.count).round(2) : 0
+
+      # Build a grade for the week
+      week_grade_score = 0
+      week_grade_score += 25 if cw["total_pnl"].to_f > 0
+      week_grade_score += 20 if week_wr >= 50
+      week_grade_score += 15 if cw["profit_factor"].to_f >= 1.5
+      week_grade_score += 15 if @week_trades.count >= 3 && @week_trades.count <= 15
+      week_grade_score += 15 if followed_plan >= (@week_trades.count * 0.7)
+      week_grade_score += 10 if symbols_traded.length >= 2
+      week_grade = week_grade_score >= 80 ? "A" : week_grade_score >= 65 ? "B" : week_grade_score >= 50 ? "C" : week_grade_score >= 35 ? "D" : "F"
+      grade_color = { "A" => "#0d904f", "B" => "#1a73e8", "C" => "#f9ab00", "D" => "#e8710a", "F" => "#d93025" }[week_grade]
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Week Report Card</h2></div>
+      <div style="padding: 1rem 1.25rem; display: flex; gap: 2rem; flex-wrap: wrap; align-items: center;">
+        <div style="width: 80px; height: 80px; border-radius: 50%; border: 4px solid <%= grade_color %>;
+                    display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+          <span style="font-size: 2rem; font-weight: 700; color: <%= grade_color %>;"><%= week_grade %></span>
+        </div>
+        <div style="flex: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem;">
+          <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Win Rate</div>
+            <div style="font-size: 1rem; font-weight: 700;"><%= week_wr %>%</div>
+          </div>
+          <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg P&L</div>
+            <div style="font-size: 1rem; font-weight: 700;" class="<%= pnl_class(avg_pnl) %>"><%= number_to_currency(avg_pnl) %></div>
+          </div>
+          <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Symbols</div>
+            <div style="font-size: 1rem; font-weight: 700;"><%= symbols_traded.count %></div>
+          </div>
+          <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Plan Adherence</div>
+            <div style="font-size: 1rem; font-weight: 700;">
+              <%= @week_trades.count > 0 ? "#{(followed_plan.to_f / @week_trades.count * 100).round(0)}%" : "—" %>
+            </div>
+          </div>
+          <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Reviewed</div>
+            <div style="font-size: 1rem; font-weight: 700;"><%= reviewed_count %>/<%= @week_trades.count %></div>
+          </div>
+          <% if setups_used.any? %>
+            <div style="padding: 0.5rem; border-radius: var(--radius); background: var(--bg); text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Setups Used</div>
+              <div style="font-size: 0.8125rem; font-weight: 600;"><%= setups_used.count %></div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <%# Symbol breakdown for the week %>
+    <% if symbols_traded.length >= 2 %>
+      <%
+        by_symbol = @week_trades.group_by { |t| t["symbol"] }
+        symbol_stats = by_symbol.map { |sym, trades|
+          pnl_sum = trades.sum { |t| t["pnl"].to_f }
+          { symbol: sym, trades: trades.count, pnl: pnl_sum,
+            wins: trades.count { |t| t["pnl"].to_f > 0 } }
+        }.sort_by { |s| -s[:pnl] }
+      %>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header"><h2>P&L by Symbol</h2></div>
+        <div style="padding: 1rem 1.25rem;">
+          <% sym_max = symbol_stats.map { |s| s[:pnl].abs }.max.to_f %>
+          <% sym_max = 1 if sym_max == 0 %>
+          <% symbol_stats.each do |s| %>
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+              <div style="width: 60px; font-weight: 600; font-size: 0.875rem;"><%= s[:symbol] %></div>
+              <div style="flex: 1; position: relative; height: 20px;">
+                <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border);"></div>
+                <% bar_w = (s[:pnl].abs / sym_max * 45).round(1) %>
+                <% if s[:pnl] >= 0 %>
+                  <div style="position: absolute; left: 50%; top: 2px; bottom: 2px; width: <%= bar_w %>%;
+                              background: var(--positive); opacity: 0.7; border-radius: 0 3px 3px 0;"></div>
+                <% else %>
+                  <div style="position: absolute; right: 50%; top: 2px; bottom: 2px; width: <%= bar_w %>%;
+                              background: var(--negative); opacity: 0.7; border-radius: 3px 0 0 3px;"></div>
+                <% end %>
+              </div>
+              <div style="width: 100px; text-align: right; font-size: 0.8125rem;">
+                <span class="<%= pnl_class(s[:pnl]) %>"><%= number_to_currency(s[:pnl]) %></span>
+                <span class="text-muted">(<%= s[:trades] %>)</span>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <% if @week_trades.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>All Trades This Week</h2>
+        <span class="text-muted"><%= @week_trades.count %> trades</span>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Symbol</th>
+            <th>Side</th>
+            <th>Entry</th>
+            <th>Exit</th>
+            <th>Qty</th>
+            <th>P&L</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @week_trades.each do |trade| %>
+            <tr>
+              <td><%= link_to Date.parse(trade["entry_time"]).strftime("%a %b %d"), trade_path(trade["id"]) if trade["entry_time"] %></td>
+              <td><strong><%= trade["symbol"] %></strong></td>
+              <td><%= trade["side"]&.capitalize %></td>
+              <td><%= number_to_currency(trade["entry_price"]) %></td>
+              <td><%= trade["exit_price"] ? number_to_currency(trade["exit_price"]) : "&mdash;".html_safe %></td>
+              <td><%= trade["quantity"] %></td>
+              <td><%= pnl_display(trade["pnl"]) %></td>
+              <td><%= badge_for(trade["status"]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p>No trading data available for this week.</p>
+  </div>
+<% end %>

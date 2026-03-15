@@ -1,0 +1,9 @@
+<div class="page-header">
+  <h1>New Trade Plan</h1>
+</div>
+
+<div class="card">
+  <%= render "form", trade_plan: @trade_plan,
+             form_url: trade_plans_path, form_method: :post,
+             submit_label: "Create Plan", cancel_path: trade_plans_path %>
+</div>

@@ -1,0 +1,277 @@
+<% content_for(:title) { "Trade Replay ##{@stats_at_point[:trade_number]}" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">replay</span>
+    Trade Replay
+  </h1>
+  <div class="page-actions">
+    <% if @prev_index %>
+      <%= link_to "← Prev", trade_replay_path(index: @prev_index), class: "btn btn-sm" %>
+    <% end %>
+    <span class="btn btn-sm" style="pointer-events: none; font-weight: 700;">
+      #<%= @stats_at_point[:trade_number] %> / <%= @stats_at_point[:total_trades] %>
+    </span>
+    <% if @next_index %>
+      <%= link_to "Next →", trade_replay_path(index: @next_index), class: "btn btn-sm" %>
+    <% end %>
+  </div>
+</div>
+
+<% if @trade %>
+  <%# Trade Card %>
+  <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid <%= @pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+    <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; padding: 1.5rem;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+          <span style="font-size: 1.5rem; font-weight: 700;"><%= @trade["symbol"] %></span>
+          <span style="font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: <%= @side&.downcase&.match?(/long|buy/) ? 'rgba(52,168,83,0.15)' : 'rgba(234,67,53,0.15)' %>; color: <%= @side&.downcase&.match?(/long|buy/) ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;">
+            <%= @side&.upcase %>
+          </span>
+          <% if @trade["setup"].present? %>
+            <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--bg); color: var(--text-secondary);"><%= @trade["setup"] %></span>
+          <% end %>
+        </div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+          <% if @trade["entry_time"] %><%= Time.parse(@trade["entry_time"]).strftime("%b %d, %Y %H:%M") %><% end %>
+          <% if @hold_display %> · <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px;">schedule</span> <%= @hold_display %><% end %>
+          <% if @trade["asset_class"] %> · <%= @trade["asset_class"]&.capitalize %><% end %>
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 2rem; font-weight: 700; color: <%= @pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @pnl >= 0 ? '+' : '' %><%= number_to_currency(@pnl) %>
+        </div>
+        <div style="font-size: 0.875rem; color: <%= @return_pct >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @return_pct >= 0 ? '+' : '' %><%= @return_pct %>%
+          <% if @r_multiple %>
+            · <%= @r_multiple >= 0 ? '+' : '' %><%= @r_multiple %>R
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <%# Trade Details Strip %>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0; border-top: 1px solid var(--border);">
+      <div style="padding: 0.625rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Entry</div>
+        <div style="font-weight: 600;"><%= number_to_currency(@entry) %></div>
+      </div>
+      <div style="padding: 0.625rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Exit</div>
+        <div style="font-weight: 600;"><%= number_to_currency(@exit) %></div>
+      </div>
+      <div style="padding: 0.625rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Qty</div>
+        <div style="font-weight: 600;"><%= @quantity.to_i %></div>
+      </div>
+      <% if @stop > 0 %>
+        <div style="padding: 0.625rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Stop</div>
+          <div style="font-weight: 600; color: var(--negative);"><%= number_to_currency(@stop) %></div>
+        </div>
+      <% end %>
+      <% if @target > 0 %>
+        <div style="padding: 0.625rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Target</div>
+          <div style="font-weight: 600; color: var(--positive);"><%= number_to_currency(@target) %></div>
+        </div>
+      <% end %>
+      <div style="padding: 0.625rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Fees</div>
+        <div style="font-weight: 600;"><%= number_to_currency(@fees) %></div>
+      </div>
+    </div>
+
+    <% if @trade["notes"].present? %>
+      <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border); font-size: 0.8125rem; color: var(--text-secondary); font-style: italic;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">format_quote</span>
+        <%= @trade["notes"] %>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Running Stats at This Point %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">analytics</span> Stats After Trade #<%= @stats_at_point[:trade_number] %></h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Cumulative P&L</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= @total_pnl_at_point >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @total_pnl_at_point >= 0 ? '+' : '' %><%= number_to_currency(@total_pnl_at_point) %>
+        </div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= @stats_at_point[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @stats_at_point[:win_rate] %>%
+        </div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Record</div>
+        <div style="font-size: 1.25rem; font-weight: 700;">
+          <span style="color: var(--positive);"><%= @stats_at_point[:wins] %></span>-<span style="color: var(--negative);"><%= @stats_at_point[:losses] %></span>
+        </div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg P&L</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= @stats_at_point[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= number_to_currency(@stats_at_point[:avg_pnl]) %>
+        </div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Streak</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= @stats_at_point[:streak_type] == :win ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @stats_at_point[:streak] %><%= @stats_at_point[:streak_type] == :win ? 'W' : 'L' %>
+        </div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Max DD</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);">
+          <%= number_to_currency(@stats_at_point[:max_drawdown]) %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Equity Curve up to This Point %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Equity Curve (Trade 1 → #<%= @stats_at_point[:trade_number] %>)</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        eq_vals = @running_equity.map { |e| e[:cumulative] }
+        eq_max = [eq_vals.max.to_f, 0].max
+        eq_min = [eq_vals.min.to_f, 0].min
+        eq_range = [(eq_max - eq_min).abs, 1].max
+        chart_w = 650
+        chart_h = 220
+        x_scale = @running_equity.length > 1 ? (chart_w - 10).to_f / (@running_equity.length - 1) : chart_w
+      %>
+      <svg viewBox="0 0 <%= chart_w + 70 %> <%= chart_h + 20 %>" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <%# Zero line %>
+        <% zero_y = chart_h - (0 - eq_min) / eq_range * (chart_h - 20) %>
+        <line x1="55" y1="<%= zero_y %>" x2="<%= chart_w + 60 %>" y2="<%= zero_y %>" stroke="var(--border)" stroke-width="1" stroke-dasharray="4"/>
+        <text x="50" y="<%= zero_y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="7">$0</text>
+
+        <%# Area fill %>
+        <%
+          area_points = @running_equity.map { |e|
+            x = 60 + e[:index] * x_scale
+            y = chart_h - (e[:cumulative] - eq_min) / eq_range * (chart_h - 20)
+            "#{x.round(1)},#{y.round(1)}"
+          }
+          first_x = 60
+          last_x = 60 + (@running_equity.length - 1) * x_scale
+        %>
+        <polygon points="<%= first_x %>,<%= zero_y %> <%= area_points.join(' ') %> <%= last_x.round(1) %>,<%= zero_y %>"
+                 fill="<%= @total_pnl_at_point >= 0 ? 'var(--positive)' : 'var(--negative)' %>" opacity="0.1"/>
+
+        <%# Line %>
+        <polyline points="<%= area_points.join(' ') %>" fill="none" stroke="<%= @total_pnl_at_point >= 0 ? 'var(--positive)' : 'var(--negative)' %>" stroke-width="2"/>
+
+        <%# Current trade marker %>
+        <% last_e = @running_equity.last %>
+        <% if last_e %>
+          <% cx = 60 + last_e[:index] * x_scale %>
+          <% cy = chart_h - (last_e[:cumulative] - eq_min) / eq_range * (chart_h - 20) %>
+          <circle cx="<%= cx.round(1) %>" cy="<%= cy.round(1) %>" r="5" fill="<%= @pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>" stroke="white" stroke-width="2"/>
+        <% end %>
+
+        <%# Individual trade P&L bars %>
+        <% bar_w = [x_scale * 0.6, 6].min %>
+        <% @running_equity.each do |e| %>
+          <% bx = 60 + e[:index] * x_scale - bar_w / 2 %>
+          <% pnl_h = (e[:pnl].abs / eq_range * (chart_h - 20)).clamp(1, chart_h / 3) %>
+          <% if e[:pnl] >= 0 %>
+            <rect x="<%= bx.round(1) %>" y="<%= (zero_y - pnl_h).round(1) %>" width="<%= bar_w.round(1) %>" height="<%= pnl_h.round(1) %>"
+                  fill="var(--positive)" opacity="<%= e[:index] == @current_index ? '0.6' : '0.2' %>" rx="1"/>
+          <% else %>
+            <rect x="<%= bx.round(1) %>" y="<%= zero_y.round(1) %>" width="<%= bar_w.round(1) %>" height="<%= pnl_h.round(1) %>"
+                  fill="var(--negative)" opacity="<%= e[:index] == @current_index ? '0.6' : '0.2' %>" rx="1"/>
+          <% end %>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+
+  <%# Trade Context Timeline %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">view_timeline</span> Nearby Trades</h2>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="display: flex; gap: 0.375rem; overflow-x: auto;">
+        <% @context_trades.each do |ct| %>
+          <% if ct[:current] %>
+            <div style="flex: 0 0 auto; padding: 0.5rem 0.75rem; border-radius: 6px; border: 2px solid <%= ct[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; background: var(--bg); text-align: center; min-width: 4.5rem;">
+              <div style="font-size: 0.6875rem; font-weight: 700; color: var(--primary);">#<%= ct[:index] + 1 %></div>
+              <div style="font-weight: 700;"><%= ct[:symbol] %></div>
+              <div style="font-size: 0.75rem; font-weight: 600; color: <%= ct[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= ct[:pnl] >= 0 ? '+' : '' %><%= number_to_currency(ct[:pnl]) %></div>
+              <div style="font-size: 0.5625rem; color: var(--text-secondary);"><%= ct[:date] %></div>
+            </div>
+          <% else %>
+            <%= link_to trade_replay_path(index: ct[:index]), style: "flex: 0 0 auto; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid var(--border); text-align: center; text-decoration: none; color: inherit; min-width: 4.5rem; transition: border-color 0.15s;" do %>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">#<%= ct[:index] + 1 %></div>
+              <div style="font-weight: 600; font-size: 0.875rem;"><%= ct[:symbol] %></div>
+              <div style="font-size: 0.75rem; color: <%= ct[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= ct[:pnl] >= 0 ? '+' : '' %><%= number_to_currency(ct[:pnl]) %></div>
+              <div style="font-size: 0.5625rem; color: var(--text-secondary);"><%= ct[:date] %></div>
+            <% end %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Jump To %>
+  <div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
+    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+      <span style="font-size: 0.8125rem; font-weight: 600;">Jump to:</span>
+      <%= link_to "First", trade_replay_path(index: 0), class: "btn btn-sm" %>
+      <%= link_to "Latest", trade_replay_path(index: @trades.length - 1), class: "btn btn-sm" %>
+      <span style="color: var(--text-secondary);">|</span>
+      <% @symbols.first(12).each do |sym| %>
+        <%
+          sym_idx = @trades.rindex { |t| t["symbol"] == sym }
+        %>
+        <% if sym_idx %>
+          <%= link_to sym, trade_replay_path(index: sym_idx), class: "btn btn-sm", style: "font-size: 0.6875rem;" %>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Tags %>
+  <% if @trade["tags"].is_a?(Array) && @trade["tags"].any? %>
+    <div style="margin-bottom: 1rem;">
+      <% @trade["tags"].each do |tag| %>
+        <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary);"><%= tag.is_a?(Hash) ? tag["name"] : tag %></span>
+      <% end %>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem;">replay</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No trades to replay</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades first to use the trade replay feature.</div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <% if @trade %>
+    <%= link_to "View Full Trade", trade_path(@trade["id"]), class: "btn btn-primary" %>
+  <% end %>
+  <%= link_to "Trade Comparison", comparison_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+</div>
+
+<style>
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>

@@ -1,0 +1,270 @@
+<div class="page-header">
+  <h1>Financial Goals</h1>
+  <div class="page-actions">
+    <%= link_to "New Goal", new_budget_goal_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<% if @goals.is_a?(Array) && @goals.any? %>
+  <% active_goals = @goals.select { |g| g["status"] == "active" } %>
+  <% achieved_goals = @goals.select { |g| g["status"] == "achieved" } %>
+  <% abandoned_goals = @goals.select { |g| g["status"] == "abandoned" } %>
+
+  <%
+    total_target = active_goals.sum { |g| g["effective_target_amount"].to_f }
+    total_saved = active_goals.sum { |g| g["effective_current_amount"].to_f }
+    overall_pct = total_target > 0 ? (total_saved / total_target * 100).round(1) : 0
+    on_track_count = active_goals.count { |g| g["on_track"] }
+    nearest_goal = active_goals.sort_by { |g| -(g["percentage_complete"].to_f) }.first
+  %>
+  <%# Overall portfolio progress gauge %>
+  <div class="card" style="display: flex; align-items: center; gap: 2rem; padding: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+    <div style="flex-shrink: 0;">
+      <%
+        gauge_pct = overall_pct / 100.0
+        arc_angle = [gauge_pct * 180, 180].min
+        end_rad = (180 - arc_angle) * Math::PI / 180
+        end_x = (70 + 55 * Math.cos(end_rad)).round(1)
+        end_y = (75 - 55 * Math.sin(end_rad)).round(1)
+        prog_color = overall_pct >= 75 ? "var(--positive)" : overall_pct >= 50 ? "var(--primary)" : overall_pct >= 25 ? "#f9ab00" : "var(--negative)"
+      %>
+      <svg viewBox="0 0 140 85" style="width: 130px;">
+        <path d="M 15 75 A 55 55 0 0 1 125 75" fill="none" stroke="var(--border)" stroke-width="8" stroke-linecap="round" />
+        <% if arc_angle > 0 %>
+          <path d="M 15 75 A 55 55 0 <%= arc_angle > 180 ? 1 : 0 %> 1 <%= end_x %> <%= end_y %>"
+                fill="none" stroke="<%= prog_color %>" stroke-width="8" stroke-linecap="round" />
+        <% end %>
+        <text x="70" y="65" text-anchor="middle" fill="<%= prog_color %>" font-size="20" font-weight="700"><%= overall_pct.round(0) %>%</text>
+        <text x="70" y="80" text-anchor="middle" fill="var(--text-secondary)" font-size="8">overall</text>
+      </svg>
+    </div>
+    <div style="flex: 1; min-width: 200px;">
+      <h2 style="margin-bottom: 0.375rem;">Goal Portfolio</h2>
+      <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.875rem;">
+        <div>
+          <span class="text-muted">Saved</span>
+          <div style="font-weight: 700;"><%= number_to_currency(total_saved) %></div>
+        </div>
+        <div>
+          <span class="text-muted">Target</span>
+          <div style="font-weight: 700;"><%= number_to_currency(total_target) %></div>
+        </div>
+        <div>
+          <span class="text-muted">Remaining</span>
+          <div style="font-weight: 700;"><%= number_to_currency(total_target - total_saved) %></div>
+        </div>
+        <%
+          total_monthly = active_goals.sum { |g| g["monthly_needed"].to_f }
+        %>
+        <% if total_monthly > 0 %>
+          <div>
+            <span class="text-muted">Monthly Need</span>
+            <div style="font-weight: 700;"><%= number_to_currency(total_monthly) %></div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Active</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= active_goals.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Achieved</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= achieved_goals.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">On Track</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= on_track_count == active_goals.count ? 'var(--positive)' : on_track_count > 0 ? 'var(--primary)' : 'var(--negative)' %>;"><%= on_track_count %>/<%= active_goals.count %></div>
+      </div>
+      <% if nearest_goal %>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Nearest</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= nearest_goal["percentage_complete"] %>%</div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= truncate(nearest_goal["name"], length: 18) %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Milestone tracker - visual progress for all active goals %>
+  <% if active_goals.count > 1 %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Goal Milestones</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <% active_goals.sort_by { |g| -g["percentage_complete"].to_f }.each do |goal| %>
+          <%
+            pct = goal["percentage_complete"].to_f
+            milestones = [25, 50, 75, 100]
+            next_milestone = milestones.find { |m| pct < m } || 100
+          %>
+          <div style="margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.375rem;">
+              <strong style="font-size: 0.875rem;"><%= goal["name"] %></strong>
+              <span style="font-size: 0.8125rem; color: var(--text-secondary);">
+                <%= number_to_currency(goal["effective_current_amount"]) %> / <%= number_to_currency(goal["effective_target_amount"]) %>
+              </span>
+            </div>
+            <div style="position: relative; height: 1.25rem; background: var(--bg); border-radius: 0.625rem; overflow: visible;">
+              <div style="position: absolute; inset: 0; border-radius: 0.625rem; overflow: hidden;">
+                <div style="width: <%= [pct, 100].min %>%; height: 100%; background: <%= goal["on_track"] ? 'var(--positive)' : 'var(--negative)' %>; border-radius: 0.625rem; transition: width 0.3s;"></div>
+              </div>
+              <%# Milestone markers %>
+              <% milestones.first(3).each do |m| %>
+                <div style="position: absolute; left: <%= m %>%; top: -2px; bottom: -2px; width: 2px; background: var(--border); z-index: 1;"
+                     title="<%= m %>% milestone"></div>
+              <% end %>
+              <% if pct > 3 %>
+                <div style="position: absolute; left: 0; top: 0; height: 100%; width: <%= [pct, 100].min %>%; display: flex; align-items: center; justify-content: center;">
+                  <span style="font-size: 0.625rem; font-weight: 700; color: white;"><%= pct.round(0) %>%</span>
+                </div>
+              <% end %>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 0.25rem; font-size: 0.625rem; color: var(--text-secondary);">
+              <span>0%</span>
+              <span>25%</span>
+              <span>50%</span>
+              <span>75%</span>
+              <span>100%</span>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if active_goals.any? %>
+    <div class="tags-grid">
+      <% active_goals.sort_by { |g| -g["percentage_complete"].to_f }.each do |goal| %>
+        <%
+          g_pct = goal["percentage_complete"].to_f
+          g_current = goal["effective_current_amount"].to_f
+          g_target = goal["effective_target_amount"].to_f
+          g_remaining = goal["remaining_amount"].to_f
+          g_monthly = goal["monthly_needed"].to_f
+          g_days = goal["days_remaining"]
+          g_on_track = goal["on_track"]
+          g_color = g_on_track ? "var(--positive)" : g_pct >= 50 ? "#f9ab00" : "var(--negative)"
+          # Circular progress ring
+          g_r = 28; g_cx = 32; g_cy = 32
+          g_circum = 2 * Math::PI * g_r
+          g_filled = g_circum * [g_pct, 100].min / 100.0
+        %>
+        <div class="card">
+          <div style="display: flex; align-items: center; gap: 1rem; padding: 1.25rem;">
+            <div style="flex-shrink: 0;">
+              <svg viewBox="0 0 64 64" style="width: 56px; height: 56px;">
+                <circle cx="<%= g_cx %>" cy="<%= g_cy %>" r="<%= g_r %>" fill="none" stroke="var(--border)" stroke-width="5" />
+                <circle cx="<%= g_cx %>" cy="<%= g_cy %>" r="<%= g_r %>" fill="none" stroke="<%= g_color %>" stroke-width="5"
+                        stroke-dasharray="<%= g_filled.round(1) %> <%= (g_circum - g_filled).round(1) %>"
+                        stroke-linecap="round" transform="rotate(-90 <%= g_cx %> <%= g_cy %>)" />
+                <text x="<%= g_cx %>" y="<%= g_cy + 1 %>" text-anchor="middle" dominant-baseline="middle" fill="<%= g_color %>" font-size="12" font-weight="700"><%= g_pct.round(0) %>%</text>
+              </svg>
+            </div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                <strong style="font-size: 1rem;">
+                  <% if goal["icon"].present? %><span style="margin-right: 0.125rem;"><%= goal["icon"] %></span><% end %>
+                  <%= link_to goal["name"], budget_goal_path(goal["id"]) %>
+                </strong>
+                <span class="badge badge-primary" style="font-size: 0.6rem;"><%= goal["goal_type"]&.titleize %></span>
+                <% if g_on_track %>
+                  <span class="badge badge-success" style="font-size: 0.6rem;">On Track</span>
+                <% else %>
+                  <span class="badge badge-danger" style="font-size: 0.6rem;">Behind</span>
+                <% end %>
+              </div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                <%= number_to_currency(g_current) %> of <%= number_to_currency(g_target) %>
+                <% if g_remaining > 0 %>
+                  — <span class="negative"><%= number_to_currency(g_remaining) %> to go</span>
+                <% end %>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding: 0 1.25rem 0.75rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 0.5rem; font-size: 0.8125rem;">
+            <% if g_monthly > 0 %>
+              <div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">Monthly Need</div>
+                <div style="font-weight: 600;"><%= number_to_currency(g_monthly) %></div>
+              </div>
+            <% end %>
+            <% if g_days.present? %>
+              <div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">Days Left</div>
+                <div style="font-weight: 600; color: <%= g_days.to_i <= 30 ? 'var(--negative)' : 'var(--text)' %>;"><%= g_days.to_i > 0 ? g_days : "Past due" %></div>
+              </div>
+            <% end %>
+            <% if goal["target_date"].present? %>
+              <div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">Target Date</div>
+                <div style="font-weight: 600;"><%= Date.parse(goal["target_date"]).strftime("%b %d, %Y") rescue goal["target_date"] %></div>
+              </div>
+            <% end %>
+          </div>
+
+          <div style="padding: 0 1.25rem 1rem;">
+            <%= link_to "Details", budget_goal_path(goal["id"]), class: "btn btn-sm" %>
+            <%= link_to "Contribute", budget_goal_path(goal["id"]), class: "btn btn-sm" %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if achieved_goals.any? %>
+    <h2 style="margin-top: 2rem; margin-bottom: 0.75rem;">
+      <span class="material-icons-outlined" style="font-size: 1.25rem; vertical-align: -3px; color: var(--positive);">emoji_events</span>
+      Achieved Goals
+    </h2>
+    <div class="tags-grid">
+      <% achieved_goals.each do |goal| %>
+        <div class="card" style="border-left: 3px solid var(--positive);">
+          <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem;">
+            <span class="material-icons-outlined" style="font-size: 1.75rem; color: var(--positive);">check_circle</span>
+            <div style="flex: 1;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <strong>
+                  <% if goal["icon"].present? %><span style="margin-right: 0.125rem;"><%= goal["icon"] %></span><% end %>
+                  <%= link_to goal["name"], budget_goal_path(goal["id"]) %>
+                </strong>
+                <span class="badge badge-success" style="font-size: 0.6rem;">Achieved</span>
+              </div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                Target: <%= number_to_currency(goal["effective_target_amount"]) %>
+              </div>
+            </div>
+            <%= link_to "Details", budget_goal_path(goal["id"]), class: "btn btn-sm" %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if abandoned_goals.any? %>
+    <h2 style="margin-top: 2rem; margin-bottom: 0.75rem;">Abandoned Goals</h2>
+    <div class="tags-grid">
+      <% abandoned_goals.each do |goal| %>
+        <div class="card" style="opacity: 0.7;">
+          <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: var(--text-secondary);">cancel</span>
+            <div style="flex: 1;">
+              <strong><%= link_to goal["name"], budget_goal_path(goal["id"]) %></strong>
+              <span class="badge" style="font-size: 0.6rem; margin-left: 0.375rem;"><%= goal["goal_type"]&.titleize %></span>
+            </div>
+            <%= link_to "Details", budget_goal_path(goal["id"]), class: "btn btn-sm" %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p>No financial goals yet. Set a goal to start tracking your progress.</p>
+    <%= link_to "Create Goal", new_budget_goal_path, class: "btn btn-primary" %>
+  </div>
+<% end %>

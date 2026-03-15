@@ -1,2 +1,4 @@
 web: bin/rails server -p 3000
 api: cd ../trading-journal && bin/rails server -p 3001
+notes: cd ../notes-api && bin/rails server -p 3002
+budget: cd ../budget-api && bin/rails server -p 3003

@@ -1,0 +1,415 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="vertical-align: -4px; margin-right: 0.25rem;">receipt_long</span>
+    Bill Negotiation Tracker
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Manage Bills", budget_recurring_index_path, class: "btn" %>
+    <%= link_to "Subscription Audit", budget_reports_subscription_audit_path, class: "btn" %>
+  </div>
+</div>
+
+<% if @bills.any? %>
+  <%# Hero summary card %>
+  <div class="card" style="display: flex; align-items: center; gap: 2rem; padding: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+    <div style="flex-shrink: 0; text-align: center;">
+      <div style="font-size: 2rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_annual_cost) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Annual Bill Cost</div>
+    </div>
+    <div style="flex: 1; display: flex; gap: 1.5rem; flex-wrap: wrap;">
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Potential Savings</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@negotiation_potential) %><span style="font-size: 0.75rem; font-weight: 400;">/yr</span></div>
+      </div>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Cost</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(@total_monthly_cost) %></div>
+      </div>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Bills Tracked</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= @bills.count %></div>
+      </div>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Price Increases</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: <%= @bills_with_increases_count > 0 ? 'var(--negative)' : 'var(--text)' %>;"><%= @bills_with_increases_count %></div>
+      </div>
+    </div>
+  </div>
+
+  <% if @negotiation_potential > 0 %>
+    <div style="background: linear-gradient(135deg, rgba(13,144,79,0.08), rgba(13,144,79,0.02)); border: 1px solid rgba(13,144,79,0.2); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+      <span class="material-icons-outlined" style="color: var(--positive); font-size: 1.5rem;">savings</span>
+      <div>
+        <div style="font-weight: 600; font-size: 0.875rem;">You could save up to <%= number_to_currency(@negotiation_potential) %> per year</div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">That's <%= number_to_currency(@negotiation_potential / 12.0) %>/month by negotiating your top bills. Estimated at 15% savings on negotiable services.</div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Negotiation Opportunities %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1rem; color: var(--primary); vertical-align: -2px;">handshake</span>
+        Negotiation Opportunities
+      </h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Sorted by savings potential</span>
+    </div>
+    <div style="padding: 0.5rem 1.25rem;">
+      <% @bills.each do |bill| %>
+        <%
+          priority_color = if bill[:negotiation_score] >= 60
+                             "var(--negative)"
+                           elsif bill[:negotiation_score] >= 35
+                             "#f9ab00"
+                           else
+                             "var(--text-secondary)"
+                           end
+          priority_label = if bill[:negotiation_score] >= 60
+                             "High"
+                           elsif bill[:negotiation_score] >= 35
+                             "Medium"
+                           else
+                             "Low"
+                           end
+          estimated_savings = bill[:annual] * 0.15
+        %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0; border-bottom: 1px solid var(--border);">
+          <%# Priority indicator %>
+          <div style="width: 3px; height: 2rem; border-radius: 2px; background: <%= priority_color %>; flex-shrink: 0;"></div>
+
+          <%# Bill info %>
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 0.8125rem; font-weight: 600;"><%= bill[:name] %></span>
+              <span style="font-size: 0.625rem; padding: 0.125rem 0.375rem; border-radius: 0.25rem; background: color-mix(in srgb, <%= priority_color %> 15%, transparent); color: <%= priority_color %>; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;"><%= priority_label %></span>
+              <% if bill[:classification] == "essential" %>
+                <span style="font-size: 0.625rem; padding: 0.125rem 0.375rem; border-radius: 0.25rem; background: var(--bg); color: var(--text-secondary);">Essential</span>
+              <% elsif bill[:classification] == "luxury" %>
+                <span style="font-size: 0.625rem; padding: 0.125rem 0.375rem; border-radius: 0.25rem; background: color-mix(in srgb, #9334e6 15%, transparent); color: #9334e6;">Luxury</span>
+              <% end %>
+            </div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= bill[:category] || bill[:bill_type]&.capitalize %> &middot; <%= bill[:frequency]&.capitalize %></div>
+          </div>
+
+          <%# Cost info %>
+          <div style="text-align: right; min-width: 5.5rem;">
+            <div style="font-size: 0.8125rem; font-weight: 700;"><%= number_to_currency(bill[:monthly]) %><span style="font-size: 0.6875rem; font-weight: 400;">/mo</span></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= number_to_currency(bill[:annual]) %>/yr</div>
+          </div>
+
+          <%# Price change indicator %>
+          <div style="text-align: center; min-width: 3.5rem;">
+            <% if bill[:price_change_pct] > 2 %>
+              <div style="font-size: 0.75rem; font-weight: 600; color: var(--negative);">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px;">trending_up</span>
+                +<%= bill[:price_change_pct] %>%
+              </div>
+            <% elsif bill[:price_change_pct] < -2 %>
+              <div style="font-size: 0.75rem; font-weight: 600; color: var(--positive);">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px;">trending_down</span>
+                <%= bill[:price_change_pct] %>%
+              </div>
+            <% else %>
+              <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px;">trending_flat</span>
+              </div>
+            <% end %>
+          </div>
+
+          <%# Potential savings badge %>
+          <div style="min-width: 5rem; text-align: right;">
+            <% if bill[:negotiation_score] >= 35 %>
+              <span style="font-size: 0.75rem; font-weight: 600; color: var(--positive); background: color-mix(in srgb, var(--positive) 10%, transparent); padding: 0.25rem 0.5rem; border-radius: 0.25rem;">
+                Save ~<%= number_to_currency(estimated_savings) %>
+              </span>
+            <% else %>
+              <span style="font-size: 0.6875rem; color: var(--text-secondary);">&mdash;</span>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <%# Total row %>
+      <div style="display: flex; justify-content: space-between; padding: 0.75rem 0 0.5rem; font-weight: 600; font-size: 0.875rem;">
+        <span>Total Annual Bills</span>
+        <span><%= number_to_currency(@total_annual_cost) %>/yr</span>
+      </div>
+    </div>
+  </div>
+
+  <%# Price Increase Alerts %>
+  <% if @price_increases.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1rem; color: var(--negative); vertical-align: -2px;">notifications_active</span>
+          Price Increase Alerts
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @price_increases.count %> detected</span>
+      </div>
+      <div style="padding: 0.75rem 1.25rem;">
+        <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          These bills have increased in price based on comparing average transaction amounts from the last 6 months vs the prior 6 months.
+        </p>
+        <% @price_increases.each do |bill| %>
+          <div style="display: flex; align-items: center; gap: 1rem; padding: 0.625rem 0; border-bottom: 1px solid var(--border);">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--negative);">arrow_circle_up</span>
+            <div style="flex: 1;">
+              <div style="font-size: 0.8125rem; font-weight: 600;"><%= bill[:name] %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= bill[:category] %></div>
+            </div>
+            <div style="text-align: right;">
+              <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem;">
+                <span style="color: var(--text-secondary); text-decoration: line-through;"><%= number_to_currency(bill[:old_avg]) %></span>
+                <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--negative);">arrow_forward</span>
+                <span style="font-weight: 700;"><%= number_to_currency(bill[:new_avg]) %></span>
+              </div>
+              <div style="font-size: 0.75rem; font-weight: 600; color: var(--negative);">+<%= bill[:price_change_pct] %>% increase</div>
+            </div>
+          </div>
+        <% end %>
+        <div style="margin-top: 0.75rem; padding: 0.75rem; border-radius: var(--radius); background: var(--bg);">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--primary);">lightbulb</span>
+          <span style="font-size: 0.8125rem;">
+            Price increases are the best time to negotiate. Call and mention the increase -- most providers will offer a discount to keep you.
+          </span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Cancellation Candidates %>
+  <% cancel_items = @cancellation_candidates.select { |b| b[:classification] != "essential" }.first(10) %>
+  <% if cancel_items.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1rem; color: #f9ab00; vertical-align: -2px;">cancel</span>
+          Cancellation Candidates
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">Discretionary bills to review</span>
+      </div>
+      <div style="padding: 0.75rem 1.25rem;">
+        <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          Non-essential bills worth reviewing. Ask yourself: "Would I sign up for this again today at this price?"
+        </p>
+        <%
+          total_cancel_savings = cancel_items.sum { |b| b[:annual] }
+        %>
+        <% cancel_items.each do |bill| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--text-secondary);">
+              <%= case bill[:bill_type]
+                  when "streaming" then "movie"
+                  when "gym" then "fitness_center"
+                  when "phone" then "smartphone"
+                  when "internet" then "wifi"
+                  when "cable" then "tv"
+                  when "insurance" then "shield"
+                  when "utility" then "bolt"
+                  else "receipt"
+                  end %>
+            </span>
+            <div style="flex: 1;">
+              <div style="font-size: 0.8125rem; font-weight: 600;"><%= bill[:name] %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+                <%= bill[:classification]&.capitalize %> &middot; <%= bill[:bill_type]&.capitalize %>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 0.8125rem; font-weight: 700;"><%= number_to_currency(bill[:monthly]) %>/mo</div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= number_to_currency(bill[:annual]) %>/yr</div>
+            </div>
+          </div>
+        <% end %>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0 0.25rem; font-size: 0.875rem;">
+          <span style="font-weight: 600;">If you canceled all of these:</span>
+          <span style="font-weight: 700; color: var(--positive);">Save <%= number_to_currency(total_cancel_savings) %>/yr</span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Bill Classification Breakdown %>
+  <%
+    essential_bills = @bills.select { |b| b[:classification] == "essential" }
+    discretionary_bills = @bills.select { |b| b[:classification] == "discretionary" }
+    luxury_bills = @bills.select { |b| b[:classification] == "luxury" }
+    essential_total = essential_bills.sum { |b| b[:annual] }
+    discretionary_total = discretionary_bills.sum { |b| b[:annual] }
+    luxury_total = luxury_bills.sum { |b| b[:annual] }
+  %>
+  <div class="content-grid" style="margin-bottom: 1.5rem;">
+    <% [
+      { items: essential_bills, label: "Essential", total: essential_total, color: "#1a73e8", icon: "home" },
+      { items: discretionary_bills, label: "Discretionary", total: discretionary_total, color: "#f9ab00", icon: "shopping_bag" },
+      { items: luxury_bills, label: "Luxury", total: luxury_total, color: "#9334e6", icon: "diamond" }
+    ].each do |group| %>
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <span class="material-icons-outlined" style="font-size: 1rem; color: <%= group[:color] %>; vertical-align: -2px;"><%= group[:icon] %></span>
+            <%= group[:label] %>
+          </h2>
+          <span style="font-size: 0.8125rem; font-weight: 600;"><%= group[:items].count %></span>
+        </div>
+        <% if group[:items].any? %>
+          <div style="padding: 0.5rem 1.25rem;">
+            <% group[:items].sort_by { |b| -b[:annual] }.each do |bill| %>
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.375rem 0; border-bottom: 1px solid var(--border);">
+                <div>
+                  <div style="font-size: 0.8125rem; font-weight: 600;"><%= bill[:name] %></div>
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= bill[:category] %></div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="font-size: 0.8125rem; font-weight: 700;"><%= number_to_currency(bill[:monthly]) %>/mo</div>
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= number_to_currency(bill[:annual]) %>/yr</div>
+                </div>
+              </div>
+            <% end %>
+            <div style="display: flex; justify-content: space-between; padding: 0.5rem 0; font-weight: 600; font-size: 0.875rem;">
+              <span>Subtotal</span>
+              <span><%= number_to_currency(group[:total] / 12.0) %>/mo</span>
+            </div>
+          </div>
+        <% else %>
+          <p class="text-muted" style="padding: 0.75rem 1.25rem; font-size: 0.8125rem;">No bills in this category.</p>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Negotiation Playbook %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1rem; color: var(--primary); vertical-align: -2px;">menu_book</span>
+        Negotiation Playbook
+      </h2>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Proven tactics for negotiating each type of bill. Pick the relevant section and call your provider.
+      </p>
+
+      <%
+        bill_type_icons = {
+          "internet" => "wifi",
+          "insurance" => "shield",
+          "phone" => "smartphone",
+          "streaming" => "movie",
+          "gym" => "fitness_center",
+          "utility" => "bolt",
+          "cable" => "tv",
+          "other" => "receipt"
+        }
+        # Only show tip sections for bill types the user actually has, plus "other" as general
+        user_bill_types = @bills.map { |b| b[:bill_type] }.uniq
+        relevant_tips = @negotiation_tips.select { |type, _| user_bill_types.include?(type) || type == "other" }
+      %>
+
+      <% relevant_tips.each_with_index do |(bill_type, tips), idx| %>
+        <div style="<%= 'margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);' if idx > 0 %>">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--primary);"><%= bill_type_icons[bill_type] || "receipt" %></span>
+            <span style="font-size: 0.875rem; font-weight: 600;"><%= bill_type == "other" ? "General Tips" : bill_type.capitalize %></span>
+            <%
+              matching_bills = @bills.select { |b| b[:bill_type] == bill_type }
+              type_total = matching_bills.sum { |b| b[:monthly] }
+            %>
+            <% if matching_bills.any? && bill_type != "other" %>
+              <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: auto;">
+                <%= matching_bills.count %> bill<%= matching_bills.count == 1 ? '' : 's' %> &middot; <%= number_to_currency(type_total) %>/mo
+              </span>
+            <% end %>
+          </div>
+          <% tips.each do |tip| %>
+            <div style="display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.25rem 0 0.25rem 1.5rem;">
+              <span class="material-icons-outlined" style="font-size: 0.75rem; color: var(--positive); margin-top: 0.1875rem; flex-shrink: 0;">check_circle</span>
+              <span style="font-size: 0.8125rem;"><%= tip %></span>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <%# General negotiation script %>
+      <div style="margin-top: 1.25rem; padding: 1rem; border-radius: var(--radius); background: var(--bg);">
+        <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--primary);">record_voice_over</span>
+          Sample Negotiation Script
+        </div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.6;">
+          "Hi, I've been a loyal customer for [X months/years] and I've noticed my rate has gone up.
+          I'd like to stay, but I've seen competitive offers from [competitor] at a lower price.
+          Is there anything you can do to help me with a better rate?"
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; font-style: italic;">
+          Key: Be polite, mention tenure, reference competitors, and ask for the retention/loyalty department.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Savings Scenarios %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1rem; color: var(--positive); vertical-align: -2px;">calculate</span>
+        Savings Scenarios
+      </h2>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <%
+        negotiable_bills = @bills.select { |b| b[:negotiation_score] >= 35 && b[:classification] != "essential" }
+        scenarios = [
+          { label: "Negotiate top bill (15% off)", savings: @bills.first ? @bills.first[:annual] * 0.15 : 0 },
+          { label: "Negotiate top 3 bills (15% off)", savings: @bills.first(3).sum { |b| b[:annual] } * 0.15 },
+          { label: "Negotiate all high-priority bills", savings: @bills.select { |b| b[:negotiation_score] >= 60 }.sum { |b| b[:annual] } * 0.15 },
+          { label: "Cancel all luxury items", savings: luxury_total },
+          { label: "10% reduction across all bills", savings: @total_annual_cost * 0.10 }
+        ]
+      %>
+      <% scenarios.each do |scenario| %>
+        <% next if scenario[:savings] <= 0 %>
+        <div style="display: flex; align-items: center; gap: 1rem; padding: 0.625rem 0; border-bottom: 1px solid var(--border);">
+          <span style="font-size: 0.8125rem; flex: 1;"><%= scenario[:label] %></span>
+          <span style="font-size: 0.875rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(scenario[:savings] / 12.0) %>/mo</span>
+          <span style="font-size: 0.8125rem; color: var(--text-secondary); min-width: 5rem; text-align: right;"><%= number_to_currency(scenario[:savings]) %>/yr</span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Bottom navigation %>
+  <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem;">
+    <%= link_to budget_reports_subscription_audit_path, class: "card", style: "flex: 1; min-width: 12rem; padding: 1rem 1.25rem; text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.75rem;" do %>
+      <span class="material-icons-outlined" style="color: var(--primary);">subscriptions</span>
+      <div>
+        <div style="font-size: 0.875rem; font-weight: 600;">Subscription Audit</div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Full subscription breakdown</div>
+      </div>
+    <% end %>
+    <%= link_to budget_recurring_index_path, class: "card", style: "flex: 1; min-width: 12rem; padding: 1rem 1.25rem; text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.75rem;" do %>
+      <span class="material-icons-outlined" style="color: var(--primary);">event_repeat</span>
+      <div>
+        <div style="font-size: 0.875rem; font-weight: 600;">Recurring Bills</div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Manage your recurring bills</div>
+      </div>
+    <% end %>
+    <%= link_to budget_reports_spending_path, class: "card", style: "flex: 1; min-width: 12rem; padding: 1rem 1.25rem; text-decoration: none; color: inherit; display: flex; align-items: center; gap: 0.75rem;" do %>
+      <span class="material-icons-outlined" style="color: var(--primary);">bar_chart</span>
+      <div>
+        <div style="font-size: 0.875rem; font-weight: 600;">Spending Report</div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Overall spending analysis</div>
+      </div>
+    <% end %>
+  </div>
+
+<% else %>
+  <div class="card empty-state">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 0.75rem;">receipt_long</span>
+    <p>No recurring bills found. Add your bills and subscriptions to start tracking negotiation opportunities.</p>
+    <%= link_to "Add Recurring Bill", new_budget_recurring_path, class: "btn btn-primary" %>
+  </div>
+<% end %>

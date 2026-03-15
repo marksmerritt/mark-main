@@ -1,0 +1,445 @@
+<% content_for(:title) { "Trade Comparison" } %>
+
+<style>
+  .tcmp-header {
+    display: flex; align-items: center; gap: 0.625rem;
+    margin-bottom: 1.5rem;
+  }
+  .tcmp-header h1 { font-size: 1.5rem; font-weight: 700; margin: 0; }
+  .tcmp-header .material-icons-outlined { font-size: 1.75rem; color: #3949ab; }
+  .tcmp-selector-grid {
+    display: grid; grid-template-columns: 1fr auto 1fr auto;
+    gap: 0.75rem; align-items: end;
+  }
+  @media (max-width: 640px) {
+    .tcmp-selector-grid { grid-template-columns: 1fr; }
+  }
+  .tcmp-selector-grid select {
+    width: 100%; padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    background: var(--surface); color: var(--text); font-size: 0.875rem;
+  }
+  .tcmp-selector-grid .tcmp-vs {
+    font-weight: 700; font-size: 1rem; color: var(--text-secondary);
+    text-align: center; padding-bottom: 0.375rem;
+  }
+  .tcmp-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+  .tcmp-table th, .tcmp-table td {
+    padding: 0.625rem 1rem; border-bottom: 1px solid var(--border);
+    text-align: center;
+  }
+  .tcmp-table th { background: var(--bg); font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 600; }
+  .tcmp-table td:first-child { text-align: left; font-weight: 500; color: var(--text-secondary); }
+  .tcmp-table th:first-child { text-align: left; }
+  .tcmp-winner-cell { background: rgba(13,144,79,0.07); font-weight: 700; color: var(--positive); }
+  .tcmp-loser-cell { opacity: 0.7; }
+  .tcmp-verdict-card {
+    border-top: 4px solid #3949ab; margin-bottom: 1.5rem;
+  }
+  .tcmp-verdict-icon { font-size: 2rem; color: #3949ab; }
+  .tcmp-verdict-title { font-size: 1.125rem; font-weight: 700; margin-bottom: 0.25rem; }
+  .tcmp-verdict-subtitle { font-size: 0.8125rem; color: var(--text-secondary); }
+  .tcmp-checklist { list-style: none; padding: 0; margin: 0.75rem 0 0; }
+  .tcmp-checklist li {
+    display: flex; align-items: center; gap: 0.5rem;
+    padding: 0.375rem 0; font-size: 0.8125rem; border-bottom: 1px solid var(--border);
+  }
+  .tcmp-checklist li:last-child { border-bottom: none; }
+  .tcmp-checklist .material-icons-outlined { font-size: 1rem; }
+  .tcmp-check-a { color: #1a73e8; }
+  .tcmp-check-b { color: #e8710a; }
+  .tcmp-recent-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.75rem;
+  }
+  .tcmp-trade-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 0.875rem 1rem; display: flex; justify-content: space-between; align-items: center;
+    transition: border-color 0.15s;
+  }
+  .tcmp-trade-card:hover { border-color: #3949ab; }
+  .tcmp-trade-symbol { font-weight: 700; font-size: 1rem; }
+  .tcmp-trade-meta { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.125rem; }
+  .tcmp-trade-pnl { font-weight: 700; font-size: 0.9375rem; }
+  .tcmp-quick-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1rem 1.25rem; text-align: center;
+  }
+  .tcmp-quick-card h3 { font-size: 0.875rem; font-weight: 600; margin: 0 0 0.5rem; color: var(--text-secondary); }
+  .tcmp-similar-list { list-style: none; padding: 0; margin: 0; }
+  .tcmp-similar-list li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.8125rem;
+  }
+  .tcmp-similar-list li:last-child { border-bottom: none; }
+  .tcmp-score-bar {
+    display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 0.5rem 0;
+  }
+  .tcmp-score-a { background: #1a73e8; }
+  .tcmp-score-b { background: #e8710a; }
+</style>
+
+<div class="tcmp-header">
+  <span class="material-icons-outlined">compare</span>
+  <h1>Trade Comparison</h1>
+</div>
+
+<%# ===================== TRADE SELECTOR ===================== %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header" style="display: flex; align-items: center; gap: 0.375rem;">
+    <span class="material-icons-outlined" style="font-size: 1.125rem; color: #3949ab;">swap_horiz</span>
+    <h2 style="margin: 0; font-size: 1rem;">Select Two Trades to Compare</h2>
+  </div>
+  <div style="padding: 1rem 1.25rem;">
+    <form method="get" action="<%= trade_compare_path %>">
+      <div class="tcmp-selector-grid">
+        <div>
+          <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Trade A</label>
+          <select name="trade_a">
+            <option value="">-- Select Trade A --</option>
+            <% (@closed_trades || []).each_with_index do |t, idx| %>
+              <% pnl = t["pnl"].to_f %>
+              <% selected = params[:trade_a].to_s == t["id"].to_s || params[:trade_a].to_s == idx.to_s %>
+              <option value="<%= t["id"] || idx %>" <%= "selected" if selected %>>
+                <%= (t["symbol"] || "N/A").upcase %> (<%= t["side"] %>) &mdash; <%= pnl >= 0 ? "+" : "" %><%= number_to_currency(pnl) %> &mdash; <%= t["entry_time"].to_s.slice(0, 10) %>
+              </option>
+            <% end %>
+          </select>
+        </div>
+
+        <div class="tcmp-vs">VS</div>
+
+        <div>
+          <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Trade B</label>
+          <select name="trade_b">
+            <option value="">-- Select Trade B --</option>
+            <% (@closed_trades || []).each_with_index do |t, idx| %>
+              <% pnl = t["pnl"].to_f %>
+              <% selected = params[:trade_b].to_s == t["id"].to_s || params[:trade_b].to_s == idx.to_s %>
+              <option value="<%= t["id"] || idx %>" <%= "selected" if selected %>>
+                <%= (t["symbol"] || "N/A").upcase %> (<%= t["side"] %>) &mdash; <%= pnl >= 0 ? "+" : "" %><%= number_to_currency(pnl) %> &mdash; <%= t["entry_time"].to_s.slice(0, 10) %>
+              </option>
+            <% end %>
+          </select>
+        </div>
+
+        <div>
+          <button type="submit" class="btn btn-primary" style="white-space: nowrap;">
+            <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">compare_arrows</span>
+            Compare
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<% if @trade_a && @trade_b && @comparison_rows %>
+  <%# ===================== SIDE-BY-SIDE COMPARISON ===================== %>
+
+  <%# Summary Header %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 0; text-align: center;">
+      <div style="padding: 1.25rem; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; text-transform: uppercase; color: #1a73e8; font-weight: 600; letter-spacing: 0.05em;">Trade A</div>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;"><%= @metrics_a[:symbol] %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @metrics_a[:direction] %> &middot; <%= @metrics_a[:quantity] %> shares</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.5rem; color: <%= @metrics_a[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @metrics_a[:pnl] >= 0 ? "+" : "" %><%= number_to_currency(@metrics_a[:pnl]) %>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; justify-content: center; padding: 0 1rem;">
+        <span class="material-icons-outlined" style="font-size: 2rem; color: var(--text-secondary);">compare_arrows</span>
+      </div>
+      <div style="padding: 1.25rem; border-left: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; text-transform: uppercase; color: #e8710a; font-weight: 600; letter-spacing: 0.05em;">Trade B</div>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;"><%= @metrics_b[:symbol] %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @metrics_b[:direction] %> &middot; <%= @metrics_b[:quantity] %> shares</div>
+        <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.5rem; color: <%= @metrics_b[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @metrics_b[:pnl] >= 0 ? "+" : "" %><%= number_to_currency(@metrics_b[:pnl]) %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Comparison Table %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header" style="display: flex; align-items: center; gap: 0.375rem;">
+      <span class="material-icons-outlined" style="font-size: 1.125rem; color: #3949ab;">table_chart</span>
+      <h2 style="margin: 0; font-size: 1rem;">Side-by-Side Metrics</h2>
+    </div>
+    <div style="overflow-x: auto;">
+      <table class="tcmp-table">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th style="color: #1a73e8;">Trade A (<%= @metrics_a[:symbol] %>)</th>
+            <th style="color: #e8710a;">Trade B (<%= @metrics_b[:symbol] %>)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @comparison_rows.each do |row| %>
+            <tr>
+              <td><%= row[:label] %></td>
+              <td class="<%= row[:winner] == :a ? 'tcmp-winner-cell' : (row[:winner] == :b ? 'tcmp-loser-cell' : '') %>">
+                <% if row[:winner] == :a %>
+                  <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--positive);">check_circle</span>
+                <% end %>
+                <%= row[:val_a] %>
+              </td>
+              <td class="<%= row[:winner] == :b ? 'tcmp-winner-cell' : (row[:winner] == :a ? 'tcmp-loser-cell' : '') %>">
+                <% if row[:winner] == :b %>
+                  <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--positive);">check_circle</span>
+                <% end %>
+                <%= row[:val_b] %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# ===================== VERDICT ===================== %>
+  <% if @verdict %>
+    <div class="card tcmp-verdict-card" style="margin-bottom: 1.5rem;">
+      <div style="padding: 1.25rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+          <span class="material-icons-outlined tcmp-verdict-icon">emoji_events</span>
+          <div>
+            <div class="tcmp-verdict-title">
+              <% if @verdict[:overall] == :a %>
+                Trade A (<%= @metrics_a[:symbol] %>) wins
+              <% elsif @verdict[:overall] == :b %>
+                Trade B (<%= @metrics_b[:symbol] %>) wins
+              <% else %>
+                It's a tie!
+              <% end %>
+            </div>
+            <div class="tcmp-verdict-subtitle">
+              Score: Trade A <%= @verdict[:scores][:a] %> &mdash; Trade B <%= @verdict[:scores][:b] %>
+            </div>
+          </div>
+        </div>
+
+        <%# Score bar %>
+        <% total_score = [@verdict[:scores][:a] + @verdict[:scores][:b], 1].max %>
+        <div class="tcmp-score-bar">
+          <div class="tcmp-score-a" style="width: <%= (@verdict[:scores][:a].to_f / total_score * 100).round(1) %>%;"></div>
+          <div class="tcmp-score-b" style="width: <%= (@verdict[:scores][:b].to_f / total_score * 100).round(1) %>%;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          <span style="color: #1a73e8; font-weight: 600;">Trade A: <%= @verdict[:scores][:a] %></span>
+          <span style="color: #e8710a; font-weight: 600;">Trade B: <%= @verdict[:scores][:b] %></span>
+        </div>
+
+        <%# Reasons checklist %>
+        <% if @verdict[:reasons].any? %>
+          <ul class="tcmp-checklist">
+            <% @verdict[:reasons].each do |r| %>
+              <li>
+                <span class="material-icons-outlined <%= r[:winner] == :a ? 'tcmp-check-a' : 'tcmp-check-b' %>">
+                  <%= r[:winner] == :a ? "arrow_back" : "arrow_forward" %>
+                </span>
+                <span style="font-weight: 600;"><%= r[:metric] %>:</span>
+                <span style="color: var(--text-secondary);"><%= r[:detail] %></span>
+              </li>
+            <% end %>
+          </ul>
+        <% end %>
+
+        <%# Key Takeaways %>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg); border-radius: var(--radius); font-size: 0.8125rem;">
+          <div style="font-weight: 600; margin-bottom: 0.375rem;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">lightbulb</span>
+            Key Takeaways
+          </div>
+          <ul style="margin: 0; padding-left: 1.25rem; color: var(--text-secondary);">
+            <% if @metrics_a[:pnl] > 0 && @metrics_b[:pnl] > 0 %>
+              <li>Both trades were profitable. Study what they had in common.</li>
+            <% elsif @metrics_a[:pnl] < 0 && @metrics_b[:pnl] < 0 %>
+              <li>Both trades resulted in losses. Identify shared weaknesses.</li>
+            <% else %>
+              <% winner = @metrics_a[:pnl] > @metrics_b[:pnl] ? @metrics_a : @metrics_b %>
+              <% loser = @metrics_a[:pnl] > @metrics_b[:pnl] ? @metrics_b : @metrics_a %>
+              <li>Compare the winning trade's setup to the losing one to spot differences.</li>
+            <% end %>
+            <% if @metrics_a[:risk_reward].to_f > 0 && @metrics_b[:risk_reward].to_f > 0 %>
+              <% better_rr = [@metrics_a, @metrics_b].max_by { |m| m[:risk_reward].to_f } %>
+              <li><%= better_rr[:symbol] %> had the better planned risk/reward at <%= better_rr[:risk_reward] %>:1.</li>
+            <% end %>
+            <% if @metrics_a[:stop_loss] > 0 && @metrics_b[:stop_loss] == 0 %>
+              <li><%= @metrics_a[:symbol] %> used a stop loss while <%= @metrics_b[:symbol] %> did not. Consider always using stops.</li>
+            <% elsif @metrics_b[:stop_loss] > 0 && @metrics_a[:stop_loss] == 0 %>
+              <li><%= @metrics_b[:symbol] %> used a stop loss while <%= @metrics_a[:symbol] %> did not. Consider always using stops.</li>
+            <% end %>
+          </ul>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ===================== SIMILAR TRADES ===================== %>
+  <% if @similar_trades.present? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header" style="display: flex; align-items: center; gap: 0.375rem;">
+        <span class="material-icons-outlined" style="font-size: 1.125rem; color: #3949ab;">content_copy</span>
+        <h2 style="margin: 0; font-size: 1rem;">Similar Trades</h2>
+      </div>
+      <div style="padding: 0 1.25rem 1rem;">
+        <p style="font-size: 0.8125rem; color: var(--text-secondary); margin: 0.75rem 0;">
+          Other trades with the same symbol as the compared trades.
+        </p>
+        <ul class="tcmp-similar-list">
+          <% @similar_trades.each do |st| %>
+            <li>
+              <div>
+                <span style="font-weight: 700;"><%= st[:symbol] %></span>
+                <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.375rem;"><%= st[:side] %></span>
+                <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.375rem;"><%= st[:reason] %></span>
+              </div>
+              <div>
+                <span style="font-weight: 700; color: <%= st[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                  <%= st[:pnl] >= 0 ? "+" : "" %><%= number_to_currency(st[:pnl]) %>
+                </span>
+                <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.5rem;">
+                  <%= st[:entry_time].to_s.slice(0, 10) %>
+                </span>
+              </div>
+            </li>
+          <% end %>
+        </ul>
+      </div>
+    </div>
+  <% end %>
+
+<% else %>
+  <%# ===================== NO TRADES SELECTED ===================== %>
+
+  <% if @closed_trades.present? && @closed_trades.length >= 2 %>
+    <%# Quick Comparisons %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header" style="display: flex; align-items: center; gap: 0.375rem;">
+        <span class="material-icons-outlined" style="font-size: 1.125rem; color: #3949ab;">bolt</span>
+        <h2 style="margin: 0; font-size: 1rem;">Quick Comparisons</h2>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <% if @best_trade && @worst_trade && @best_trade["id"] != @worst_trade["id"] %>
+            <div class="tcmp-quick-card">
+              <h3>
+                <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">emoji_events</span>
+                Best vs Worst
+              </h3>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                Compare your highest and lowest P&L trades
+              </div>
+              <%= link_to trade_compare_path(trade_a: @best_trade["id"], trade_b: @worst_trade["id"]), class: "btn btn-primary", style: "font-size: 0.8125rem;" do %>
+                <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">compare_arrows</span>
+                Compare
+              <% end %>
+              <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+                <span style="color: var(--positive); font-weight: 600;"><%= (@best_trade["symbol"] || "N/A").upcase %> +<%= number_to_currency(@best_trade["pnl"].to_f) %></span>
+                vs
+                <span style="color: var(--negative); font-weight: 600;"><%= (@worst_trade["symbol"] || "N/A").upcase %> <%= number_to_currency(@worst_trade["pnl"].to_f) %></span>
+              </div>
+            </div>
+          <% end %>
+
+          <% if @first_trade && @last_trade && @first_trade["id"] != @last_trade["id"] %>
+            <div class="tcmp-quick-card">
+              <h3>
+                <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">history</span>
+                First vs Last
+              </h3>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                See how your trading has evolved over time
+              </div>
+              <%= link_to trade_compare_path(trade_a: @first_trade["id"], trade_b: @last_trade["id"]), class: "btn btn-primary", style: "font-size: 0.8125rem;" do %>
+                <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">compare_arrows</span>
+                Compare
+              <% end %>
+              <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+                <span style="font-weight: 600;"><%= (@first_trade["symbol"] || "N/A").upcase %></span>
+                (<%= @first_trade["entry_time"].to_s.slice(0, 10) %>)
+                vs
+                <span style="font-weight: 600;"><%= (@last_trade["symbol"] || "N/A").upcase %></span>
+                (<%= @last_trade["entry_time"].to_s.slice(0, 10) %>)
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Recent Trades Grid %>
+  <% if @recent_trades.present? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header" style="display: flex; align-items: center; gap: 0.375rem;">
+        <span class="material-icons-outlined" style="font-size: 1.125rem; color: #3949ab;">list_alt</span>
+        <h2 style="margin: 0; font-size: 1rem;">Recent Closed Trades</h2>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <p style="font-size: 0.8125rem; color: var(--text-secondary); margin: 0 0 0.75rem;">
+          Select two trades from the dropdown above, or use the quick comparison buttons.
+        </p>
+        <div class="tcmp-recent-grid">
+          <% @recent_trades.each do |t| %>
+            <% pnl = t["pnl"].to_f %>
+            <div class="tcmp-trade-card">
+              <div>
+                <div class="tcmp-trade-symbol"><%= (t["symbol"] || "N/A").upcase %></div>
+                <div class="tcmp-trade-meta">
+                  <%= t["side"] %> &middot; <%= t["entry_time"].to_s.slice(0, 10) %>
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div class="tcmp-trade-pnl" style="color: <%= pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                  <%= pnl >= 0 ? "+" : "" %><%= number_to_currency(pnl) %>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% elsif @closed_trades.blank? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div style="padding: 2rem; text-align: center;">
+        <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary);">compare</span>
+        <div style="margin-top: 0.75rem; font-size: 1rem; font-weight: 600;">No Closed Trades Found</div>
+        <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Close some trades with P&L to use the comparison tool.
+        </div>
+        <%= link_to "Go to Trades", trades_path, class: "btn btn-primary", style: "margin-top: 1rem;" %>
+      </div>
+    </div>
+  <% end %>
+<% end %>
+
+<%# ===================== Bottom Navigation ===================== %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to trades_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">list</span> Trades
+  <% end %>
+  <%= link_to edge_finder_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">gps_fixed</span> Edge Finder
+  <% end %>
+  <%= link_to trade_replay_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem;">replay</span> Replay
+  <% end %>
+</div>
+
+<style>
+  @media (max-width: 640px) {
+    .tcmp-recent-grid { grid-template-columns: 1fr !important; }
+    div[style*="grid-template-columns: 1fr auto 1fr"] { grid-template-columns: 1fr !important; }
+    div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+  }
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>

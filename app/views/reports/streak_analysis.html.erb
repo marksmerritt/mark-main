@@ -1,0 +1,352 @@
+<div class="page-header">
+  <h1>Streak Analysis</h1>
+  <div class="page-actions">
+    <button class="btn" onclick="window.print()">
+      <span class="material-icons-outlined">print</span> Print
+    </button>
+  </div>
+</div>
+
+<div class="card">
+  <%= form_with url: reports_streak_analysis_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :start_date, "Start Date" %>
+        <%= f.date_field :start_date, value: params[:start_date], class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :end_date, "End Date" %>
+        <%= f.date_field :end_date, value: params[:end_date], class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+        <%= link_to "Clear", reports_streak_analysis_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @timeline.present? && @timeline.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_trades %></div>
+      </div>
+      <% if @best_win_streak %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Win Streak</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= @best_win_streak[:count] %> trades</div>
+          <div style="font-size: 0.75rem;" class="positive"><%= number_to_currency(@best_win_streak[:pnl]) %></div>
+        </div>
+      <% end %>
+      <% if @worst_loss_streak %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Loss Streak</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= @worst_loss_streak[:count] %> trades</div>
+          <div style="font-size: 0.75rem;" class="negative"><%= number_to_currency(@worst_loss_streak[:pnl]) %></div>
+        </div>
+      <% end %>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win Streak</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @avg_win_streak %> trades</div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss Streak</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @avg_loss_streak %> trades</div>
+      </div>
+    </div>
+  </div>
+
+  <%# Consistency Metrics %>
+  <% if @consistency %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Consistency Score</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <%
+          # Compute a consistency score (0-100)
+          # Factors: win rate, profit factor, low CV, profitable days
+          wr_score = @consistency[:positive_pct].clamp(0, 100) * 0.3
+          cv_score = (100 - @consistency[:cv].clamp(0, 200) / 2.0) * 0.25
+          day_score = @consistency[:total_days] > 0 ? (@consistency[:profitable_days].to_f / @consistency[:total_days] * 100).round(0) * 0.25 : 0
+          streak_score = @best_win_streak && @worst_loss_streak ? ([@best_win_streak[:count] - @worst_loss_streak[:count], 0].max * 5).clamp(0, 100) * 0.2 : 50 * 0.2
+          total_score = (wr_score + cv_score + day_score + streak_score).round(0).clamp(0, 100)
+          score_color = total_score >= 70 ? "var(--positive)" : total_score >= 45 ? "var(--primary)" : total_score >= 25 ? "#f9ab00" : "var(--negative)"
+          score_label = total_score >= 70 ? "Highly Consistent" : total_score >= 45 ? "Moderately Consistent" : total_score >= 25 ? "Inconsistent" : "Very Inconsistent"
+        %>
+        <div style="display: flex; gap: 2rem; flex-wrap: wrap; align-items: center;">
+          <div style="position: relative; width: 100px; height: 100px; flex-shrink: 0;">
+            <svg viewBox="0 0 36 36" style="transform: rotate(-90deg); width: 100%; height: 100%;">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" stroke-width="3" />
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="<%= score_color %>"
+                      stroke-width="3" stroke-dasharray="<%= total_score %> 100" stroke-linecap="round" />
+            </svg>
+            <div style="position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+              <span style="font-size: 1.25rem; font-weight: 700; color: <%= score_color %>;"><%= total_score %></span>
+              <span style="font-size: 0.5rem; color: var(--text-secondary);">/ 100</span>
+            </div>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-size: 1rem; font-weight: 700; color: <%= score_color %>; margin-bottom: 0.25rem;"><%= score_label %></div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8125rem;">
+              <div>
+                <span style="color: var(--text-secondary);">Win Rate:</span> <strong><%= @consistency[:positive_pct] %>%</strong>
+              </div>
+              <div>
+                <span style="color: var(--text-secondary);">Profitable Days:</span>
+                <strong><%= @consistency[:profitable_days] %>/<%= @consistency[:total_days] %></strong>
+              </div>
+              <div>
+                <span style="color: var(--text-secondary);">P&L Std Dev:</span> <strong><%= number_to_currency(@consistency[:stddev]) %></strong>
+              </div>
+              <div>
+                <span style="color: var(--text-secondary);">Variation:</span>
+                <strong><%= @consistency[:cv] %>%</strong>
+                <span style="font-size: 0.6875rem; color: var(--text-secondary);">(lower = better)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Running Equity Curve %>
+  <% if @running_equity && @running_equity.length >= 5 %>
+    <%
+      eq_w = 700
+      eq_h = 200
+      eq_pad_l = 55
+      eq_pad_r = 15
+      eq_pad_t = 15
+      eq_pad_b = 30
+      eq_cw = eq_w - eq_pad_l - eq_pad_r
+      eq_ch = eq_h - eq_pad_t - eq_pad_b
+
+      eq_vals = @running_equity.map { |e| e[:equity] }
+      eq_min = [eq_vals.min, 0].min
+      eq_max = [eq_vals.max, 0].max
+      eq_range = eq_max - eq_min
+      eq_range = 1 if eq_range == 0
+
+      eq_points = @running_equity.each_with_index.map { |e, i|
+        x = eq_pad_l + (i.to_f / (@running_equity.length - 1) * eq_cw)
+        y = eq_pad_t + eq_ch - ((e[:equity] - eq_min) / eq_range * eq_ch)
+        "#{x.round(1)},#{y.round(1)}"
+      }.join(' ')
+
+      # Fill area (close the polygon)
+      zero_y = eq_pad_t + eq_ch - ((0 - eq_min) / eq_range * eq_ch)
+      eq_fill = eq_points + " #{eq_pad_l + eq_cw},#{zero_y.round(1)} #{eq_pad_l},#{zero_y.round(1)}"
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>Equity Curve</h2>
+        <span class="text-muted"><%= @running_equity.length %> trades</span>
+      </div>
+      <div style="padding: 1rem 1.25rem; overflow-x: auto;">
+        <svg viewBox="0 0 <%= eq_w %> <%= eq_h %>" style="width: 100%; max-width: <%= eq_w %>px; height: auto;">
+          <%# Grid lines %>
+          <% 5.times do |i| %>
+            <%
+              y_val = eq_min + eq_range * i / 4.0
+              y_pos = eq_pad_t + eq_ch - (i / 4.0 * eq_ch)
+            %>
+            <line x1="<%= eq_pad_l %>" y1="<%= y_pos.round(1) %>" x2="<%= eq_w - eq_pad_r %>" y2="<%= y_pos.round(1) %>"
+                  stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3" />
+            <text x="<%= eq_pad_l - 6 %>" y="<%= y_pos.round(1) + 3 %>" text-anchor="end"
+                  fill="var(--text-secondary)" font-size="9">
+              $<%= (y_val / 1000.0).round(1) %>k
+            </text>
+          <% end %>
+          <%# Zero line %>
+          <line x1="<%= eq_pad_l %>" y1="<%= zero_y.round(1) %>" x2="<%= eq_w - eq_pad_r %>" y2="<%= zero_y.round(1) %>"
+                stroke="var(--text-secondary)" stroke-width="0.5" />
+          <%# Fill %>
+          <polygon points="<%= eq_fill %>" fill="var(--primary)" opacity="0.08" />
+          <%# Line %>
+          <polyline points="<%= eq_points %>" fill="none" stroke="var(--primary)" stroke-width="2" />
+          <%# Highlight max/min %>
+          <%
+            max_eq = @running_equity.max_by { |e| e[:equity] }
+            min_eq = @running_equity.min_by { |e| e[:equity] }
+            max_i = @running_equity.index(max_eq)
+            min_i = @running_equity.index(min_eq)
+            max_x = eq_pad_l + (max_i.to_f / (@running_equity.length - 1) * eq_cw)
+            max_y = eq_pad_t + eq_ch - ((max_eq[:equity] - eq_min) / eq_range * eq_ch)
+            min_x = eq_pad_l + (min_i.to_f / (@running_equity.length - 1) * eq_cw)
+            min_y = eq_pad_t + eq_ch - ((min_eq[:equity] - eq_min) / eq_range * eq_ch)
+          %>
+          <circle cx="<%= max_x.round(1) %>" cy="<%= max_y.round(1) %>" r="4" fill="var(--positive)" stroke="var(--surface)" stroke-width="1.5">
+            <title>Peak: <%= number_to_currency(max_eq[:equity]) %> (Trade #<%= max_eq[:trade] %>)</title>
+          </circle>
+          <circle cx="<%= min_x.round(1) %>" cy="<%= min_y.round(1) %>" r="4" fill="var(--negative)" stroke="var(--surface)" stroke-width="1.5">
+            <title>Trough: <%= number_to_currency(min_eq[:equity]) %> (Trade #<%= min_eq[:trade] %>)</title>
+          </circle>
+          <%# X-axis labels %>
+          <text x="<%= eq_pad_l %>" y="<%= eq_h - 5 %>" fill="var(--text-secondary)" font-size="9">Trade 1</text>
+          <text x="<%= eq_w - eq_pad_r %>" y="<%= eq_h - 5 %>" text-anchor="end" fill="var(--text-secondary)" font-size="9">Trade <%= @running_equity.length %></text>
+        </svg>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Daily P&L Consistency Chart %>
+  <% if @daily_pnls && @daily_pnls.length >= 3 %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>Daily P&L</h2>
+        <span class="text-muted"><%= @daily_pnls.count { |d| d[:pnl] > 0 } %>/<%= @daily_pnls.count %> profitable days</span>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: flex; align-items: flex-end; gap: 2px; height: 100px;">
+          <% max_daily = @daily_pnls.map { |d| d[:pnl].abs }.max.to_f %>
+          <% max_daily = 1 if max_daily == 0 %>
+          <% @daily_pnls.last(30).each do |d| %>
+            <% h = (d[:pnl].abs / max_daily * 90).round(1) %>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: flex-end; height: 100%;"
+                 title="<%= d[:date] %>: <%= number_to_currency(d[:pnl]) %>">
+              <div style="height: <%= [h, 2].max %>px;
+                          background: <%= d[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;
+                          border-radius: 2px 2px 0 0; opacity: 0.7;"></div>
+            </div>
+          <% end %>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 0.25rem; font-size: 0.625rem; color: var(--text-secondary);">
+          <span><%= @daily_pnls.last(30).first&.dig(:date) %></span>
+          <span><%= @daily_pnls.last&.dig(:date) %></span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Streak Timeline</h2>
+      <span class="text-muted">Visual history of wins and losses</span>
+    </div>
+    <div class="streak-timeline" style="padding: 1rem 1.25rem;">
+      <div class="streak-blocks">
+        <% @timeline.each_with_index do |streak, idx| %>
+          <%
+            max_streak = @timeline.map { |s| s[:count] }.max.to_f
+            width_pct = [(streak[:count] / max_streak * 100).round(1), 8].max
+            css_class = streak[:type] == "win" ? "streak-block-win" : "streak-block-loss"
+            first_date = streak[:trades].first&.dig("entry_time")&.to_s&.slice(0, 10)
+          %>
+          <div class="streak-block <%= css_class %>"
+               style="flex: <%= streak[:count] %>;"
+               title="<%= streak[:count] %> <%= streak[:type] %>s: <%= number_to_currency(streak[:pnl]) %> (<%= first_date %>)">
+            <% if streak[:count] >= 2 %>
+              <span class="streak-block-label"><%= streak[:count] %></span>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+        <span class="text-muted" style="font-size: 0.75rem;">
+          <span style="display: inline-block; width: 10px; height: 10px; background: var(--positive); border-radius: 2px; vertical-align: middle;"></span> Win
+          &nbsp;
+          <span style="display: inline-block; width: 10px; height: 10px; background: var(--negative); border-radius: 2px; vertical-align: middle;"></span> Loss
+        </span>
+        <span class="text-muted" style="font-size: 0.75rem;"><%= @timeline.count %> streaks total</span>
+      </div>
+    </div>
+  </div>
+
+  <% if @after_win_streak || @after_loss_streak %>
+    <div class="content-grid">
+      <% if @after_win_streak %>
+        <div class="card">
+          <div class="card-header">
+            <h2>After 3+ Win Streak</h2>
+          </div>
+          <div class="text-content" style="padding: 1rem 1.25rem;">
+            <p>After a winning streak of 3+, the next trade:</p>
+            <div class="card" style="margin-top: 0.75rem;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+                <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Sample Size</div>
+                  <div style="font-size: 1.5rem; font-weight: 700;"><%= @after_win_streak[:count] %></div>
+                </div>
+                <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+                  <div style="font-size: 1.5rem; font-weight: 700;"><%= @after_win_streak[:win_rate] %>%</div>
+                </div>
+                <div style="padding: 1rem; text-align: center;">
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg P&L</div>
+                  <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(@after_win_streak[:avg_pnl]) %>"><%= number_to_currency(@after_win_streak[:avg_pnl]) %></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+
+      <% if @after_loss_streak %>
+        <div class="card">
+          <div class="card-header">
+            <h2>After 3+ Loss Streak</h2>
+          </div>
+          <div class="text-content" style="padding: 1rem 1.25rem;">
+            <p>After a losing streak of 3+, the next trade:</p>
+            <div class="card" style="margin-top: 0.75rem;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+                <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Sample Size</div>
+                  <div style="font-size: 1.5rem; font-weight: 700;"><%= @after_loss_streak[:count] %></div>
+                </div>
+                <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+                  <div style="font-size: 1.5rem; font-weight: 700;"><%= @after_loss_streak[:win_rate] %>%</div>
+                </div>
+                <div style="padding: 1rem; text-align: center;">
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg P&L</div>
+                  <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(@after_loss_streak[:avg_pnl]) %>"><%= number_to_currency(@after_loss_streak[:avg_pnl]) %></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Streak Details</h2>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Type</th>
+          <th>Length</th>
+          <th>P&L</th>
+          <th>Start Date</th>
+          <th>Symbols</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @timeline.each_with_index do |streak, idx| %>
+          <tr>
+            <td><%= idx + 1 %></td>
+            <td>
+              <span class="badge <%= streak[:type] == 'win' ? 'badge-completed' : 'badge-closed' %>">
+                <%= streak[:type].capitalize %>
+              </span>
+            </td>
+            <td><strong><%= streak[:count] %></strong></td>
+            <td class="<%= pnl_class(streak[:pnl]) %>"><%= number_to_currency(streak[:pnl]) %></td>
+            <td><%= streak[:trades].first&.dig("entry_time")&.to_s&.slice(0, 10) %></td>
+            <td class="text-muted"><%= streak[:trades].map { |t| t["symbol"] }.uniq.join(", ") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <div class="card empty-state" style="padding: 3rem; text-align: center;">
+    <p>No closed trades found.</p>
+  </div>
+<% end %>

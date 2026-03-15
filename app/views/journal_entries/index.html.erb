@@ -1,7 +1,141 @@
 <div class="page-header">
   <h1>Journal Entries</h1>
-  <%= link_to "New Entry", new_journal_entry_path, class: "btn btn-primary" %>
+  <div class="page-actions">
+    <%= link_to calendar_journal_entries_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">calendar_month</span> Calendar
+    <% end %>
+    <%= link_to "New Entry", new_journal_entry_path, class: "btn btn-primary" %>
+  </div>
 </div>
+
+<%# Journaling Stats and Streak %>
+<% if @journal_entries.is_a?(Array) && @journal_entries.count >= 3 %>
+  <%
+    entries_by_date = @journal_entries.map { |e| e["date"] }.compact.uniq.sort.reverse
+    streak = 0
+    if entries_by_date.any?
+      check_date = Date.current
+      entries_by_date.each do |d|
+        entry_date = Date.parse(d) rescue nil
+        next unless entry_date
+        if entry_date == check_date || entry_date == check_date - 1
+          streak += 1
+          check_date = entry_date - 1
+        else
+          break
+        end
+      end
+    end
+
+    total_entries = @journal_entries.count
+    entries_with_mood = @journal_entries.count { |e| e["mood"].present? }
+    mood_pct = total_entries > 0 ? (entries_with_mood.to_f / total_entries * 100).round(0) : 0
+    moods = @journal_entries.map { |e| e["mood"] }.compact
+    dominant_mood = moods.tally.max_by { |_, v| v }&.first
+    entries_with_pnl = @journal_entries.count { |e| e["daily_pnl"].present? }
+    total_pnl = @journal_entries.sum { |e| e["daily_pnl"].to_f }
+    positive_days = @journal_entries.count { |e| e["daily_pnl"].to_f > 0 }
+  %>
+  <div class="card" style="display: flex; align-items: center; gap: 1.5rem; padding: 1.25rem; margin-bottom: 1rem; flex-wrap: wrap;">
+    <%# Streak circle %>
+    <div style="text-align: center; flex-shrink: 0;">
+      <%
+        s_size = 70; s_r = 28; s_cx = 35; s_cy = 35
+        s_circum = 2 * Math::PI * s_r
+        s_target = 30 # 30 day streak as "max"
+        s_pct = [streak.to_f / s_target * 100, 100].min
+        s_filled = s_circum * s_pct / 100.0
+        s_color = streak >= 7 ? "var(--positive)" : streak >= 3 ? "var(--primary)" : "var(--border)"
+      %>
+      <svg width="<%= s_size %>" height="<%= s_size %>" viewBox="0 0 <%= s_size %> <%= s_size %>">
+        <circle cx="<%= s_cx %>" cy="<%= s_cy %>" r="<%= s_r %>" fill="none" stroke="var(--border)" stroke-width="4" />
+        <circle cx="<%= s_cx %>" cy="<%= s_cy %>" r="<%= s_r %>" fill="none" stroke="<%= s_color %>" stroke-width="4"
+                stroke-dasharray="<%= s_filled.round(1) %> <%= s_circum.round(1) %>"
+                stroke-linecap="round" transform="rotate(-90 <%= s_cx %> <%= s_cy %>)" />
+        <text x="<%= s_cx %>" y="<%= s_cy - 2 %>" text-anchor="middle" font-size="16" font-weight="700" fill="<%= s_color %>"><%= streak %></text>
+        <text x="<%= s_cx %>" y="<%= s_cy + 10 %>" text-anchor="middle" font-size="6" fill="var(--text-secondary)">day streak</text>
+      </svg>
+    </div>
+
+    <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; flex: 1;">
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Entries</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= total_entries %></div>
+      </div>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Mood Logged</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= mood_pct %>%</div>
+      </div>
+      <% if dominant_mood %>
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Dominant Mood</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= dominant_mood.capitalize %></div>
+        </div>
+      <% end %>
+      <% if entries_with_pnl > 0 %>
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total P&L</div>
+          <div style="font-size: 1.125rem; font-weight: 700;" class="<%= total_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(total_pnl) %></div>
+        </div>
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Green Days</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= positive_days %> / <%= entries_with_pnl %></div>
+        </div>
+      <% end %>
+      <% if streak >= 3 %>
+        <div style="display: flex; align-items: center; gap: 0.25rem;">
+          <span class="material-icons-outlined" style="font-size: 1rem; color: var(--positive);">local_fire_department</span>
+          <span style="font-size: 0.8125rem; font-weight: 600; color: var(--positive);">
+            <%= streak >= 14 ? "Incredible!" : streak >= 7 ? "On fire!" : "Building consistency" %>
+          </span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# 30-day journaling heatmap %>
+  <%
+    entry_dates = @journal_entries.each_with_object({}) do |e, h|
+      next unless e["date"].present?
+      h[e["date"]] = (h[e["date"]] || 0) + 1
+    end
+    today = Date.current
+    days_30 = (0..29).map { |i| today - (29 - i) }
+    heatmap_max = entry_dates.values.max || 1
+    journaled_days = days_30.count { |d| entry_dates[d.strftime("%Y-%m-%d")].to_i > 0 }
+    consistency = (journaled_days.to_f / 30 * 100).round(0)
+  %>
+  <div class="card" style="margin-bottom: 1rem;">
+    <div class="card-header">
+      <h2>30-Day Activity</h2>
+      <span style="font-size: 0.8125rem; color: var(--text-secondary);">
+        <%= journaled_days %>/30 days (<%= consistency %>%)
+      </span>
+    </div>
+    <div style="padding: 0.75rem 1.25rem;">
+      <div style="display: flex; gap: 3px; flex-wrap: wrap;">
+        <% days_30.each do |day| %>
+          <%
+            date_str = day.strftime("%Y-%m-%d")
+            count = entry_dates[date_str] || 0
+            intensity = count > 0 ? (count.to_f / heatmap_max).clamp(0.3, 1) : 0
+            is_today = day == today
+          %>
+          <div style="width: calc((100% - 87px) / 30); min-width: 14px; aspect-ratio: 1;
+                      border-radius: 3px;
+                      background: <%= count > 0 ? "rgba(26,115,232, #{(intensity * 0.7).round(2)})" : "var(--bg)" %>;
+                      border: <%= is_today ? '2px solid var(--primary)' : '1px solid var(--border)' %>;"
+               title="<%= day.strftime('%b %d') %>: <%= count %> entr<%= count == 1 ? 'y' : 'ies' %>">
+          </div>
+        <% end %>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 0.375rem; font-size: 0.625rem; color: var(--text-secondary);">
+        <span><%= days_30.first.strftime("%b %d") %></span>
+        <span>Today</span>
+      </div>
+    </div>
+  </div>
+<% end %>
 
 <div class="card">
   <%= form_with url: journal_entries_path, method: :get, class: "filter-form" do |f| %>
@@ -28,6 +162,103 @@
     </div>
   <% end %>
 </div>
+
+<% if @mood_analytics.present? && @mood_analytics["distribution"].present? %>
+<div class="mood-tracker-section">
+  <div class="section-header">
+    <h2><span class="material-icons-outlined">psychology</span> Mood Tracker</h2>
+  </div>
+
+  <div class="mood-tracker-grid">
+    <%# Mood Distribution %>
+    <div class="card mood-distribution-card">
+      <h3>Mood Distribution</h3>
+      <div class="mood-bars">
+        <% total = @mood_analytics["entries_with_mood"].to_i %>
+        <% mood_colors = { "great" => "#0d904f", "good" => "#34a853", "neutral" => "#9aa0a6", "bad" => "#ea8600", "terrible" => "#d93025" } %>
+        <% mood_icons = { "great" => "sentiment_very_satisfied", "good" => "sentiment_satisfied", "neutral" => "sentiment_neutral", "bad" => "sentiment_dissatisfied", "terrible" => "sentiment_very_dissatisfied" } %>
+        <% @mood_analytics["distribution"].each do |item| %>
+          <% pct = total > 0 ? (item["count"].to_f / total * 100).round(1) : 0 %>
+          <div class="mood-bar-row">
+            <div class="mood-bar-label">
+              <span class="material-icons-outlined" style="color: <%= mood_colors[item["mood"]] %>"><%= mood_icons[item["mood"]] || "sentiment_neutral" %></span>
+              <span><%= item["mood"]&.capitalize %></span>
+            </div>
+            <div class="mood-bar-track">
+              <div class="mood-bar-fill" style="width: <%= pct %>%; background: <%= mood_colors[item["mood"]] || "var(--text-secondary)" %>"></div>
+            </div>
+            <span class="mood-bar-value"><%= item["count"] %> (<%= pct %>%)</span>
+          </div>
+        <% end %>
+      </div>
+      <div class="mood-dist-footer">
+        <span><%= total %> entries with mood logged</span>
+        <span><%= @mood_analytics["total_entries"].to_i %> total entries</span>
+      </div>
+    </div>
+
+    <%# Mood vs Performance %>
+    <div class="card mood-performance-card">
+      <h3>Mood vs. Trading Performance</h3>
+      <% if @mood_analytics["mood_performance"].present? %>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Mood</th>
+              <th>Avg P&L</th>
+              <th>Win Rate</th>
+              <th>Days</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @mood_analytics["mood_performance"].each do |mp| %>
+              <tr>
+                <td>
+                  <span class="material-icons-outlined" style="color: <%= mood_colors[mp["mood"]] %>; vertical-align: middle; font-size: 1.1rem;"><%= mood_icons[mp["mood"]] || "sentiment_neutral" %></span>
+                  <%= mp["mood"]&.capitalize %>
+                </td>
+                <td class="<%= mp["avg_pnl"].to_f >= 0 ? "positive" : "negative" %>"><%= number_to_currency(mp["avg_pnl"]) %></td>
+                <td><%= mp["win_rate"] %>%</td>
+                <td><%= mp["trade_days"] %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+        <% best = @mood_analytics["best_mood"] %>
+        <% if best && best["trade_days"].to_i >= 3 %>
+          <div class="mood-insight">
+            <span class="material-icons-outlined">lightbulb</span>
+            You trade best when feeling <strong><%= best["mood"]&.capitalize %></strong> — averaging <%= number_to_currency(best["avg_pnl"]) %>/day with a <%= best["win_rate"] %>% win rate.
+          </div>
+        <% end %>
+      <% else %>
+        <p class="text-secondary">Log moods on your journal entries to see how they correlate with trading performance.</p>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Weekly Mood Trend %>
+  <% if @mood_analytics["weekly_trend"].present? && @mood_analytics["weekly_trend"].size > 1 %>
+    <div class="card">
+      <h3>Weekly Mood Trend</h3>
+      <div class="mood-trend-chart"
+           data-controller="chart"
+           data-chart-type-value="line"
+           data-chart-data-value='<%= @mood_analytics["weekly_trend"].map { |w| { label: w["label"], value: w["avg_score"] } }.to_json %>'
+           data-chart-height-value="180"
+           data-chart-color-value="#1a73e8">
+      </div>
+      <div class="mood-scale-legend">
+        <span>1 = Terrible</span>
+        <span>2 = Bad</span>
+        <span>3 = Neutral</span>
+        <span>4 = Good</span>
+        <span>5 = Great</span>
+      </div>
+    </div>
+  <% end %>
+</div>
+<% end %>
 
 <% if @journal_entries.is_a?(Array) && @journal_entries.any? %>
   <div class="entries-list"

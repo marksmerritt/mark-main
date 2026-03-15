@@ -10,27 +10,50 @@
   </div>
 </div>
 
-<% if @tag["stats"] %>
-  <div class="stats-grid">
-    <div class="card stat-card">
-      <h3>Trades</h3>
-      <p class="stat-value"><%= @tag["stats"]["trade_count"] %></p>
+<%
+  if @tag["stats"]
+    ts = @tag["stats"]
+    ts_trades = ts["trade_count"].to_i
+    ts_pnl = ts["total_pnl"].to_f
+    ts_wr = ts["win_rate"].to_f
+    ts_avg = ts["avg_pnl"].to_f
+    ts_wins = ts["win_count"].to_i
+    ts_losses = ts["loss_count"].to_i
+    # Profit factor
+    ts_pf = ts["profit_factor"].to_f if ts["profit_factor"]
+%>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 1.5rem; padding: 1.25rem; flex-wrap: wrap;">
+      <div style="flex-shrink: 0; width: 56px; height: 56px; border-radius: 50%; background: <%= @tag["color"].present? ? @tag["color"] + '22' : 'var(--bg)' %>; border: 3px solid <%= @tag["color"].presence || 'var(--border)' %>; display: flex; align-items: center; justify-content: center;">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: <%= @tag["color"].presence || 'var(--text-secondary)' %>;">sell</span>
+      </div>
+      <div style="flex: 1; min-width: 200px;">
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @tag["name"] %></div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+          <%= ts_trades %> trades
+          <% if ts_wins > 0 || ts_losses > 0 %>
+            &middot; <%= ts_wins %>W / <%= ts_losses %>L
+          <% end %>
+        </div>
+      </div>
     </div>
-    <div class="card stat-card">
-      <h3>Total P&L</h3>
-      <p class="stat-value <%= @tag["stats"]["total_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
-        <%= number_to_currency(@tag["stats"]["total_pnl"]) %>
-      </p>
-    </div>
-    <div class="card stat-card">
-      <h3>Win Rate</h3>
-      <p class="stat-value"><%= @tag["stats"]["win_rate"] %>%</p>
-    </div>
-    <div class="card stat-card">
-      <h3>Avg P&L</h3>
-      <p class="stat-value <%= @tag["stats"]["avg_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
-        <%= number_to_currency(@tag["stats"]["avg_pnl"]) %>
-      </p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0; border-top: 1px solid var(--border);">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= ts_trades %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= ts_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(ts_pnl) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= ts_wr >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= ts_wr %>%</div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= ts_avg >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(ts_avg) %></div>
+      </div>
     </div>
   </div>
 <% end %>

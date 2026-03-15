@@ -1,0 +1,144 @@
+<% content_for(:title) { "Trading Report Card" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">school</span>
+    Trading Report Card
+  </h1>
+</div>
+
+<% if @trades.blank? || @trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem;">school</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Not enough trades</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades to generate your report card.</div>
+  </div>
+<% else %>
+
+  <%# Overall Grade Hero %>
+  <div class="card" style="margin-bottom: 1.5rem; text-align: center; padding: 2rem;">
+    <div style="position: relative; display: inline-block;">
+      <svg viewBox="0 0 120 120" style="width: 8rem; height: 8rem;">
+        <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" stroke-width="8"/>
+        <%
+          grade_color = case @overall_grade
+                        when "A" then "var(--positive)"
+                        when "B" then "var(--primary)"
+                        when "C" then "#fbbc04"
+                        when "D" then "#ff5722"
+                        else "var(--negative)"
+                        end
+          dash = (326.7 * @overall_score / 100.0).round(1)
+        %>
+        <circle cx="60" cy="60" r="52" fill="none" stroke="<%= grade_color %>" stroke-width="8"
+                stroke-dasharray="<%= dash %> 326.7" stroke-linecap="round" transform="rotate(-90 60 60)"/>
+      </svg>
+      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+        <div style="font-size: 2.5rem; font-weight: 700; color: <%= grade_color %>; line-height: 1;"><%= @overall_grade %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @overall_score %>/100</div>
+      </div>
+    </div>
+    <div style="margin-top: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);">
+      Overall Trading Grade · Based on <%= @trades.count %> trades
+    </div>
+  </div>
+
+  <%# Strengths & Weaknesses %>
+  <% if @strongest && @weakest && @strongest[:name] != @weakest[:name] %>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+      <div class="card" style="padding: 1rem 1.25rem; border-left: 4px solid var(--positive);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Biggest Strength</div>
+        <div style="font-weight: 700; margin-top: 0.25rem;"><%= @strongest[:name] %> — <%= @strongest[:grade] %></div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= @strongest[:tip] %></div>
+      </div>
+      <div class="card" style="padding: 1rem 1.25rem; border-left: 4px solid var(--negative);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Needs Work</div>
+        <div style="font-weight: 700; margin-top: 0.25rem;"><%= @weakest[:name] %> — <%= @weakest[:grade] %></div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= @weakest[:tip] %></div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Grade Cards %>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <% @grades.each do |g| %>
+      <%
+        g_color = case g[:grade]
+                  when "A" then "var(--positive)"
+                  when "B" then "var(--primary)"
+                  when "C" then "#fbbc04"
+                  when "D" then "#ff5722"
+                  else "var(--negative)"
+                  end
+      %>
+      <div class="card">
+        <div style="padding: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= g_color %>;"><%= g[:icon] %></span>
+              <span style="font-weight: 700;"><%= g[:name] %></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 1.5rem; font-weight: 700; color: <%= g_color %>;"><%= g[:grade] %></span>
+            </div>
+          </div>
+
+          <div style="font-size: 1.125rem; font-weight: 700; margin-bottom: 0.25rem;"><%= g[:value] %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.75rem;"><%= g[:detail] %></div>
+
+          <%# Score bar %>
+          <div style="height: 0.375rem; background: var(--bg); border-radius: 3px; overflow: hidden; margin-bottom: 0.5rem;">
+            <div style="height: 100%; width: <%= g[:score] %>%; background: <%= g_color %>; opacity: 0.7; border-radius: 3px;"></div>
+          </div>
+
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">
+            <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px;">lightbulb</span>
+            <%= g[:tip] %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Score Comparison Bar Chart %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Score Overview</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @grades.sort_by { |g| -g[:score] }.each do |g| %>
+        <%
+          g_color = case g[:grade]
+                    when "A" then "var(--positive)"
+                    when "B" then "var(--primary)"
+                    when "C" then "#fbbc04"
+                    when "D" then "#ff5722"
+                    else "var(--negative)"
+                    end
+        %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+          <span style="width: 7rem; font-size: 0.8125rem; text-align: right; font-weight: 500;"><%= g[:name] %></span>
+          <div style="flex: 1; height: 1.25rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= g[:score] %>%; background: <%= g_color %>; opacity: 0.6; border-radius: 4px;"></div>
+          </div>
+          <span style="min-width: 2rem; font-size: 0.8125rem; font-weight: 700; color: <%= g_color %>;"><%= g[:grade] %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Scorecard", reports_scorecard_path, class: "btn" %>
+  <%= link_to "Discipline", reports_discipline_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+  <%= link_to "Dashboard", root_path, class: "btn" %>
+</div>
+
+<style>
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>

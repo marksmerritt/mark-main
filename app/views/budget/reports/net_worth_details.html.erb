@@ -1,0 +1,223 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">account_balance</span>
+    Net Worth Details
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Net Worth", budget_reports_net_worth_path, class: "btn btn-sm" %>
+    <%= form_tag budget_reports_take_snapshot_path, method: :post, style: "display: inline;" do %>
+      <button type="submit" class="btn btn-sm btn-primary">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">add_a_photo</span> Snapshot
+      </button>
+    <% end %>
+  </div>
+</div>
+
+<%# Net Worth Hero %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 2rem; text-align: center;">
+  <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">Total Net Worth</div>
+  <div style="font-size: 3rem; font-weight: 700; color: <%= @net_worth_amount >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+    <%= number_to_currency(@net_worth_amount) %>
+  </div>
+  <% if @nw_change %>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">
+      <span style="color: <%= @nw_change >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;"><%= @nw_change >= 0 ? 'trending_up' : 'trending_down' %></span>
+        <%= @nw_change >= 0 ? '+' : '' %><%= number_to_currency(@nw_change) %> (<%= @nw_change_pct >= 0 ? '+' : '' %><%= @nw_change_pct %>%)
+      </span>
+      <span style="color: var(--text-secondary);"> since last snapshot</span>
+    </div>
+  <% end %>
+  <% if @nw_all_time_change %>
+    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+      All-time change: <span style="color: <%= @nw_all_time_change >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @nw_all_time_change >= 0 ? '+' : '' %><%= number_to_currency(@nw_all_time_change) %></span>
+    </div>
+  <% end %>
+</div>
+
+<%# Summary Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Assets</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@total_assets) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Liabilities</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_liabilities) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Debt-to-Asset</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @debt_to_asset < 30 ? 'var(--positive)' : @debt_to_asset < 60 ? '#f9ab00' : 'var(--negative)' %>;"><%= @debt_to_asset %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Snapshots</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @snapshots.count %></div>
+    </div>
+  </div>
+</div>
+
+<%# Assets vs Liabilities Visual %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+  <h3 style="font-size: 0.875rem; margin-bottom: 1rem;">Balance Sheet</h3>
+  <% total = @total_assets + @total_liabilities; total = 1 if total == 0 %>
+  <div style="display: flex; height: 2rem; border-radius: 6px; overflow: hidden; margin-bottom: 0.75rem;">
+    <div style="width: <%= (@total_assets / total * 100).round %>%; background: var(--positive); opacity: 0.7; display: flex; align-items: center; justify-content: center;">
+      <span style="font-size: 0.6875rem; color: white; font-weight: 600;">Assets</span>
+    </div>
+    <div style="width: <%= (@total_liabilities / total * 100).round %>%; background: var(--negative); opacity: 0.7; display: flex; align-items: center; justify-content: center;">
+      <span style="font-size: 0.6875rem; color: white; font-weight: 600;">Debts</span>
+    </div>
+  </div>
+  <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary);">
+    <span>Assets: <%= number_to_currency(@total_assets) %> (<%= (@total_assets / total * 100).round %>%)</span>
+    <span>Debts: <%= number_to_currency(@total_liabilities) %> (<%= (@total_liabilities / total * 100).round %>%)</span>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Assets Breakdown %>
+  <% if @assets.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">account_balance_wallet</span> Assets</h2>
+        <span style="font-weight: 700; color: var(--positive);"><%= number_to_currency(@total_assets) %></span>
+      </div>
+      <% @assets.sort_by { |a| -a["balance"].to_f }.each do |asset| %>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <div>
+            <div style="font-size: 0.875rem; font-weight: 500;"><%= asset["name"] %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= asset["type"]&.titleize %></div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-weight: 600;"><%= number_to_currency(asset["balance"]) %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+              <%= @total_assets > 0 ? (asset["balance"].to_f / @total_assets * 100).round(1) : 0 %>%
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# Liabilities Breakdown %>
+  <% if @liabilities.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">credit_card</span> Liabilities</h2>
+        <span style="font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_liabilities) %></span>
+      </div>
+      <% @liabilities.sort_by { |d| -d["current_balance"].to_f }.each do |debt| %>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <div>
+            <div style="font-size: 0.875rem; font-weight: 500;"><%= debt["name"] %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+              <% if debt["interest_rate"].to_f > 0 %>
+                <%= debt["interest_rate"] %>% APR ·
+              <% end %>
+              <%= debt["debt_type"]&.titleize %>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-weight: 600; color: var(--negative);"><%= number_to_currency(debt["current_balance"]) %></div>
+            <% if debt["minimum_payment"].to_f > 0 %>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Min: <%= number_to_currency(debt["minimum_payment"]) %>/mo</div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+
+<%# Net Worth Timeline %>
+<% if @snapshots.count >= 2 %>
+  <%
+    nw_values = @snapshots.map { |s| s["net_worth"].to_f }
+    max_nw = nw_values.max.to_f
+    min_nw = nw_values.min.to_f
+    nw_range = [max_nw - min_nw, 1].max
+    chart_w = 700; chart_h = 200; pad_l = 80; pad_r = 20
+    usable_w = chart_w - pad_l - pad_r
+    usable_h = chart_h - 30
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">timeline</span> Net Worth Over Time</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h + 30 %>" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <% 5.times do |i| %>
+          <% y = 15 + i * (usable_h / 4.0) %>
+          <line x1="<%= pad_l %>" y1="<%= y %>" x2="<%= chart_w - pad_r %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3"/>
+          <text x="<%= pad_l - 5 %>" y="<%= y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="8">
+            $<%= ((max_nw - i * nw_range / 4.0) / 1000).round(1) %>k
+          </text>
+        <% end %>
+
+        <%
+          step = usable_w.to_f / [@snapshots.count - 1, 1].max
+          points = @snapshots.each_with_index.map { |s, i|
+            x = pad_l + i * step
+            y = 15 + (max_nw - s["net_worth"].to_f) / nw_range * usable_h
+            [x, y.clamp(5, chart_h + 5)]
+          }
+
+          # Gradient fill
+          fill_points = points.map { |p| "#{p[0].round(1)},#{p[1].round(1)}" }.join(' ')
+          fill_points += " #{points.last[0].round(1)},#{15 + usable_h} #{points.first[0].round(1)},#{15 + usable_h}"
+        %>
+        <polygon points="<%= fill_points %>" fill="var(--positive)" opacity="0.08"/>
+        <polyline points="<%= points.map { |p| "#{p[0].round(1)},#{p[1].round(1)}" }.join(' ') %>"
+                  fill="none" stroke="var(--positive)" stroke-width="2.5"/>
+        <% points.each_with_index do |(x, y), i| %>
+          <circle cx="<%= x %>" cy="<%= y %>" r="3" fill="var(--positive)"/>
+        <% end %>
+
+        <% label_step = [@snapshots.count / 6, 1].max %>
+        <% @snapshots.each_with_index do |s, i| %>
+          <% next unless i % label_step == 0 || i == @snapshots.count - 1 %>
+          <text x="<%= pad_l + i * step %>" y="<%= chart_h + 20 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8">
+            <%= s["date"].to_s.slice(0, 7) %>
+          </text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<%# Goals Impact %>
+<% if @goals.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">flag</span> Goals Contribution</h2>
+      <span style="font-size: 0.8125rem; color: var(--text-secondary);">
+        <%= number_to_currency(@goals_total) %> of <%= number_to_currency(@goals_target) %> saved
+      </span>
+    </div>
+    <% active_goals = @goals.select { |g| g["status"] == "active" }.sort_by { |g| -g["percentage_complete"].to_f } %>
+    <% active_goals.first(5).each do |goal| %>
+      <% pct = goal["percentage_complete"].to_f %>
+      <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.375rem;">
+          <strong style="font-size: 0.875rem;"><%= goal["name"] %></strong>
+          <span style="font-size: 0.8125rem;">
+            <%= number_to_currency(goal["effective_current_amount"]) %> / <%= number_to_currency(goal["effective_target_amount"]) %>
+          </span>
+        </div>
+        <div style="height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+          <div style="height: 100%; width: <%= [pct, 100].min %>%; background: var(--positive); opacity: 0.7; border-radius: 3px;"></div>
+        </div>
+        <div style="text-align: right; font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= pct.round(1) %>%</div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Net Worth Chart", budget_reports_net_worth_path, class: "btn" %>
+  <%= link_to "Debt Accounts", budget_debt_accounts_path, class: "btn" %>
+  <%= link_to "Goals", budget_goals_path, class: "btn" %>
+  <%= link_to "Annual Review", budget_reports_annual_review_path, class: "btn" %>
+</div>

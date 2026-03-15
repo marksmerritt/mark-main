@@ -1,0 +1,223 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">upload_file</span>
+    Import Trades
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Back to Trades", trades_path, class: "btn" %>
+  </div>
+</div>
+
+<div data-controller="import-wizard">
+  <%# Step indicators %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: flex; align-items: center; padding: 1rem 1.25rem; gap: 0;">
+      <div data-step-indicator="1" class="active" style="flex: 1; text-align: center;">
+        <div style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 0.8125rem; font-weight: 700; margin-bottom: 0.25rem; transition: all 0.2s;"
+             class="step-circle">1</div>
+        <div style="font-size: 0.75rem; font-weight: 600;">Upload CSV</div>
+      </div>
+      <div style="flex: 0.5; height: 2px; background: var(--border);"></div>
+      <div data-step-indicator="2" style="flex: 1; text-align: center;">
+        <div style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 0.8125rem; font-weight: 700; margin-bottom: 0.25rem; transition: all 0.2s;"
+             class="step-circle">2</div>
+        <div style="font-size: 0.75rem; font-weight: 600;">Map Columns</div>
+      </div>
+      <div style="flex: 0.5; height: 2px; background: var(--border);"></div>
+      <div data-step-indicator="3" style="flex: 1; text-align: center;">
+        <div style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 0.8125rem; font-weight: 700; margin-bottom: 0.25rem; transition: all 0.2s;"
+             class="step-circle">3</div>
+        <div style="font-size: 0.75rem; font-weight: 600;">Review & Import</div>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    [data-step-indicator] .step-circle {
+      background: var(--bg); color: var(--text-secondary); border: 2px solid var(--border);
+    }
+    [data-step-indicator].active .step-circle {
+      background: var(--primary); color: #fff; border-color: var(--primary);
+    }
+    [data-step-indicator].completed .step-circle {
+      background: var(--positive); color: #fff; border-color: var(--positive);
+    }
+    .drop-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 3rem 2rem; text-align: center; cursor: pointer; transition: all 0.2s; }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: var(--primary); background: rgba(26,115,232,0.04); }
+    .drop-zone .drop-icon { font-size: 3rem; color: var(--text-secondary); margin-bottom: 1rem; display: block; }
+    .drop-zone.drag-over .drop-icon { color: var(--primary); }
+  </style>
+
+  <%# STEP 1: Upload %>
+  <div data-import-wizard-target="step1">
+    <div class="card">
+      <div class="card-header"><h2>Select CSV File</h2></div>
+      <div style="padding: 1.5rem;">
+        <div class="drop-zone"
+             data-import-wizard-target="dropZone"
+             data-action="dragover->import-wizard#dragOver dragenter->import-wizard#dragOver dragleave->import-wizard#dragLeave drop->import-wizard#drop click->import-wizard#selectFile">
+          <span class="material-icons-outlined drop-icon">cloud_upload</span>
+          <p style="font-size: 1.125rem; font-weight: 600; margin: 0 0 0.5rem;">
+            Drag & drop your CSV file here
+          </p>
+          <p class="text-muted" style="margin: 0 0 1rem;">or click to browse</p>
+          <span class="btn btn-primary" style="pointer-events: none;">Choose File</span>
+        </div>
+        <input type="file" accept=".csv" class="hidden"
+               data-import-wizard-target="fileInput"
+               data-action="change->import-wizard#fileSelected">
+      </div>
+    </div>
+
+    <div class="card" style="margin-top: 1rem;">
+      <div class="card-header"><h2>Supported Formats</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div>
+            <h4 style="margin: 0 0 0.5rem; font-size: 0.875rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px; color: var(--primary);">check_circle</span>
+              Required Columns
+            </h4>
+            <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.8125rem; color: var(--text-secondary);">
+              <li>Symbol / Ticker</li>
+              <li>Side (Long/Short or Buy/Sell)</li>
+              <li>Quantity / Shares</li>
+              <li>Entry Price</li>
+            </ul>
+          </div>
+          <div>
+            <h4 style="margin: 0 0 0.5rem; font-size: 0.875rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px; color: var(--text-secondary);">add_circle_outline</span>
+              Optional Columns
+            </h4>
+            <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.8125rem; color: var(--text-secondary);">
+              <li>Exit Price, Entry/Exit Time</li>
+              <li>Commissions, Fees</li>
+              <li>Notes, Setup, Asset Class</li>
+              <li>Stop Loss, Take Profit</li>
+            </ul>
+          </div>
+          <div>
+            <h4 style="margin: 0 0 0.5rem; font-size: 0.875rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px; color: var(--text-secondary);">info</span>
+              Tips
+            </h4>
+            <ul style="margin: 0; padding-left: 1.25rem; font-size: 0.8125rem; color: var(--text-secondary);">
+              <li>First row must be headers</li>
+              <li>Columns are auto-matched</li>
+              <li>You can remap any column</li>
+              <li>Most broker exports work</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# STEP 2: Column Mapping %>
+  <div data-import-wizard-target="step2" class="hidden">
+    <div class="card" style="margin-bottom: 1rem; border-left: 3px solid var(--primary);">
+      <div style="padding: 0.75rem 1.25rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+        <span class="material-icons-outlined" style="color: var(--primary);">description</span>
+        <div style="flex: 1;">
+          <strong data-import-wizard-target="fileName">file.csv</strong>
+          <span class="text-muted" style="margin-left: 0.75rem;">
+            <span data-import-wizard-target="rowCount">0</span> rows &middot;
+            <span data-import-wizard-target="headerCount">0</span> columns
+          </span>
+        </div>
+        <button class="btn btn-sm" data-action="import-wizard#backToUpload">
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">swap_horiz</span> Change File
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Map Columns</h2>
+        <span class="text-muted" style="font-size: 0.8125rem;">Match your CSV columns to trade fields. Required fields marked with *</span>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Trade Field</th>
+              <th>CSV Column</th>
+              <th>Sample Data</th>
+            </tr>
+          </thead>
+          <tbody data-import-wizard-target="mappingBody"></tbody>
+        </table>
+      </div>
+      <div style="padding: 1rem 1.25rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 0.5rem;">
+        <button class="btn" data-action="import-wizard#backToUpload">Back</button>
+        <button class="btn btn-primary" data-action="import-wizard#goToPreview">
+          Preview Import
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <%# STEP 3: Preview & Import %>
+  <div data-import-wizard-target="step3" class="hidden">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0; margin-bottom: 1rem;" class="card">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Rows</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" data-import-wizard-target="previewCount">0</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Valid</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);" data-import-wizard-target="validCount">0</div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Errors</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);" data-import-wizard-target="errorCount">0</div>
+      </div>
+    </div>
+
+    <div data-import-wizard-target="errorList" class="card hidden" style="margin-bottom: 1rem; border-left: 3px solid var(--negative);">
+      <div style="padding: 0.75rem 1.25rem; font-size: 0.875rem; font-weight: 600; border-bottom: 1px solid var(--border);">
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px; color: var(--negative);">warning</span>
+        Validation Errors
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Data Preview</h2></div>
+      <div style="overflow-x: auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th>Qty</th>
+              <th>Entry</th>
+              <th>Exit</th>
+              <th>Date</th>
+              <th>Comm.</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody data-import-wizard-target="previewBody"></tbody>
+        </table>
+      </div>
+      <div style="padding: 1rem 1.25rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+        <button class="btn" data-action="import-wizard#backToMapping">
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">arrow_back</span>
+          Back to Mapping
+        </button>
+
+        <%= form_with url: import_trades_path, method: :post, multipart: true do |f| %>
+          <input type="file" name="file" class="hidden" data-import-wizard-target="hiddenFile">
+          <button type="button" class="btn btn-primary"
+                  data-import-wizard-target="submitBtn"
+                  data-action="import-wizard#submitImport">
+            <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">check_circle</span>
+            Import Trades
+          </button>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>

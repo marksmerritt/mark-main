@@ -1,0 +1,283 @@
+<% content_for(:title) { "Word Analysis" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #00695c;">text_fields</span>
+    Word Frequency Analysis
+  </h1>
+</div>
+
+<% if @error.present? %>
+  <div class="card" style="padding: 1.25rem; margin-bottom: 1.5rem; border-left: 3px solid var(--negative);">
+    <strong>Error loading data:</strong> <%= @error %>
+  </div>
+<% end %>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Words</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_with_delimiter(@total_words) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Unique Words</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #00695c;"><%= number_with_delimiter(@unique_words) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Vocabulary Richness</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= (@vocabulary_richness * 100).round(1) %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Reading Level</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @reading_level_label %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Common Phrases</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @top_bigrams.count %></div>
+    </div>
+  </div>
+</div>
+
+<%# Word Cloud %>
+<% if @cloud_words.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">cloud</span> Word Cloud</h2>
+    </div>
+    <div style="padding: 1.5rem; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.5rem 0.75rem; min-height: 120px;">
+      <% cloud_range = [(@cloud_max - @cloud_min), 1].max.to_f %>
+      <% @cloud_words.shuffle.each do |word, count| %>
+        <%
+          ratio = (count - @cloud_min) / cloud_range
+          font_size = 0.75 + ratio * 2.25
+          opacity = 0.5 + ratio * 0.5
+          colors = %w[#00695c #00897b #00796b #004d40 #26a69a #009688 #00bfa5 #1b5e20 #2e7d32 #388e3c]
+          color = colors[(count * 7) % colors.length]
+        %>
+        <span style="font-size: <%= font_size.round(2) %>rem; font-weight: <%= ratio > 0.5 ? 700 : 500 %>; color: <%= color %>; opacity: <%= opacity.round(2) %>; cursor: default; line-height: 1.2;"
+              title="<%= word %>: <%= count %> occurrences"><%= word %></span>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Top Words Table %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">format_list_numbered</span> Top 50 Words</h2>
+    </div>
+    <div style="max-height: 500px; overflow-y: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="position: sticky; top: 0; background: var(--card-bg); border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.5rem 1rem; text-align: left; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">#</th>
+            <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Word</th>
+            <th style="padding: 0.5rem 0.75rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Count</th>
+            <th style="padding: 0.5rem 1rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Freq %</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @top_words.each_with_index do |(word, count), i| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.375rem 1rem; color: var(--text-secondary);"><%= i + 1 %></td>
+              <td style="padding: 0.375rem 0.75rem; font-weight: 600;"><%= word %></td>
+              <td style="padding: 0.375rem 0.75rem; text-align: right;"><%= number_with_delimiter(count) %></td>
+              <td style="padding: 0.375rem 1rem; text-align: right; color: var(--text-secondary);">
+                <%= @total_words > 0 ? (count.to_f / @total_words * 100).round(2) : 0 %>%
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# Bigram Frequency Table %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">join_inner</span> Common Phrases (Bigrams)</h2>
+    </div>
+    <div style="max-height: 500px; overflow-y: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="position: sticky; top: 0; background: var(--card-bg); border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.5rem 1rem; text-align: left; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">#</th>
+            <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Phrase</th>
+            <th style="padding: 0.5rem 1rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @top_bigrams.each_with_index do |(phrase, count), i| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.375rem 1rem; color: var(--text-secondary);"><%= i + 1 %></td>
+              <td style="padding: 0.375rem 0.75rem; font-weight: 500;"><%= phrase %></td>
+              <td style="padding: 0.375rem 1rem; text-align: right;"><%= count %></td>
+            </tr>
+          <% end %>
+          <% if @top_bigrams.empty? %>
+            <tr><td colspan="3" style="padding: 1rem; text-align: center; color: var(--text-secondary);">Not enough data</td></tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<%# Word Length Distribution %>
+<% if @word_lengths.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Word Length Distribution</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% wl_max = @word_lengths.values.max.to_f; wl_max = 1 if wl_max == 0 %>
+      <% @word_lengths.select { |k, _| k <= 15 }.each do |length, count| %>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem;">
+          <span style="width: 4rem; font-size: 0.75rem; text-align: right; color: var(--text-secondary);"><%= length %> chars</span>
+          <div style="flex: 1; height: 1.25rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= (count / wl_max * 100).round(1) %>%; background: #00695c; opacity: 0.6; border-radius: 4px;"></div>
+          </div>
+          <span style="min-width: 4rem; font-size: 0.75rem; font-weight: 600; text-align: right;"><%= number_with_delimiter(count) %></span>
+          <span style="min-width: 3rem; font-size: 0.6875rem; color: var(--text-secondary); text-align: right;">
+            <%= @total_words > 0 ? (count.to_f / @total_words * 100).round(1) : 0 %>%
+          </span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Reading Level Card %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">school</span> Reading Level</h2>
+    </div>
+    <div style="padding: 1.5rem; text-align: center;">
+      <div style="font-size: 3rem; font-weight: 700; color: #00695c;"><%= @fk_grade %></div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">Flesch-Kincaid Grade Level</div>
+      <div style="display: inline-block; padding: 0.375rem 1rem; border-radius: 9999px; background: #e0f2f1; color: #00695c; font-weight: 600; font-size: 0.875rem;">
+        <%= @reading_level_label %>
+      </div>
+      <div style="margin-top: 1.25rem; font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5;">
+        <strong>Ease Score:</strong> <%= @fk_ease %>/100<br>
+        <%
+          ease_desc = case @fk_ease
+          when 90..100 then "Very Easy - easily understood by an average 11-year-old"
+          when 80..89 then "Easy - conversational English"
+          when 70..79 then "Fairly Easy - 7th grade level"
+          when 60..69 then "Standard - 8th-9th grade, easily understood by 13-15 year olds"
+          when 50..59 then "Fairly Difficult - 10th-12th grade"
+          when 30..49 then "Difficult - college level"
+          else "Very Difficult - best understood by university graduates"
+          end
+        %>
+        <%= ease_desc %>
+      </div>
+    </div>
+  </div>
+
+  <%# Jargon / Technical Terms %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">psychology</span> Specialized Vocabulary</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% if @jargon_words.any? %>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+          <% jargon_max = @jargon_words.first[1].to_f %>
+          <% @jargon_words.each do |word, count| %>
+            <%
+              ratio = count / [jargon_max, 1].max.to_f
+              bg_opacity = (0.1 + ratio * 0.2).round(2)
+            %>
+            <span style="font-size: 0.75rem; padding: 0.25rem 0.625rem; border-radius: 9999px; background: rgba(0, 105, 92, <%= bg_opacity %>); border: 1px solid rgba(0, 105, 92, 0.3); color: var(--text);">
+              <%= word %> <span style="color: var(--text-secondary); font-size: 0.6875rem;">&times;<%= count %></span>
+            </span>
+          <% end %>
+        </div>
+      <% else %>
+        <div style="text-align: center; padding: 1rem; color: var(--text-secondary); font-size: 0.8125rem;">
+          Not enough data to identify specialized terms (minimum 3 occurrences required)
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# By-Notebook Word Comparison %>
+<% if @notebook_top_words.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">book</span> Top Words by Notebook</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notebook</th>
+            <th style="padding: 0.5rem 0.75rem; text-align: left; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;" colspan="5">Top 5 Words</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @notebook_top_words.first(10).each do |nb, words| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem 0.75rem; font-weight: 600; white-space: nowrap;"><%= nb %></td>
+              <% words.each do |word, count| %>
+                <td style="padding: 0.5rem 0.75rem;">
+                  <span style="font-weight: 500;"><%= word %></span>
+                  <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.25rem;"><%= count %></span>
+                </td>
+              <% end %>
+              <% (5 - words.count).times do %>
+                <td></td>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Word Evolution Over Time %>
+<% if @word_evolution_summary.any? && @word_evolution_summary.count > 1 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">timeline</span> Vocabulary Evolution</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        evo_max = @word_evolution_summary.values.map { |v| v[:unique] }.max.to_f
+        evo_max = 1 if evo_max == 0
+      %>
+      <svg viewBox="0 0 <%= @word_evolution_summary.count * 64 + 60 %> 180" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <% @word_evolution_summary.each_with_index do |(month, data), i| %>
+          <% bar_h = data[:unique] / evo_max * 110 %>
+          <% x = 35 + i * 64 %>
+          <rect x="<%= x %>" y="<%= 140 - bar_h %>" width="48" height="<%= bar_h %>"
+                fill="#00695c" opacity="0.45" rx="3"/>
+          <text x="<%= x + 24 %>" y="<%= 140 - bar_h - 4 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="7"><%= data[:unique] %> unique</text>
+          <text x="<%= x + 24 %>" y="155" text-anchor="middle" fill="var(--text-secondary)" font-size="6.5">
+            <% begin %><%= Date.parse("#{month}-01").strftime("%b %y") %><% rescue %><%= month %><% end %>
+          </text>
+          <text x="<%= x + 24 %>" y="167" text-anchor="middle" fill="#00695c" font-size="6" font-weight="600"><%= data[:top_word] %></text>
+        <% end %>
+      </svg>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-align: center; margin-top: 0.5rem;">
+        Unique words per month with top word shown below
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Nav %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Notes", notes_path, class: "btn" %>
+  <%= link_to "Writing Stats", writing_stats_path, class: "btn" %>
+  <%= link_to "Reading Stats", reading_stats_path, class: "btn" %>
+</div>

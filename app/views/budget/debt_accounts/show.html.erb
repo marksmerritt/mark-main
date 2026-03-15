@@ -1,0 +1,354 @@
+<%
+  d_balance = @account["balance"].to_f
+  d_original = @account["original_balance"].to_f
+  d_paid = @account["total_paid"].to_f
+  d_pct = @account["percentage_paid"].to_f
+  d_rate = @account["interest_rate"].to_f
+  d_monthly_interest = @account["monthly_interest"].to_f
+  d_min_payment = @account["minimum_payment"].to_f
+  d_active = @account["status"] == "active"
+  d_paid_off = @account["status"] == "paid_off"
+  d_payments = @account["debt_payments"].is_a?(Array) ? @account["debt_payments"] : []
+  d_payoff_months = @account["payoff_months"].to_i
+%>
+
+<div class="page-header">
+  <h1><%= @account["name"] %></h1>
+  <div class="page-actions">
+    <span class="tag"><%= debt_type_label(@account["debt_type"]) %></span>
+    <%= link_to "Edit", edit_budget_debt_account_path(@account["id"]), class: "btn" %>
+    <%= link_to "Delete", budget_debt_account_path(@account["id"]), data: { turbo_method: :delete, turbo_confirm: "Delete?" }, class: "btn btn-danger" %>
+    <%= link_to "Back", budget_debt_accounts_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Payoff Hero %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: stretch; flex-wrap: wrap;">
+    <%# Payoff gauge %>
+    <div style="flex: 0 0 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; border-right: 1px solid var(--border);">
+      <%
+        dr = 65; dcx = 90; dcy = 78
+        d_circum = Math::PI * dr
+        d_filled = d_circum * [d_pct, 100].min / 100.0
+        d_color = d_pct >= 100 ? "var(--positive)" : d_pct >= 50 ? "var(--primary)" : "#f9ab00"
+      %>
+      <svg width="180" height="105" viewBox="0 0 180 105">
+        <path d="M <%= dcx - dr %> <%= dcy %> A <%= dr %> <%= dr %> 0 1 1 <%= dcx + dr %> <%= dcy %>"
+              fill="none" stroke="var(--border)" stroke-width="10" stroke-linecap="round" />
+        <path d="M <%= dcx - dr %> <%= dcy %> A <%= dr %> <%= dr %> 0 1 1 <%= dcx + dr %> <%= dcy %>"
+              fill="none" stroke="<%= d_color %>" stroke-width="10" stroke-linecap="round"
+              stroke-dasharray="<%= d_filled.round(1) %> <%= d_circum.round(1) %>" />
+        <text x="<%= dcx %>" y="<%= dcy - 12 %>" text-anchor="middle" font-size="24" font-weight="700" fill="<%= d_color %>"><%= d_pct.round(0) %>%</text>
+        <text x="<%= dcx %>" y="<%= dcy + 4 %>" text-anchor="middle" font-size="9" fill="var(--text-secondary)">
+          <%= d_paid_off ? "PAID OFF" : "PAID" %>
+        </text>
+      </svg>
+      <% if d_paid_off %>
+        <span class="material-icons-outlined" style="color: var(--positive); font-size: 1.25rem;">celebration</span>
+      <% end %>
+    </div>
+
+    <%# Key metrics %>
+    <div style="flex: 1; min-width: 280px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0;">
+      <div style="padding: 1.25rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Current Balance</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(d_balance) %></div>
+      </div>
+      <div style="padding: 1.25rem; border-bottom: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Paid</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(d_paid) %></div>
+      </div>
+      <div style="padding: 1.25rem; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Interest Rate</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= d_rate %>% APR</div>
+        <div style="font-size: 0.6875rem; color: var(--negative);"><%= number_to_currency(d_monthly_interest) %>/mo interest</div>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% if d_active && d_payoff_months > 0 && d_payoff_months < 360 %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Debt Free By</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= (Date.current + d_payoff_months.months).strftime("%b %Y") %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= d_payoff_months %> months left</div>
+        <% elsif d_paid_off %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Status</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);">Paid Off!</div>
+        <% else %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Minimum Payment</div>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(d_min_payment) %></div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Payoff progress bar with dollar markers %>
+  <% if d_original > 0 %>
+    <div style="padding: 0.75rem 1.25rem 1rem;">
+      <div style="position: relative; height: 1.5rem; background: var(--bg); border-radius: 0.75rem; overflow: hidden;">
+        <div style="width: <%= [d_pct, 100].min %>%; height: 100%; background: <%= d_color %>; border-radius: 0.75rem;"></div>
+        <% [25, 50, 75].each do |m| %>
+          <div style="position: absolute; left: <%= m %>%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.3);"></div>
+        <% end %>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 0.25rem; font-size: 0.625rem; color: var(--text-secondary);">
+        <span><%= number_to_currency(d_original) %></span>
+        <span><%= number_to_currency(d_original * 0.5) %> left</span>
+        <span>$0 (debt free)</span>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Interest cost awareness %>
+<% if d_active && d_monthly_interest > 0 %>
+  <div class="card" style="margin-bottom: 1rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+      <%
+        daily_interest = d_monthly_interest / 30.0
+        yearly_interest = d_monthly_interest * 12
+        pct_to_interest = d_min_payment > 0 ? (d_monthly_interest / d_min_payment * 100).round(0) : 0
+      %>
+      <div style="padding: 1rem 1.25rem; border-right: 1px solid var(--border); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Daily Interest</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(daily_interest) %></div>
+      </div>
+      <div style="padding: 1rem 1.25rem; border-right: 1px solid var(--border); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Interest</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(d_monthly_interest) %></div>
+      </div>
+      <div style="padding: 1rem 1.25rem; border-right: 1px solid var(--border); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Yearly Interest</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(yearly_interest) %></div>
+      </div>
+      <div style="padding: 1rem 1.25rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Payment to Interest</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: <%= pct_to_interest > 50 ? 'var(--negative)' : 'var(--text)' %>;"><%= pct_to_interest %>%</div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div class="content-grid">
+  <div class="card">
+    <div class="card-header"><h2>Details</h2></div>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <span class="detail-label">Current Balance</span>
+        <span class="detail-value negative"><%= number_to_currency(d_balance) %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Original Balance</span>
+        <span class="detail-value"><%= number_to_currency(d_original) %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Interest Rate</span>
+        <span class="detail-value"><%= d_rate %>% APR</span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Monthly Interest</span>
+        <span class="detail-value negative"><%= number_to_currency(d_monthly_interest) %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Minimum Payment</span>
+        <span class="detail-value"><%= number_to_currency(d_min_payment) %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Total Paid</span>
+        <span class="detail-value positive"><%= number_to_currency(d_paid) %></span>
+      </div>
+    </div>
+  </div>
+
+  <% if d_active %>
+    <div class="card">
+      <div class="card-header"><h2>Make Payment</h2></div>
+      <%= form_with url: pay_budget_debt_account_path(@account["id"]), method: :post, class: "form-container" do |f| %>
+        <div class="form-group">
+          <%= f.label :amount, "Payment Amount" %>
+          <%= f.number_field :amount, step: "0.01", class: "form-control", value: d_min_payment, required: true %>
+        </div>
+        <div class="form-group">
+          <%= f.label :payment_type, "Type" %>
+          <%= f.select :payment_type, [["Regular", "regular"], ["Extra", "extra"], ["Snowball", "snowball"]], {}, class: "form-control" %>
+        </div>
+        <div class="form-group">
+          <%= f.label :note, "Note" %>
+          <%= f.text_field :note, class: "form-control", placeholder: "Monthly payment" %>
+        </div>
+        <div class="form-actions">
+          <%= f.submit "Record Payment", class: "btn btn-primary" %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+
+<%# Accelerated payoff scenarios %>
+<% if d_active && d_payoff_months > 0 && d_payoff_months < 360 && d_min_payment > 0 %>
+  <div class="card" style="margin-top: 1rem;">
+    <div class="card-header"><h2>Payoff Scenarios</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        See how extra payments can accelerate your payoff and save on interest.
+      </p>
+      <%
+        monthly_rate = d_rate / 100.0 / 12
+        # Calculate months to payoff for a given payment amount
+        calc_months = ->(payment) {
+          return 0 if payment <= d_monthly_interest || d_balance <= 0
+          if monthly_rate > 0
+            n = (-Math.log(1 - d_balance * monthly_rate / payment) / Math.log(1 + monthly_rate)).ceil rescue d_payoff_months
+            [n, 600].min
+          else
+            (d_balance / payment).ceil
+          end
+        }
+        scenarios = [
+          { label: "Minimum only", extra: 0 },
+          { label: "+$50/month", extra: 50 },
+          { label: "+$100/month", extra: 100 },
+          { label: "+$200/month", extra: 200 },
+          { label: "Double payment", extra: d_min_payment }
+        ]
+      %>
+      <% scenarios.each do |s| %>
+        <%
+          payment = d_min_payment + s[:extra]
+          months = calc_months.call(payment)
+          next if months <= 0
+          payoff_date = Date.current + months.months
+          # Rough interest estimate
+          total_cost = payment * months
+          interest_paid = total_cost - d_balance
+          saved_vs_min = s[:extra] > 0 ? (d_min_payment * d_payoff_months - d_balance) - interest_paid : 0
+          months_saved = d_payoff_months - months
+        %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0; border-bottom: 1px solid var(--border);">
+          <span style="font-size: 0.8125rem; min-width: 8rem;"><%= s[:label] %></span>
+          <span style="font-size: 0.8125rem; font-weight: 600; min-width: 5rem;"><%= number_to_currency(payment) %>/mo</span>
+          <span style="font-size: 0.8125rem; min-width: 5rem;"><%= months %> mo</span>
+          <span style="font-size: 0.8125rem; flex: 1; text-align: right;">
+            <% if months_saved > 0 %>
+              <span class="positive"><%= months_saved %> mo faster</span>
+            <% else %>
+              <span style="color: var(--text-secondary);"><%= payoff_date.strftime("%b %Y") %></span>
+            <% end %>
+          </span>
+          <span style="font-size: 0.75rem; min-width: 5rem; text-align: right; color: var(--text-secondary);">
+            <% if saved_vs_min > 0 %>
+              Save <%= number_to_currency(saved_vs_min, precision: 0) %>
+            <% end %>
+          </span>
+        </div>
+      <% end %>
+
+      <div style="margin-top: 1rem; padding: 0.75rem; border-radius: var(--radius); background: var(--bg);">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--primary);">lightbulb</span>
+        <span style="font-size: 0.8125rem;">
+          Try the <%= link_to "Snowball Plan", snowball_budget_debt_accounts_path %> or
+          <%= link_to "Avalanche Plan", avalanche_budget_debt_accounts_path %> to optimize across all your debts.
+        </span>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Payment history with stats %>
+<% if d_payments.any? %>
+  <%
+    p_amounts = d_payments.map { |p| p["amount"].to_f }
+    p_total = p_amounts.sum
+    p_avg = p_amounts.sum / p_amounts.count
+    p_max = p_amounts.max
+    p_extra_count = d_payments.count { |p| p["payment_type"] == "extra" || p["payment_type"] == "snowball" }
+    p_by_month = d_payments.group_by { |p| p["paid_on"].to_s.slice(0, 7) }
+  %>
+
+  <%# Payment stats strip %>
+  <div class="card" style="margin-top: 1rem;">
+    <div class="card-header"><h2>Payment Stats</h2></div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 0.75rem 1rem; border-right: 1px solid var(--border); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Payments</div>
+        <div style="font-size: 1rem; font-weight: 700;"><%= d_payments.count %></div>
+      </div>
+      <div style="padding: 0.75rem 1rem; border-right: 1px solid var(--border); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Paid</div>
+        <div style="font-size: 1rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(p_total) %></div>
+      </div>
+      <div style="padding: 0.75rem 1rem; border-right: 1px solid var(--border); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Average</div>
+        <div style="font-size: 1rem; font-weight: 700;"><%= number_to_currency(p_avg) %></div>
+      </div>
+      <div style="padding: 0.75rem 1rem; border-right: 1px solid var(--border); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Largest</div>
+        <div style="font-size: 1rem; font-weight: 700;"><%= number_to_currency(p_max) %></div>
+      </div>
+      <div style="padding: 0.75rem 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Extra Payments</div>
+        <div style="font-size: 1rem; font-weight: 700; color: var(--positive);"><%= p_extra_count %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Monthly payment bar chart %>
+  <% if p_by_month.count >= 2 %>
+    <%
+      pm_data = p_by_month.map { |m, ps| { month: m, total: ps.sum { |p| p["amount"].to_f } } }.sort_by { |d| d[:month] }
+      pm_max = pm_data.map { |d| d[:total] }.max
+      pm_max = 1 if pm_max == 0
+      pm_bar_w = 380.0 / pm_data.length
+    %>
+    <div class="card" style="margin-top: 1rem;">
+      <div class="card-header"><h2>Monthly Payments</h2></div>
+      <div style="padding: 0.75rem 1.25rem;">
+        <svg width="100%" viewBox="0 0 400 120" preserveAspectRatio="xMidYMid meet">
+          <line x1="10" y1="90" x2="390" y2="90" stroke="var(--border)" stroke-width="1" />
+          <% if d_min_payment > 0 %>
+            <%
+              min_y = 90 - (d_min_payment / pm_max * 80).round(1)
+            %>
+            <line x1="10" y1="<%= min_y %>" x2="390" y2="<%= min_y %>" stroke="var(--primary)" stroke-width="0.5" stroke-dasharray="4,4" />
+            <text x="392" y="<%= min_y + 3 %>" font-size="6" fill="var(--primary)">min</text>
+          <% end %>
+          <% pm_data.each_with_index do |d, i| %>
+            <%
+              bar_h = (d[:total] / pm_max * 80).round(1)
+              x = 10 + i * pm_bar_w
+              above_min = d[:total] > d_min_payment
+            %>
+            <rect x="<%= x + 2 %>" y="<%= 90 - bar_h %>" width="<%= [pm_bar_w - 4, 4].max %>" height="<%= [bar_h, 2].max %>"
+                  fill="<%= above_min ? 'var(--positive)' : 'var(--primary)' %>" opacity="0.65" rx="2" />
+            <text x="<%= x + pm_bar_w / 2 %>" y="<%= 87 - bar_h %>" text-anchor="middle" font-size="7" font-weight="600" fill="var(--positive)">
+              <%= number_to_currency(d[:total], precision: 0) %>
+            </text>
+            <text x="<%= x + pm_bar_w / 2 %>" y="105" text-anchor="middle" font-size="7" fill="var(--text-secondary)">
+              <%= Date.parse("#{d[:month]}-01").strftime("%b") rescue d[:month] %>
+            </text>
+          <% end %>
+        </svg>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="card" style="margin-top: 1rem;">
+    <div class="card-header">
+      <h2>Payment History</h2>
+      <span class="text-muted"><%= d_payments.count %> payments</span>
+    </div>
+    <table class="table">
+      <thead>
+        <tr><th>Date</th><th style="text-align: right;">Amount</th><th>Type</th><th>Note</th></tr>
+      </thead>
+      <tbody>
+        <% d_payments.sort_by { |p| p["paid_on"] || "" }.reverse.each do |p| %>
+          <tr>
+            <td><%= Date.parse(p["paid_on"]).strftime("%b %d, %Y") rescue p["paid_on"] %></td>
+            <td style="text-align: right;" class="positive"><%= number_to_currency(p["amount"]) %></td>
+            <td><span class="tag"><%= p["payment_type"]&.capitalize %></span></td>
+            <td><%= p["note"] %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

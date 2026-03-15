@@ -1,0 +1,279 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">analytics</span>
+    Expectancy & Edge Analysis
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Risk of Ruin", reports_risk_of_ruin_path, class: "btn" %>
+    <%= link_to "Reports", reports_overview_path, class: "btn" %>
+  </div>
+</div>
+
+<% if @total_trades < 5 %>
+  <div class="card"><p class="empty-state">Need at least 5 closed trades for expectancy analysis.</p></div>
+<% else %>
+
+  <%# Expectancy hero card %>
+  <%
+    exp_color = @expectancy > 0 ? "var(--positive)" : @expectancy < 0 ? "var(--negative)" : "var(--text-secondary)"
+    exp_label = if @expectancy > 50
+                  "Strong Positive Edge"
+                elsif @expectancy > 0
+                  "Positive Edge"
+                elsif @expectancy == 0
+                  "Break Even"
+                elsif @expectancy > -50
+                  "Slight Negative Edge"
+                else
+                  "Negative Edge"
+                end
+  %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid <%= exp_color %>;">
+    <div style="padding: 1.5rem; text-align: center;">
+      <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px;">Expected Value Per Trade</div>
+      <div style="font-size: 3rem; font-weight: 700; color: <%= exp_color %>; margin: 0.25rem 0;">
+        <%= number_to_currency(@expectancy) %>
+      </div>
+      <div style="font-size: 1rem; font-weight: 600; color: <%= exp_color %>; margin-bottom: 0.5rem;"><%= exp_label %></div>
+      <div style="font-size: 0.875rem; color: var(--text-secondary);">
+        For every dollar risked, you expect to make <strong class="<%= @expectancy_per_dollar >= 0 ? 'positive' : 'negative' %>"><%= @expectancy_per_dollar >= 0 ? "+" : "" %><%= @expectancy_per_dollar %>x</strong>
+      </div>
+    </div>
+  </div>
+
+  <%# Win/Loss breakdown %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @win_rate %>%</div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @win_count %> wins</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@avg_win) %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">median: <%= number_to_currency(@median_win) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@avg_loss) %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">median: <%= number_to_currency(@median_loss) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Payoff Ratio</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @payoff_ratio %>x</div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">avg win / avg loss</div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_trades %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @loss_count %> losses</div>
+      </div>
+    </div>
+  </div>
+
+  <%# Expectancy formula breakdown %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Expectancy Formula</h2></div>
+    <div style="padding: 1.25rem; text-align: center; font-size: 1rem;">
+      <div style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; flex-wrap: wrap;">
+        <span style="padding: 0.5rem 0.75rem; background: rgba(13,144,79,0.08); border-radius: var(--radius);">
+          <span style="font-size: 0.6875rem; color: var(--text-secondary); display: block;">Win Rate</span>
+          <strong class="positive"><%= @win_rate %>%</strong>
+        </span>
+        <span style="font-size: 1.25rem; color: var(--text-secondary);">&times;</span>
+        <span style="padding: 0.5rem 0.75rem; background: rgba(13,144,79,0.08); border-radius: var(--radius);">
+          <span style="font-size: 0.6875rem; color: var(--text-secondary); display: block;">Avg Win</span>
+          <strong class="positive"><%= number_to_currency(@avg_win) %></strong>
+        </span>
+        <span style="font-size: 1.25rem; color: var(--text-secondary);">&minus;</span>
+        <span style="padding: 0.5rem 0.75rem; background: rgba(217,48,37,0.08); border-radius: var(--radius);">
+          <span style="font-size: 0.6875rem; color: var(--text-secondary); display: block;">Loss Rate</span>
+          <strong class="negative"><%= @loss_rate %>%</strong>
+        </span>
+        <span style="font-size: 1.25rem; color: var(--text-secondary);">&times;</span>
+        <span style="padding: 0.5rem 0.75rem; background: rgba(217,48,37,0.08); border-radius: var(--radius);">
+          <span style="font-size: 0.6875rem; color: var(--text-secondary); display: block;">Avg Loss</span>
+          <strong class="negative"><%= number_to_currency(@avg_loss) %></strong>
+        </span>
+        <span style="font-size: 1.25rem; color: var(--text-secondary);">=</span>
+        <span style="padding: 0.5rem 0.75rem; background: <%= @expectancy >= 0 ? 'rgba(13,144,79,0.08)' : 'rgba(217,48,37,0.08)' %>; border-radius: var(--radius);">
+          <span style="font-size: 0.6875rem; color: var(--text-secondary); display: block;">Expectancy</span>
+          <strong class="<%= @expectancy >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(@expectancy) %></strong>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+    <%# Rolling expectancy chart %>
+    <% if @rolling_expectancy.length >= 5 %>
+      <div class="card">
+        <div class="card-header"><h2>Rolling 20-Trade Expectancy</h2></div>
+        <div style="padding: 1rem 1.25rem;">
+          <%
+            re_vals = @rolling_expectancy.map { |r| r[:expectancy] }
+            re_min = re_vals.min.to_f
+            re_max = re_vals.max.to_f
+            re_range = re_max - re_min; re_range = 1 if re_range == 0
+            re_w = 400; re_h = 150
+            zero_y = re_max > 0 && re_min < 0 ? (re_h - (-re_min / re_range * re_h)).round(1) : (re_min >= 0 ? re_h : 0)
+          %>
+          <svg viewBox="0 0 <%= re_w %> <%= re_h + 10 %>" style="width: 100%;">
+            <%# Zero line %>
+            <line x1="0" y1="<%= zero_y %>" x2="<%= re_w %>" y2="<%= zero_y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,2" />
+
+            <%# Positive area %>
+            <%
+              step = re_w.to_f / (@rolling_expectancy.length - 1)
+              points = @rolling_expectancy.each_with_index.map { |r, i|
+                x = (i * step).round(1)
+                y = (re_h - (r[:expectancy] - re_min) / re_range * re_h).round(1)
+                "#{x},#{y}"
+              }.join(" ")
+            %>
+            <polyline points="<%= points %>" fill="none" stroke="var(--primary)" stroke-width="1.5" />
+
+            <%# Labels %>
+            <text x="2" y="<%= zero_y - 3 %>" fill="var(--text-secondary)" font-size="6">$0</text>
+            <text x="<%= re_w - 2 %>" y="<%= re_h + 8 %>" text-anchor="end" fill="var(--text-secondary)" font-size="6">Trade #<%= @rolling_expectancy.last[:trade] %></text>
+          </svg>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            Expectancy over a rolling window of 20 trades. Above zero = positive edge.
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <%# P&L Distribution %>
+    <% if @distribution.any? %>
+      <div class="card">
+        <div class="card-header"><h2>P&L Distribution</h2></div>
+        <div style="padding: 1rem 1.25rem;">
+          <% @distribution.each do |label, data| %>
+            <%
+              bar_pct = (data[:count] / @max_bucket_count * 100).round(0)
+              is_positive = data[:range_start] >= 0
+            %>
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+              <span style="font-size: 0.625rem; min-width: 6rem; text-align: right; color: var(--text-secondary);"><%= label %></span>
+              <div style="flex: 1; height: 14px; background: var(--bg); border-radius: 2px; overflow: hidden;">
+                <div style="height: 100%; width: <%= bar_pct %>%; background: <%= is_positive ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.6; border-radius: 2px;"></div>
+              </div>
+              <span style="font-size: 0.6875rem; min-width: 1.5rem;"><%= data[:count] %></span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Edge by Setup %>
+  <% if @setup_edge.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Edge by Setup</h2></div>
+      <div style="overflow-x: auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Setup</th>
+              <th style="text-align: right;">Trades</th>
+              <th style="text-align: right;">Win Rate</th>
+              <th style="text-align: right;">Avg Win</th>
+              <th style="text-align: right;">Avg Loss</th>
+              <th style="text-align: right;">Expectancy</th>
+              <th style="text-align: right;">Total P&L</th>
+              <th>Edge</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% max_abs_exp = @setup_edge.values.map { |d| d[:expectancy].abs }.max.to_f; max_abs_exp = 1 if max_abs_exp == 0 %>
+            <% @setup_edge.each do |setup, data| %>
+              <tr>
+                <td style="font-weight: 600;"><%= setup %></td>
+                <td style="text-align: right;"><%= data[:trades] %></td>
+                <td style="text-align: right;"><%= data[:win_rate] %>%</td>
+                <td style="text-align: right; color: var(--positive); font-size: 0.8125rem;"><%= number_to_currency(data[:avg_win]) %></td>
+                <td style="text-align: right; color: var(--negative); font-size: 0.8125rem;"><%= number_to_currency(data[:avg_loss]) %></td>
+                <td style="text-align: right; font-weight: 700;" class="<%= data[:expectancy] >= 0 ? 'positive' : 'negative' %>">
+                  <%= number_to_currency(data[:expectancy]) %>
+                </td>
+                <td style="text-align: right;" class="<%= data[:total_pnl] >= 0 ? 'positive' : 'negative' %>">
+                  <%= number_to_currency(data[:total_pnl]) %>
+                </td>
+                <td>
+                  <% bar_w = (data[:expectancy].abs / max_abs_exp * 50).round(0) %>
+                  <div style="display: flex; align-items: center; gap: 0.25rem;">
+                    <% if data[:expectancy] >= 0 %>
+                      <div style="width: <%= bar_w %>px; height: 8px; background: var(--positive); border-radius: 2px;"></div>
+                    <% else %>
+                      <div style="width: <%= bar_w %>px; height: 8px; background: var(--negative); border-radius: 2px;"></div>
+                    <% end %>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Edge by Side %>
+  <% if @side_edge.count >= 2 %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Edge by Direction</h2></div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 1rem 1.25rem;">
+        <% @side_edge.each do |side, data| %>
+          <div style="padding: 1rem; background: var(--bg); border-radius: var(--radius); border-left: 3px solid <%= data[:expectancy] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <div style="font-size: 1rem; font-weight: 700; text-transform: capitalize;"><%= side %></div>
+            <div style="font-size: 1.375rem; font-weight: 700; margin: 0.25rem 0;" class="<%= data[:expectancy] >= 0 ? 'positive' : 'negative' %>">
+              <%= number_to_currency(data[:expectancy]) %>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              <%= data[:trades] %> trades &middot; <%= data[:win_rate] %>% WR &middot;
+              <span class="<%= data[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:total_pnl]) %></span>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem;">
+    <%# Top wins %>
+    <div class="card">
+      <div class="card-header"><h2>Top 5 Wins</h2></div>
+      <div style="padding: 0;">
+        <% @top_wins.each do |t| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--positive);">trending_up</span>
+            <div style="flex: 1;">
+              <%= link_to t["symbol"], trade_path(t["id"]), style: "font-weight: 600; text-decoration: none;" %>
+              <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.25rem;"><%= t["entry_time"]&.to_s&.slice(0, 10) %></span>
+            </div>
+            <span style="font-weight: 700; color: var(--positive);"><%= number_to_currency(t["pnl"]) %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Top losses %>
+    <div class="card">
+      <div class="card-header"><h2>Top 5 Losses</h2></div>
+      <div style="padding: 0;">
+        <% @top_losses.each do |t| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--negative);">trending_down</span>
+            <div style="flex: 1;">
+              <%= link_to t["symbol"], trade_path(t["id"]), style: "font-weight: 600; text-decoration: none;" %>
+              <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.25rem;"><%= t["entry_time"]&.to_s&.slice(0, 10) %></span>
+            </div>
+            <span style="font-weight: 700; color: var(--negative);"><%= number_to_currency(t["pnl"]) %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>

@@ -1,0 +1,386 @@
+<div class="page-header">
+  <h1>Performance by Time</h1>
+  <div class="page-actions">
+    <button class="btn" onclick="window.print()">
+      <span class="material-icons-outlined">print</span> Print
+    </button>
+  </div>
+</div>
+
+<div class="card">
+  <%= form_with url: reports_by_time_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :start_date, "Start Date" %>
+        <%= f.date_field :start_date, value: params[:start_date], class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :end_date, "End Date" %>
+        <%= f.date_field :end_date, value: params[:end_date], class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+        <%= link_to "Clear", reports_by_time_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @time_stats.present? && !@time_stats["error"] %>
+  <% days = %w[Sunday Monday Tuesday Wednesday Thursday Friday Saturday] %>
+  <% day_short = %w[Sun Mon Tue Wed Thu Fri Sat] %>
+
+  <%# Best/worst summary %>
+  <% day_data = @time_stats["day_of_week"] || [] %>
+  <% hourly_data = @time_stats["hourly"] || [] %>
+  <% best_day = day_data.max_by { |r| r["avg_pnl"].to_f } %>
+  <% worst_day = day_data.min_by { |r| r["avg_pnl"].to_f } %>
+  <% best_hour = hourly_data.max_by { |r| r["avg_pnl"].to_f } %>
+  <% worst_hour = hourly_data.min_by { |r| r["avg_pnl"].to_f } %>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <% if best_day %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Day</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= days[best_day["day_of_week"].to_i] %></div>
+          <div style="font-size: 0.75rem;" class="positive">Avg: <%= number_to_currency(best_day["avg_pnl"]) %></div>
+        </div>
+      <% end %>
+      <% if worst_day %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Day</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= days[worst_day["day_of_week"].to_i] %></div>
+          <div style="font-size: 0.75rem;" class="negative">Avg: <%= number_to_currency(worst_day["avg_pnl"]) %></div>
+        </div>
+      <% end %>
+      <% if best_hour %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Hour</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= best_hour["hour"] %>:00</div>
+          <div style="font-size: 0.75rem;" class="positive">Avg: <%= number_to_currency(best_hour["avg_pnl"]) %></div>
+        </div>
+      <% end %>
+      <% if worst_hour %>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Hour</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= worst_hour["hour"] %>:00</div>
+          <div style="font-size: 0.75rem;" class="negative">Avg: <%= number_to_currency(worst_hour["avg_pnl"]) %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Day of week chart %>
+  <% if day_data.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>P&L by Day of Week</h2>
+      </div>
+      <div class="chart-wrapper"
+           data-controller="chart"
+           data-chart-type-value="bar"
+           data-chart-points-value="<%= day_data.map { |r| { x: day_short[r["day_of_week"].to_i], y: r["total_pnl"] } }.to_json %>">
+      </div>
+    </div>
+  <% end %>
+
+  <%# Hourly chart %>
+  <% if hourly_data.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>P&L by Hour</h2>
+      </div>
+      <div class="chart-wrapper"
+           data-controller="chart"
+           data-chart-type-value="bar"
+           data-chart-points-value="<%= hourly_data.map { |r| { x: "#{r["hour"]}:00", y: r["total_pnl"] } }.to_json %>">
+      </div>
+    </div>
+  <% end %>
+
+  <%# Session Analysis %>
+  <% if @sessions.present? && @sessions.any? { |_, s| s[:count] > 0 } %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Session Performance</h2></div>
+      <div style="padding: 1rem 1.25rem; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <% max_session_pnl = @sessions.values.map { |s| s[:pnl].abs }.max.to_f %>
+        <% @sessions.each do |_, session| %>
+          <% next if session[:count] == 0 %>
+          <% win_rate = (session[:wins].to_f / session[:count] * 100).round(0) %>
+          <div style="flex: 1; min-width: 120px; text-align: center; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);
+                      background: <%= session[:pnl] >= 0 ? 'rgba(13,144,79,0.04)' : 'rgba(217,48,37,0.04)' %>;">
+            <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.03em;">
+              <%= session[:label] %>
+            </div>
+            <div style="font-size: 1.125rem; font-weight: 700; margin: 0.25rem 0;" class="<%= pnl_class(session[:pnl]) %>">
+              <%= number_to_currency(session[:pnl]) %>
+            </div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+              <%= session[:count] %> trades · <%= win_rate %>% win
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Hour x Day Heatmap %>
+  <% if @hour_day_grid.present? %>
+    <%
+      grid_max = @hour_day_grid.values.flat_map { |days| days.values.map { |d| d[:pnl].abs } }.max.to_f
+      grid_max = 1 if grid_max == 0
+      active_hours = @hour_day_grid.select { |_, days| days.values.any? { |d| d[:count] > 0 } }.keys.sort
+      active_hours = (6..20).to_a if active_hours.empty?
+      day_labels = %w[Sun Mon Tue Wed Thu Fri Sat]
+    %>
+    <% if active_hours.any? %>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header"><h2>Performance Heatmap (Hour × Day)</h2></div>
+        <div style="padding: 1rem 1.25rem; overflow-x: auto;">
+          <table style="width: 100%; border-collapse: separate; border-spacing: 3px;">
+            <thead>
+              <tr>
+                <th style="font-size: 0.6875rem; text-align: left; padding: 0.25rem;"></th>
+                <% (1..5).each do |d| %>
+                  <th style="font-size: 0.6875rem; text-align: center; padding: 0.25rem; color: var(--text-secondary);"><%= day_labels[d] %></th>
+                <% end %>
+              </tr>
+            </thead>
+            <tbody>
+              <% active_hours.each do |hour| %>
+                <tr>
+                  <td style="font-size: 0.6875rem; padding: 0.25rem; color: var(--text-secondary); white-space: nowrap;">
+                    <%= "#{hour.to_s.rjust(2, '0')}:00" %>
+                  </td>
+                  <% (1..5).each do |day| %>
+                    <% cell = @hour_day_grid[hour][day] %>
+                    <% intensity = cell[:count] > 0 ? (cell[:pnl].abs / grid_max).clamp(0.1, 1) : 0 %>
+                    <td style="text-align: center; padding: 0.375rem; border-radius: 4px; min-width: 3.5rem;
+                               <% if cell[:count] > 0 %>
+                                 background: rgba(<%= cell[:pnl] >= 0 ? '13,144,79' : '217,48,37' %>, <%= (intensity * 0.3).round(2) %>);
+                               <% else %>
+                                 background: var(--bg);
+                               <% end %>"
+                        title="<%= day_labels[day] %> <%= hour %>:00 — P&L: <%= number_to_currency(cell[:pnl]) %>, Trades: <%= cell[:count] %>">
+                      <% if cell[:count] > 0 %>
+                        <div style="font-size: 0.6875rem; font-weight: 600;" class="<%= pnl_class(cell[:pnl]) %>">
+                          <%= number_to_currency(cell[:pnl], precision: 0) %>
+                        </div>
+                        <div style="font-size: 0.5625rem; color: var(--text-secondary);">
+                          <%= cell[:count] %>t
+                        </div>
+                      <% end %>
+                    </td>
+                  <% end %>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+        <div style="padding: 0 1.25rem 0.75rem; display: flex; gap: 1rem; justify-content: center; font-size: 0.6875rem; color: var(--text-secondary);">
+          <div style="display: flex; align-items: center; gap: 0.25rem;">
+            <div style="width: 12px; height: 12px; border-radius: 2px; background: rgba(13,144,79,0.3);"></div>
+            Profit
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.25rem;">
+            <div style="width: 12px; height: 12px; border-radius: 2px; background: rgba(217,48,37,0.3);"></div>
+            Loss
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.25rem;">
+            <div style="width: 12px; height: 12px; border-radius: 2px; background: var(--bg);"></div>
+            No trades
+          </div>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <%# Time-based Insights %>
+  <%
+    time_insights = []
+    if best_day && worst_day
+      best_day_name = days[best_day["day_of_week"].to_i]
+      worst_day_name = days[worst_day["day_of_week"].to_i]
+      day_spread = best_day["avg_pnl"].to_f - worst_day["avg_pnl"].to_f
+      time_insights << { icon: "calendar_today", text: "#{best_day_name} is your best day (avg #{number_to_currency(best_day["avg_pnl"])}) while #{worst_day_name} is weakest (avg #{number_to_currency(worst_day["avg_pnl"])}). Day spread: #{number_to_currency(day_spread)}.", type: day_spread > 50 ? "warning" : "info" }
+    end
+    if best_hour && worst_hour
+      time_insights << { icon: "schedule", text: "Peak hour: #{best_hour["hour"]}:00 (avg #{number_to_currency(best_hour["avg_pnl"])}). Avoid #{worst_hour["hour"]}:00 (avg #{number_to_currency(worst_hour["avg_pnl"])}).", type: best_hour["avg_pnl"].to_f > 0 ? "success" : "info" }
+    end
+    # Find if weekends are traded
+    if day_data.any?
+      weekend_data = day_data.select { |r| [0, 6].include?(r["day_of_week"].to_i) }
+      weekday_data = day_data.reject { |r| [0, 6].include?(r["day_of_week"].to_i) }
+      weekend_trades = weekend_data.sum { |r| r["trade_count"].to_i }
+      weekday_trades = weekday_data.sum { |r| r["trade_count"].to_i }
+      if weekend_trades > 0
+        weekend_pnl = weekend_data.sum { |r| r["total_pnl"].to_f }
+        weekday_pnl = weekday_data.sum { |r| r["total_pnl"].to_f }
+        time_insights << { icon: "weekend", text: "Weekend trading: #{weekend_trades} trades for #{number_to_currency(weekend_pnl)}. Weekdays: #{weekday_trades} trades for #{number_to_currency(weekday_pnl)}.", type: weekend_pnl > 0 ? "success" : "warning" }
+      end
+    end
+    # Concentration analysis
+    if hourly_data.length >= 3
+      total_hourly_trades = hourly_data.sum { |r| r["trade_count"].to_i }
+      if total_hourly_trades > 0
+        top_3_hours = hourly_data.sort_by { |r| -r["trade_count"].to_i }.first(3)
+        top_3_count = top_3_hours.sum { |r| r["trade_count"].to_i }
+        top_3_pct = (top_3_count.to_f / total_hourly_trades * 100).round(0)
+        top_3_labels = top_3_hours.map { |r| "#{r["hour"]}:00" }.join(", ")
+        time_insights << { icon: "access_time", text: "#{top_3_pct}% of trades happen in your top 3 hours (#{top_3_labels}). #{top_3_pct > 70 ? 'Very concentrated — disciplined focus.' : 'Fairly spread — consider focusing on peak hours.'}", type: "info" }
+      end
+    end
+  %>
+  <% if time_insights.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Time-Based Insights</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <% time_insights.each do |insight| %>
+          <div class="insight-item insight-<%= insight[:type] %>" style="margin-bottom: 0.5rem;">
+            <span class="material-icons-outlined"><%= insight[:icon] %></span>
+            <span><%= insight[:text] %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Optimal Trading Window %>
+  <% if hourly_data.length >= 3 %>
+    <%
+      profitable_hours = hourly_data.select { |r| r["avg_pnl"].to_f > 0 }.sort_by { |r| r["hour"].to_i }
+      losing_hours = hourly_data.select { |r| r["avg_pnl"].to_f < 0 }.sort_by { |r| -r["avg_pnl"].to_f.abs }
+    %>
+    <% if profitable_hours.any? %>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header"><h2>Optimal Trading Window</h2></div>
+        <div style="padding: 1rem 1.25rem;">
+          <%# Hour-by-hour performance strip %>
+          <div style="display: flex; gap: 2px; margin-bottom: 1rem;">
+            <% min_hour = hourly_data.map { |r| r["hour"].to_i }.min %>
+            <% max_hour_val = hourly_data.map { |r| r["hour"].to_i }.max %>
+            <% hour_max_pnl = hourly_data.map { |r| r["avg_pnl"].to_f.abs }.max.to_f %>
+            <% hour_max_pnl = 1 if hour_max_pnl == 0 %>
+            <% (min_hour..max_hour_val).each do |h| %>
+              <% hr = hourly_data.find { |r| r["hour"].to_i == h } %>
+              <% avg = hr ? hr["avg_pnl"].to_f : 0 %>
+              <% intensity = (avg.abs / hour_max_pnl).clamp(0, 1) %>
+              <div style="flex: 1; min-width: 16px; text-align: center;" title="<%= h %>:00 — Avg: <%= number_to_currency(avg) %>">
+                <div style="height: 30px; border-radius: 3px; display: flex; align-items: flex-end; justify-content: center;
+                            background: <%= hr ? (avg >= 0 ? "rgba(13,144,79,#{(intensity * 0.5 + 0.1).round(2)})" : "rgba(217,48,37,#{(intensity * 0.5 + 0.1).round(2)})") : "var(--bg)" %>;">
+                </div>
+                <div style="font-size: 0.5625rem; margin-top: 2px; color: var(--text-secondary);"><%= h %></div>
+              </div>
+            <% end %>
+          </div>
+
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 200px;">
+              <h4 style="font-size: 0.75rem; color: var(--positive); text-transform: uppercase; margin-bottom: 0.5rem;">Profitable Hours</h4>
+              <% profitable_hours.first(5).each do |hr| %>
+                <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.8125rem;">
+                  <span><%= hr["hour"] %>:00</span>
+                  <span class="positive"><%= number_to_currency(hr["avg_pnl"]) %> avg (<%= hr["trade_count"] %> trades)</span>
+                </div>
+              <% end %>
+            </div>
+            <% if losing_hours.any? %>
+              <div style="flex: 1; min-width: 200px;">
+                <h4 style="font-size: 0.75rem; color: var(--negative); text-transform: uppercase; margin-bottom: 0.5rem;">Avoid These Hours</h4>
+                <% losing_hours.first(5).each do |hr| %>
+                  <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.8125rem;">
+                    <span><%= hr["hour"] %>:00</span>
+                    <span class="negative"><%= number_to_currency(hr["avg_pnl"]) %> avg (<%= hr["trade_count"] %> trades)</span>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header">
+        <h2>By Day of Week</h2>
+      </div>
+      <% if day_data.any? %>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Day</th>
+              <th>Trades</th>
+              <th>Total P&L</th>
+              <th>Avg P&L</th>
+              <th>Performance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% max_day_pnl = day_data.map { |r| r["total_pnl"].to_f.abs }.max.to_f %>
+            <% day_data.each do |row| %>
+              <tr>
+                <td><strong><%= days[row["day_of_week"].to_i] %></strong></td>
+                <td><%= row["trade_count"] %></td>
+                <td class="<%= pnl_class(row["total_pnl"]) %>"><%= number_to_currency(row["total_pnl"]) %></td>
+                <td class="<%= pnl_class(row["avg_pnl"]) %>"><%= number_to_currency(row["avg_pnl"]) %></td>
+                <td>
+                  <div class="mini-bar-container">
+                    <div class="mini-bar <%= row["total_pnl"].to_f >= 0 ? 'positive' : 'negative' %>"
+                         style="width: <%= max_day_pnl > 0 ? (row["total_pnl"].to_f.abs / max_day_pnl * 100).round(1) : 0 %>%"></div>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p class="empty-state">No data available.</p>
+      <% end %>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>By Hour of Day</h2>
+      </div>
+      <% if hourly_data.any? %>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Hour</th>
+              <th>Trades</th>
+              <th>Total P&L</th>
+              <th>Avg P&L</th>
+              <th>Performance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% max_hour_pnl = hourly_data.map { |r| r["total_pnl"].to_f.abs }.max.to_f %>
+            <% hourly_data.each do |row| %>
+              <tr>
+                <td><strong><%= "#{row["hour"]}:00" %></strong></td>
+                <td><%= row["trade_count"] %></td>
+                <td class="<%= pnl_class(row["total_pnl"]) %>"><%= number_to_currency(row["total_pnl"]) %></td>
+                <td class="<%= pnl_class(row["avg_pnl"]) %>"><%= number_to_currency(row["avg_pnl"]) %></td>
+                <td>
+                  <div class="mini-bar-container">
+                    <div class="mini-bar <%= row["total_pnl"].to_f >= 0 ? 'positive' : 'negative' %>"
+                         style="width: <%= max_hour_pnl > 0 ? (row["total_pnl"].to_f.abs / max_hour_pnl * 100).round(1) : 0 %>%"></div>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p class="empty-state">No data available.</p>
+      <% end %>
+    </div>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No data available.</p>
+  </div>
+<% end %>

@@ -1,0 +1,47 @@
+<div class="page-header">
+  <h1>Edit Budget</h1>
+  <div class="page-actions">
+    <%= link_to "Back", budget_budget_path(@budget["id"]), class: "btn" %>
+  </div>
+</div>
+
+<div class="card">
+  <% if @errors.present? %>
+    <div class="alert alert-danger" style="margin: 1rem 1.25rem 0;">
+      <ul style="margin: 0; padding-left: 1rem;">
+        <% @errors.each do |error| %>
+          <li><%= error %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <%= form_with url: budget_budget_path(@budget["id"]), method: :patch, class: "form-container" do |f| %>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+      <div class="form-group">
+        <%= f.label :month, "Month" %>
+        <%= f.select :month, (1..12).map { |m| [Date::MONTHNAMES[m], m] },
+            { selected: @budget["month"] }, class: "form-control", name: "budget[month]" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :year, "Year" %>
+        <%= f.number_field :year, value: @budget["year"], class: "form-control", name: "budget[year]" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :income, "Monthly Income" %>
+        <%= f.number_field :income, value: @budget["income"], step: "0.01", class: "form-control", name: "budget[income]" %>
+      </div>
+    </div>
+    <div class="form-group">
+      <%= f.label :name, "Budget Name" %>
+      <%= f.text_field :name, value: @budget["name"], class: "form-control", name: "budget[name]" %>
+    </div>
+    <div class="form-group">
+      <%= f.label :notes, "Notes" %>
+      <%= f.text_area :notes, value: @budget["notes"], class: "form-control", name: "budget[notes]", rows: 3 %>
+    </div>
+    <div class="form-actions">
+      <%= f.submit "Update Budget", class: "btn btn-primary" %>
+    </div>
+  <% end %>
+</div>

@@ -1,0 +1,263 @@
+<div class="page-header">
+  <h1>Watchlist</h1>
+  <div class="page-actions">
+    <%= link_to "Add Symbol", new_watchlist_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2>Filters</h2>
+  </div>
+
+  <%= form_with url: watchlists_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :priority, "Priority" %>
+        <%= f.select :priority,
+              options_for_select([["High", "high"], ["Medium", "medium"], ["Low", "low"]], params[:priority]),
+              { include_blank: "All" },
+              { class: "form-control" } %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :active, "Status" %>
+        <%= f.select :active,
+              options_for_select([["Active", "true"], ["Inactive", "false"]], params[:active]),
+              { include_blank: "All" },
+              { class: "form-control" } %>
+      </div>
+
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Filter", class: "btn btn-primary" %>
+        <%= link_to "Clear", watchlists_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @watchlists.is_a?(Array) && @watchlists.any? %>
+  <%
+    high_count = @watchlists.count { |w| w["priority"] == "high" }
+    medium_count = @watchlists.count { |w| w["priority"] == "medium" }
+    low_count = @watchlists.count { |w| w["priority"] == "low" }
+    with_alerts = @watchlists.count { |w| w["alert_above"].present? || w["alert_below"].present? }
+    with_targets = @watchlists.count { |w| w["target_entry"].present? }
+    asset_classes = @watchlists.group_by { |w| w["asset_class"] || "other" }
+  %>
+  <%
+    traded_symbols = @watchlists.count { |w| @symbol_history[w["symbol"]&.upcase] }
+    total_hist_pnl = @watchlists.sum { |w| h = @symbol_history[w["symbol"]&.upcase]; h ? h[:total_pnl] : 0 }
+  %>
+  <div class="card" style="margin-bottom: 1rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Watching</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @watchlists.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">High Priority</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= high_count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">With Alerts</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= with_alerts %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Traded Before</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= traded_symbols %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Historical P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= total_hist_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(total_hist_pnl) %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Asset class distribution %>
+  <% if asset_classes.count >= 2 %>
+    <div class="card" style="margin-bottom: 1rem;">
+      <div class="card-header"><h2>Asset Class Mix</h2></div>
+      <div style="padding: 0.75rem 1.25rem;">
+        <%
+          ac_colors = ["#1a73e8", "#0d904f", "#e8710a", "#d93025", "#9334e6", "#00bcd4", "#f9ab00"]
+          ac_total = @watchlists.count.to_f
+        %>
+        <div style="display: flex; height: 1.25rem; border-radius: 0.625rem; overflow: hidden; margin-bottom: 0.5rem;">
+          <% asset_classes.each_with_index do |(ac, items), i| %>
+            <div style="width: <%= (items.count / ac_total * 100).round(1) %>%; background: <%= ac_colors[i % ac_colors.length] %>; opacity: 0.7;"
+                 title="<%= ac.capitalize %>: <%= items.count %>"></div>
+          <% end %>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.75rem;">
+          <% asset_classes.each_with_index do |(ac, items), i| %>
+            <span style="display: flex; align-items: center; gap: 4px;">
+              <span style="width: 8px; height: 8px; border-radius: 2px; background: <%= ac_colors[i % ac_colors.length] %>;"></span>
+              <%= ac.capitalize %> (<%= items.count %>)
+            </span>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Priority heat overview %>
+  <% if @watchlists.count >= 3 %>
+    <% priority_colors = { "high" => "#d93025", "medium" => "#f9ab00", "low" => "#0d904f" } %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Watchlist Overview</h2></div>
+      <div style="padding: 0.75rem 1.25rem; display: flex; flex-wrap: wrap; gap: 0.375rem;">
+        <% @watchlists.sort_by { |w| { "high" => 0, "medium" => 1, "low" => 2 }[w["priority"]] || 3 }.each do |w| %>
+          <%
+            sym = w["symbol"]&.upcase
+            hist = @symbol_history[sym]
+            bg_color = priority_colors[w["priority"]] || "#80868b"
+            # Readiness score: alerts, target entry, notes each add 1 point
+            readiness = 0
+            readiness += 1 if w["alert_above"].present? || w["alert_below"].present?
+            readiness += 1 if w["target_entry"].present?
+            readiness += 1 if w["notes"].present?
+            readiness_label = readiness == 3 ? "Ready" : readiness == 2 ? "Almost" : readiness == 1 ? "Partial" : "Needs work"
+            readiness_color = readiness >= 3 ? "var(--positive)" : readiness == 2 ? "#f9ab00" : "var(--text-secondary)"
+          %>
+          <div style="padding: 0.375rem 0.625rem; border-radius: var(--radius); border: 2px solid <%= bg_color %>;
+                      background: <%= bg_color %>11; display: flex; flex-direction: column; align-items: center; min-width: 4.5rem;"
+               title="<%= sym %> — <%= w["priority"]&.capitalize %> priority · <%= readiness_label %><%= hist ? " · #{hist[:trades]} trades, #{number_to_currency(hist[:total_pnl])}" : '' %>">
+            <strong style="font-size: 0.875rem;"><%= sym %></strong>
+            <% if hist %>
+              <span style="font-size: 0.5625rem; color: var(--text-secondary);"><%= hist[:trades] %> trades</span>
+              <span style="font-size: 0.5625rem;" class="<%= hist[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(hist[:total_pnl]) %></span>
+            <% else %>
+              <span style="font-size: 0.5625rem; color: var(--text-secondary);">No history</span>
+            <% end %>
+            <div style="display: flex; gap: 1px; margin-top: 2px;">
+              <% 3.times do |dot| %>
+                <div style="width: 4px; height: 4px; border-radius: 50%; background: <%= dot < readiness ? readiness_color : 'var(--border)' %>;"></div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+      <div style="padding: 0.25rem 1.25rem 0.75rem; font-size: 0.625rem; color: var(--text-secondary);">
+        Dots = readiness (alerts, target entry, notes). Border color = priority.
+      </div>
+    </div>
+  <% end %>
+
+  <div class="tags-grid">
+    <% @watchlists.each do |item| %>
+      <%
+        item_readiness = 0
+        item_readiness += 1 if item["alert_above"].present? || item["alert_below"].present?
+        item_readiness += 1 if item["target_entry"].present?
+        item_readiness += 1 if item["notes"].present?
+      %>
+      <div class="card" style="border-left: 3px solid <%= { 'high' => '#d93025', 'medium' => '#f9ab00', 'low' => '#0d904f' }[item["priority"]] || 'var(--border)' %>;">
+        <div class="card-header">
+          <h2><%= link_to item["symbol"], watchlist_path(item["id"]) %></h2>
+          <div style="display: flex; gap: 0.375rem; align-items: center;">
+            <% if item_readiness == 3 %>
+              <span class="badge badge-success" style="font-size: 0.6rem;">Ready</span>
+            <% end %>
+            <span class="badge badge-<%= item["priority"] %>"><%= item["priority"]&.capitalize %></span>
+          </div>
+        </div>
+
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Asset Class</span>
+            <span class="detail-value"><%= item["asset_class"]&.capitalize %></span>
+          </div>
+          <% if item["target_entry"].present? %>
+            <div class="detail-item">
+              <span class="detail-label">Target Entry</span>
+              <span class="detail-value"><%= number_to_currency(item["target_entry"]) %></span>
+            </div>
+          <% end %>
+          <% if item["alert_above"].present? %>
+            <div class="detail-item">
+              <span class="detail-label">Alert Above</span>
+              <span class="detail-value"><%= number_to_currency(item["alert_above"]) %></span>
+            </div>
+          <% end %>
+          <% if item["alert_below"].present? %>
+            <div class="detail-item">
+              <span class="detail-label">Alert Below</span>
+              <span class="detail-value"><%= number_to_currency(item["alert_below"]) %></span>
+            </div>
+          <% end %>
+        </div>
+
+        <%
+          prices = [item["target_entry"], item["alert_above"], item["alert_below"]].compact.map(&:to_f).select { |p| p > 0 }
+          if prices.length >= 2
+            price_min = prices.min * 0.98
+            price_max = prices.max * 1.02
+            price_range = price_max - price_min
+        %>
+          <div class="watchlist-price-range" style="margin-top: 0.75rem;">
+            <div class="price-range-bar">
+              <% if item["alert_below"].to_f > 0 %>
+                <% pos = ((item["alert_below"].to_f - price_min) / price_range * 100).clamp(0, 100) %>
+                <div class="price-range-marker price-range-below" style="left: <%= pos %>%;" title="Alert Below: <%= number_to_currency(item["alert_below"]) %>"></div>
+              <% end %>
+              <% if item["target_entry"].to_f > 0 %>
+                <% pos = ((item["target_entry"].to_f - price_min) / price_range * 100).clamp(0, 100) %>
+                <div class="price-range-marker price-range-entry" style="left: <%= pos %>%;" title="Target Entry: <%= number_to_currency(item["target_entry"]) %>"></div>
+              <% end %>
+              <% if item["alert_above"].to_f > 0 %>
+                <% pos = ((item["alert_above"].to_f - price_min) / price_range * 100).clamp(0, 100) %>
+                <div class="price-range-marker price-range-above" style="left: <%= pos %>%;" title="Alert Above: <%= number_to_currency(item["alert_above"]) %>"></div>
+              <% end %>
+            </div>
+            <div class="price-range-labels">
+              <span><%= number_to_currency(price_min.round(2)) %></span>
+              <span><%= number_to_currency(price_max.round(2)) %></span>
+            </div>
+          </div>
+        <% end %>
+
+        <% hist = @symbol_history[item["symbol"]&.upcase] %>
+        <% if hist %>
+          <div style="margin-top: 0.75rem; padding: 0.5rem; border-radius: var(--radius); background: var(--bg); display: flex; gap: 0.75rem; font-size: 0.75rem;">
+            <span><strong><%= hist[:trades] %></strong> trades</span>
+            <span class="<%= hist[:win_rate] >= 50 ? 'positive' : 'negative' %>"><%= hist[:win_rate] %>% WR</span>
+            <span class="<%= hist[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(hist[:total_pnl]) %></span>
+            <% if hist[:last_trade] %>
+              <span style="color: var(--text-secondary);">Last: <%= time_ago_short(hist[:last_trade]["entry_time"]) %></span>
+            <% end %>
+          </div>
+        <% end %>
+
+        <% if item["notes"].present? %>
+          <p style="margin-top: 0.75rem; font-size: 0.875rem; color: var(--text-secondary);"><%= truncate(item["notes"], length: 100) %></p>
+        <% end %>
+
+        <div class="tag-card-footer" style="margin-top: 0.75rem;">
+          <%= link_to new_trade_path(trade: {
+            symbol: item["symbol"],
+            asset_class: item["asset_class"],
+            entry_price: item["target_entry"],
+            side: "long"
+          }), class: "btn btn-sm btn-primary", title: "Quick trade #{item["symbol"]}" do %>
+            <span class="material-icons-outlined" style="font-size: 14px; vertical-align: -2px;">trending_up</span> Trade
+          <% end %>
+          <%= link_to "View", watchlist_path(item["id"]), class: "btn btn-sm" %>
+          <%= link_to "Edit", edit_watchlist_path(item["id"]), class: "btn btn-sm" %>
+          <%= link_to "Trade Plan", new_trade_plan_path(
+            "trade_plan[symbol]" => item["symbol"],
+            "trade_plan[asset_class]" => item["asset_class"],
+            "trade_plan[stop_loss]" => item["alert_below"],
+            "trade_plan[take_profit]" => item["alert_above"]
+          ), class: "btn btn-sm", title: "Create trade plan from watchlist" %>
+          <%= link_to "Trades", trades_path(symbol: item["symbol"]), class: "btn btn-sm", title: "View trades for #{item["symbol"]}" %>
+          <%= link_to "Delete", watchlist_path(item["id"]), data: { turbo_method: :delete, turbo_confirm: "Remove this symbol from your watchlist?" }, class: "btn btn-sm btn-danger" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card">
+    <p class="empty-state">No watchlist items match your filters.</p>
+  </div>
+<% end %>

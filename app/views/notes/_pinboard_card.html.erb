@@ -1,0 +1,37 @@
+<%= link_to note_path(note["id"]), class: "pinboard-card", style: note["color"].present? ? "border-top: 3px solid #{note["color"]}" : nil do %>
+  <div class="pinboard-card-header">
+    <h3><%= note["title"].presence || "Untitled" %></h3>
+    <div class="pinboard-card-badges">
+      <% if note["pinned"] %>
+        <span class="material-icons-outlined icon-sm">push_pin</span>
+      <% end %>
+      <% if note["favorited"] %>
+        <span class="material-icons-outlined icon-sm text-warning">star</span>
+      <% end %>
+    </div>
+  </div>
+
+  <% if note.dig("notebook", "name") %>
+    <span class="pinboard-card-notebook"><%= note.dig("notebook", "name") %></span>
+  <% end %>
+
+  <% content = note["content_preview"] || note["content"] %>
+  <% if content.present? %>
+    <p class="pinboard-card-content"><%= truncate(content, length: 200) %></p>
+  <% end %>
+
+  <% if note["tags"].present? && note["tags"].any? %>
+    <div class="pinboard-card-tags">
+      <% note["tags"].first(3).each do |tag| %>
+        <span class="tag tag-sm" <% if tag["color"].present? %>style="background-color: <%= tag["color"] %>"<% end %>><%= tag["name"] %></span>
+      <% end %>
+      <% if note["tags"].count > 3 %>
+        <span class="text-muted" style="font-size: 0.75rem;">+<%= note["tags"].count - 3 %></span>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div class="pinboard-card-footer">
+    <span class="text-muted"><%= time_ago_short(note["updated_at"]) %> ago</span>
+  </div>
+<% end %>

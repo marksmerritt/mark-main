@@ -1,0 +1,382 @@
+<div class="page-header">
+  <div>
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <h1><%= @playbook["name"] %></h1>
+      <% if @playbook["status"] == "archived" %>
+        <span class="badge badge-closed">Archived</span>
+      <% else %>
+        <span class="badge badge-open">Active</span>
+      <% end %>
+    </div>
+    <% if @playbook["description"].present? %>
+      <p class="text-muted" style="margin-top: 0.25rem;"><%= @playbook["description"] %></p>
+    <% end %>
+  </div>
+  <div class="page-actions">
+    <%= link_to edit_playbook_path(@playbook["id"]), class: "btn" do %>
+      <span class="material-icons-outlined">edit</span> Edit
+    <% end %>
+    <%= link_to playbook_path(@playbook["id"]), method: :delete, data: { turbo_method: :delete, turbo_confirm: "Delete this playbook?" }, class: "btn btn-danger" do %>
+      <span class="material-icons-outlined">delete</span> Delete
+    <% end %>
+  </div>
+</div>
+
+<div class="playbook-meta-bar">
+  <% if @playbook["asset_classes"].present? %>
+    <span class="playbook-meta-item">
+      <span class="material-icons-outlined" style="font-size: 1rem;">category</span>
+      <strong>Asset Classes:</strong> <%= @playbook["asset_classes"] %>
+    </span>
+  <% end %>
+  <% if @playbook["timeframes"].present? %>
+    <span class="playbook-meta-item">
+      <span class="material-icons-outlined" style="font-size: 1rem;">schedule</span>
+      <strong>Timeframes:</strong> <%= @playbook["timeframes"] %>
+    </span>
+  <% end %>
+</div>
+
+<div class="playbook-sections">
+  <% if @playbook["setup_rules"].present? %>
+    <div class="card playbook-section">
+      <div class="playbook-section-header">
+        <span class="material-icons-outlined">visibility</span>
+        <h2>Setup Rules</h2>
+      </div>
+      <div class="playbook-section-content">
+        <%= simple_format(@playbook["setup_rules"]) %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @playbook["entry_criteria"].present? %>
+    <div class="card playbook-section">
+      <div class="playbook-section-header">
+        <span class="material-icons-outlined">login</span>
+        <h2>Entry Criteria</h2>
+      </div>
+      <div class="playbook-section-content">
+        <%= simple_format(@playbook["entry_criteria"]) %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @playbook["exit_criteria"].present? %>
+    <div class="card playbook-section">
+      <div class="playbook-section-header">
+        <span class="material-icons-outlined">logout</span>
+        <h2>Exit Criteria</h2>
+      </div>
+      <div class="playbook-section-content">
+        <%= simple_format(@playbook["exit_criteria"]) %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @playbook["risk_rules"].present? %>
+    <div class="card playbook-section">
+      <div class="playbook-section-header">
+        <span class="material-icons-outlined">shield</span>
+        <h2>Risk Management</h2>
+      </div>
+      <div class="playbook-section-content">
+        <%= simple_format(@playbook["risk_rules"]) %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @related_trades.present? && @related_trades.any? %>
+  <%
+    wins = @related_trades.count { |t| t["pnl"].to_f > 0 }
+    losses = @related_trades.count { |t| t["pnl"].to_f < 0 }
+    breakevens = @related_trades.count { |t| t["pnl"].to_f == 0 }
+    total_pnl = @related_trades.sum { |t| t["pnl"].to_f }
+    win_rate = @related_trades.any? ? (wins.to_f / @related_trades.count * 100).round(1) : 0
+    winning_trades = @related_trades.select { |t| t["pnl"].to_f > 0 }
+    losing_trades = @related_trades.select { |t| t["pnl"].to_f < 0 }
+    avg_win = winning_trades.any? ? (winning_trades.sum { |t| t["pnl"].to_f } / winning_trades.count).round(2) : 0
+    avg_loss = losing_trades.any? ? (losing_trades.sum { |t| t["pnl"].to_f } / losing_trades.count).round(2) : 0
+    profit_factor = avg_loss.abs > 0 ? (avg_win / avg_loss.abs).round(2) : 0
+    expectancy = @related_trades.any? ? (total_pnl / @related_trades.count).round(2) : 0
+    best_trade = @related_trades.max_by { |t| t["pnl"].to_f }
+    worst_trade = @related_trades.min_by { |t| t["pnl"].to_f }
+    largest_win_streak = 0; largest_loss_streak = 0; current_streak = 0; streak_type = nil
+    sorted_all = @related_trades.select { |t| t["entry_time"].present? }.sort_by { |t| t["entry_time"] }
+    sorted_all.each do |t|
+      if t["pnl"].to_f > 0
+        current_streak = streak_type == :win ? current_streak + 1 : 1
+        streak_type = :win
+        largest_win_streak = [largest_win_streak, current_streak].max
+      elsif t["pnl"].to_f < 0
+        current_streak = streak_type == :loss ? current_streak + 1 : 1
+        streak_type = :loss
+        largest_loss_streak = [largest_loss_streak, current_streak].max
+      end
+    end
+  %>
+
+  <%# Performance Hero Card %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div style="display: flex; align-items: stretch; flex-wrap: wrap;">
+      <%# Win rate gauge %>
+      <div style="flex: 0 0 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; border-right: 1px solid var(--border);">
+        <%
+          wr_r = 60; wr_cx = 90; wr_cy = 75
+          wr_circum = Math::PI * wr_r
+          wr_filled = wr_circum * win_rate / 100.0
+          wr_color = win_rate >= 55 ? "var(--positive)" : win_rate >= 45 ? "var(--primary)" : "var(--negative)"
+        %>
+        <svg width="180" height="100" viewBox="0 0 180 100">
+          <path d="M <%= wr_cx - wr_r %> <%= wr_cy %> A <%= wr_r %> <%= wr_r %> 0 1 1 <%= wr_cx + wr_r %> <%= wr_cy %>"
+                fill="none" stroke="var(--border)" stroke-width="10" stroke-linecap="round" />
+          <path d="M <%= wr_cx - wr_r %> <%= wr_cy %> A <%= wr_r %> <%= wr_r %> 0 1 1 <%= wr_cx + wr_r %> <%= wr_cy %>"
+                fill="none" stroke="<%= wr_color %>" stroke-width="10" stroke-linecap="round"
+                stroke-dasharray="<%= wr_filled.round(1) %> <%= wr_circum.round(1) %>" />
+          <text x="<%= wr_cx %>" y="<%= wr_cy - 8 %>" text-anchor="middle" font-size="22" font-weight="700" fill="<%= wr_color %>"><%= win_rate %>%</text>
+          <text x="<%= wr_cx %>" y="<%= wr_cy + 8 %>" text-anchor="middle" font-size="9" fill="var(--text-secondary)">WIN RATE</text>
+        </svg>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          <span class="positive"><%= wins %>W</span> &middot;
+          <span class="negative"><%= losses %>L</span>
+          <% if breakevens > 0 %>&middot; <%= breakevens %>BE<% end %>
+        </div>
+      </div>
+
+      <%# Key metrics %>
+      <div style="flex: 1; min-width: 300px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0;">
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total P&L</div>
+          <div style="font-size: 1.25rem; font-weight: 700;" class="<%= pnl_class(total_pnl) %>"><%= number_to_currency(total_pnl) %></div>
+        </div>
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Expectancy</div>
+          <div style="font-size: 1.25rem; font-weight: 700;" class="<%= pnl_class(expectancy) %>"><%= number_to_currency(expectancy) %></div>
+        </div>
+        <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profit Factor</div>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= profit_factor %></div>
+        </div>
+        <div style="padding: 1rem 1.25rem; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(avg_win) %></div>
+        </div>
+        <div style="padding: 1rem 1.25rem; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(avg_loss) %></div>
+        </div>
+        <div style="padding: 1rem 1.25rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= @related_trades.count %></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Win/Loss Distribution & Streaks %>
+  <div class="content-grid" style="margin-top: 1rem;">
+    <div class="card">
+      <div class="card-header"><h2>P&L Distribution</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <%
+          pnl_values = @related_trades.map { |t| t["pnl"].to_f }
+          pnl_min = pnl_values.min || 0
+          pnl_max = pnl_values.max || 0
+          pnl_abs_max = [pnl_min.abs, pnl_max.abs, 1].max
+          bucket_count = 12
+          bucket_size = (pnl_abs_max * 2.0 / bucket_count).ceil
+          bucket_size = 1 if bucket_size == 0
+          buckets = {}
+          pnl_values.each do |v|
+            key = (v / bucket_size).floor * bucket_size
+            buckets[key] = (buckets[key] || 0) + 1
+          end
+          all_keys = ((-pnl_abs_max / bucket_size).floor..(pnl_abs_max / bucket_size).ceil).map { |k| k * bucket_size }
+          bar_max = buckets.values.max || 1
+        %>
+        <svg width="100%" viewBox="0 0 400 140" preserveAspectRatio="xMidYMid meet">
+          <% bar_w = 380.0 / [all_keys.length, 1].max %>
+          <% all_keys.each_with_index do |key, i| %>
+            <%
+              count = buckets[key] || 0
+              bar_h = count > 0 ? (count.to_f / bar_max * 100).round(1) : 0
+              x = 10 + i * bar_w
+              color = key >= 0 ? "var(--positive)" : "var(--negative)"
+            %>
+            <rect x="<%= x + 1 %>" y="<%= 120 - bar_h %>" width="<%= [bar_w - 2, 1].max %>" height="<%= bar_h %>"
+                  fill="<%= color %>" opacity="0.6" rx="2" />
+            <% if count > 0 %>
+              <text x="<%= x + bar_w / 2 %>" y="<%= 118 - bar_h %>" text-anchor="middle" font-size="7" fill="var(--text-secondary)"><%= count %></text>
+            <% end %>
+          <% end %>
+          <line x1="10" y1="120" x2="390" y2="120" stroke="var(--border)" stroke-width="1" />
+          <% zero_x = 10 + all_keys.index(0).to_i * bar_w + bar_w / 2 %>
+          <line x1="<%= zero_x %>" y1="5" x2="<%= zero_x %>" y2="120" stroke="var(--text-secondary)" stroke-width="0.5" stroke-dasharray="3,3" />
+          <text x="<%= zero_x %>" y="132" text-anchor="middle" font-size="8" fill="var(--text-secondary)">$0</text>
+          <text x="15" y="132" text-anchor="start" font-size="7" fill="var(--negative)"><%= number_to_currency(all_keys.first) %></text>
+          <text x="385" y="132" text-anchor="end" font-size="7" fill="var(--positive)"><%= number_to_currency(all_keys.last) %></text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Streaks & Extremes</h2></div>
+      <div class="detail-grid" style="padding: 0.5rem 0;">
+        <div class="detail-item">
+          <span class="detail-label">Best Win Streak</span>
+          <span class="detail-value positive"><%= largest_win_streak %> trades</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Worst Loss Streak</span>
+          <span class="detail-value negative"><%= largest_loss_streak %> trades</span>
+        </div>
+      </div>
+
+      <%# Best & worst trade highlights %>
+      <% if best_trade %>
+        <div style="padding: 0.5rem 1.25rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">Best Trade</div>
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; background: rgba(13,144,79,0.08); border-radius: var(--radius);">
+            <div>
+              <strong><%= link_to best_trade["symbol"], trade_path(best_trade["id"]) %></strong>
+              <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem;">
+                <%= Date.parse(best_trade["entry_time"]).strftime("%b %d") if best_trade["entry_time"] %>
+              </span>
+            </div>
+            <span style="font-weight: 700; color: var(--positive);"><%= number_to_currency(best_trade["pnl"]) %></span>
+          </div>
+        </div>
+      <% end %>
+
+      <% if worst_trade && worst_trade["pnl"].to_f < 0 %>
+        <div style="padding: 0.5rem 1.25rem 1rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">Worst Trade</div>
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0.75rem; background: rgba(217,48,37,0.08); border-radius: var(--radius);">
+            <div>
+              <strong><%= link_to worst_trade["symbol"], trade_path(worst_trade["id"]) %></strong>
+              <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.5rem;">
+                <%= Date.parse(worst_trade["entry_time"]).strftime("%b %d") if worst_trade["entry_time"] %>
+              </span>
+            </div>
+            <span style="font-weight: 700; color: var(--negative);"><%= number_to_currency(worst_trade["pnl"]) %></span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Monthly Performance Breakdown %>
+  <%
+    monthly = sorted_all.group_by { |t| t["entry_time"].to_s.slice(0, 7) }
+    monthly_data = monthly.map do |month, trades|
+      m_pnl = trades.sum { |t| t["pnl"].to_f }
+      m_wins = trades.count { |t| t["pnl"].to_f > 0 }
+      m_wr = trades.any? ? (m_wins.to_f / trades.count * 100).round(1) : 0
+      { month: month, pnl: m_pnl, count: trades.count, wins: m_wins, wr: m_wr }
+    end.sort_by { |m| m[:month] }
+  %>
+  <% if monthly_data.length >= 2 %>
+    <div class="card" style="margin-top: 1rem;">
+      <div class="card-header">
+        <h2>Monthly Breakdown</h2>
+        <span class="text-muted"><%= monthly_data.length %> months</span>
+      </div>
+      <%# Monthly bar chart %>
+      <%
+        m_max_abs = monthly_data.map { |m| m[:pnl].abs }.max
+        m_max_abs = 1 if m_max_abs == 0
+        m_bar_w = 380.0 / monthly_data.length
+        m_mid_y = 75
+      %>
+      <div style="padding: 0.75rem 1.25rem;">
+        <svg width="100%" viewBox="0 0 400 165" preserveAspectRatio="xMidYMid meet">
+          <line x1="10" y1="<%= m_mid_y %>" x2="390" y2="<%= m_mid_y %>" stroke="var(--border)" stroke-width="1" />
+          <% monthly_data.each_with_index do |m, i| %>
+            <%
+              bar_h = (m[:pnl].abs / m_max_abs * 60).round(1)
+              x = 10 + i * m_bar_w
+              color = m[:pnl] >= 0 ? "var(--positive)" : "var(--negative)"
+              y = m[:pnl] >= 0 ? m_mid_y - bar_h : m_mid_y
+            %>
+            <rect x="<%= x + 2 %>" y="<%= y %>" width="<%= [m_bar_w - 4, 4].max %>" height="<%= [bar_h, 2].max %>"
+                  fill="<%= color %>" opacity="0.65" rx="2" />
+            <text x="<%= x + m_bar_w / 2 %>" y="<%= m[:pnl] >= 0 ? y - 3 : y + bar_h + 9 %>" text-anchor="middle" font-size="7" font-weight="600" fill="<%= color %>">
+              <%= number_to_currency(m[:pnl], precision: 0) %>
+            </text>
+            <text x="<%= x + m_bar_w / 2 %>" y="155" text-anchor="middle" font-size="7" fill="var(--text-secondary)">
+              <%= Date.parse("#{m[:month]}-01").strftime("%b %y") rescue m[:month] %>
+            </text>
+          <% end %>
+        </svg>
+      </div>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th style="text-align: right;">Trades</th>
+            <th style="text-align: right;">Win Rate</th>
+            <th style="text-align: right;">P&L</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% monthly_data.reverse.each do |m| %>
+            <tr>
+              <td><%= Date.parse("#{m[:month]}-01").strftime("%B %Y") rescue m[:month] %></td>
+              <td style="text-align: right;"><%= m[:count] %></td>
+              <td style="text-align: right;"><%= m[:wr] %>%</td>
+              <td style="text-align: right; font-weight: 600;" class="<%= m[:pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(m[:pnl]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
+  <%# Equity Curve %>
+  <% if sorted_all.count >= 3 %>
+    <%
+      cum = 0
+      equity_data = sorted_all.map { |t| cum += t["pnl"].to_f; { x: t["entry_time"].to_s.slice(0, 10), y: cum.round(2) } }
+    %>
+    <div class="card" style="margin-top: 1rem;">
+      <div class="card-header"><h2>Equity Curve</h2></div>
+      <div style="padding: 0.75rem 1.25rem 1rem;">
+        <div data-controller="chart"
+             data-chart-type-value="line"
+             data-chart-points-value="<%= equity_data.to_json %>"
+             style="height: 180px;">
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Trade Log %>
+  <div class="card" style="margin-top: 1rem;">
+    <div class="card-header">
+      <h2>Trade Log</h2>
+      <span class="text-muted"><%= @related_trades.count %> trades</span>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Symbol</th>
+          <th>Side</th>
+          <th style="text-align: right;">P&L</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% sorted_all.reverse.first(30).each do |trade| %>
+          <tr>
+            <td><%= Date.parse(trade["entry_time"]).strftime("%b %d, %Y") if trade["entry_time"] %></td>
+            <td><strong><%= link_to trade["symbol"], trade_path(trade["id"]) %></strong></td>
+            <td><%= trade["side"]&.capitalize %></td>
+            <td style="text-align: right;"><%= outcome_badge(trade["pnl"]) %> <%= pnl_display(trade["pnl"]) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

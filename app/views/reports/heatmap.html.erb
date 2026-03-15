@@ -1,0 +1,78 @@
+<div class="page-header">
+  <h1>Performance Heatmap</h1>
+</div>
+
+<% if @daily_pnl.present? && @daily_pnl.any? %>
+  <div class="card">
+    <div class="card-header">
+      <h2>Daily P&L &mdash; Last 12 Months</h2>
+    </div>
+    <div class="heatmap-container"
+         data-controller="heatmap"
+         data-heatmap-data-value="<%= @daily_pnl.to_json %>">
+      <div data-heatmap-target="grid"></div>
+      <div class="heatmap-tooltip" data-heatmap-target="tooltip"></div>
+    </div>
+
+    <div class="heatmap-legend">
+      <span class="heatmap-legend-label">Loss</span>
+      <div class="heatmap-cell heatmap-loss-4"></div>
+      <div class="heatmap-cell heatmap-loss-3"></div>
+      <div class="heatmap-cell heatmap-loss-2"></div>
+      <div class="heatmap-cell heatmap-loss-1"></div>
+      <div class="heatmap-cell heatmap-level-0"></div>
+      <div class="heatmap-cell heatmap-profit-1"></div>
+      <div class="heatmap-cell heatmap-profit-2"></div>
+      <div class="heatmap-cell heatmap-profit-3"></div>
+      <div class="heatmap-cell heatmap-profit-4"></div>
+      <span class="heatmap-legend-label">Profit</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top: 1rem;">
+    <div class="card-header">
+      <h2>Summary</h2>
+    </div>
+    <%
+      positive_days = @daily_pnl.count { |_, pnl| pnl.to_f > 0 }
+      negative_days = @daily_pnl.count { |_, pnl| pnl.to_f < 0 }
+      total_days = @daily_pnl.count
+      best_day = @daily_pnl.max_by { |_, pnl| pnl.to_f }
+      worst_day = @daily_pnl.min_by { |_, pnl| pnl.to_f }
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trading Days</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= total_days %></div>
+        </div>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Green Days</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= positive_days %> (<%= total_days > 0 ? (positive_days.to_f / total_days * 100).round(1) : 0 %>%)</div>
+        </div>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Red Days</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= negative_days %> (<%= total_days > 0 ? (negative_days.to_f / total_days * 100).round(1) : 0 %>%)</div>
+        </div>
+        <% if best_day %>
+          <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Day</div>
+            <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= number_to_currency(best_day[1]) %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= best_day[0] %></div>
+          </div>
+        <% end %>
+        <% if worst_day %>
+          <div style="padding: 1rem; text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Day</div>
+            <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(worst_day[1]) %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= worst_day[0] %></div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No daily P&L data available.</p>
+  </div>
+<% end %>

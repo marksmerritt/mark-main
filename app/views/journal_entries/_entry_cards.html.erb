@@ -2,9 +2,7 @@
   <div class="card entry-card">
     <div class="entry-card-header">
       <span class="entry-date"><%= Date.parse(entry["date"]).strftime("%A, %B %-d, %Y") %></span>
-      <% if entry["mood"].present? %>
-        <span class="badge badge-mood"><%= entry["mood"] %></span>
-      <% end %>
+      <%= mood_badge(entry["mood"]) %>
     </div>
     <div class="entry-card-footer">
       <%= link_to "View", journal_entry_path(entry["id"]), class: "btn btn-sm" %>

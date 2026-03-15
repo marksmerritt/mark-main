@@ -1,0 +1,220 @@
+<% content_for(:title) { "Performance Attribution" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #1a73e8;">pie_chart</span>
+    Performance Attribution
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Summary Cards %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <div class="card" style="padding: 1rem 1.25rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total P&L</div>
+    <div style="font-size: 1.5rem; font-weight: 700; color: <%= @summary[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@summary[:total_pnl]) %></div>
+  </div>
+  <div class="card" style="padding: 1rem 1.25rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Trades</div>
+    <div style="font-size: 1.5rem; font-weight: 700;"><%= @summary[:total_trades] %></div>
+  </div>
+  <div class="card" style="padding: 1rem 1.25rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+    <div style="font-size: 1.5rem; font-weight: 700;"><%= @summary[:win_rate] || "—" %>%</div>
+  </div>
+  <div class="card" style="padding: 1rem 1.25rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Concentration (HHI)</div>
+    <div style="font-size: 1.5rem; font-weight: 700; color: <%= @concentration[:diversified] ? 'var(--positive)' : '#f9a825' %>;"><%= @concentration[:hhi] %></div>
+    <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= @concentration[:diversified] ? "Diversified" : "Concentrated" %></div>
+  </div>
+</div>
+
+<%# Top Contributors & Detractors %>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">arrow_upward</span> Top Contributors</h2>
+    </div>
+    <div style="padding: 0;">
+      <% @top_contributors.each do |sym| %>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <div>
+            <div style="font-size: 0.875rem; font-weight: 600;"><%= sym[:name] %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= sym[:count] %> trades &middot; <%= sym[:win_rate] %>% WR</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.875rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(sym[:total_pnl]) %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= sym[:pnl_pct] %>% of total</div>
+          </div>
+        </div>
+      <% end %>
+      <% if @top_contributors.empty? %>
+        <div style="padding: 1.25rem; color: var(--text-secondary); text-align: center; font-size: 0.8125rem;">No data yet</div>
+      <% end %>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">arrow_downward</span> Top Detractors</h2>
+    </div>
+    <div style="padding: 0;">
+      <% @top_detractors.each do |sym| %>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <div>
+            <div style="font-size: 0.875rem; font-weight: 600;"><%= sym[:name] %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= sym[:count] %> trades &middot; <%= sym[:win_rate] %>% WR</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.875rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(sym[:total_pnl]) %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= sym[:pnl_pct] %>% of total</div>
+          </div>
+        </div>
+      <% end %>
+      <% if @top_detractors.empty? %>
+        <div style="padding: 1.25rem; color: var(--text-secondary); text-align: center; font-size: 0.8125rem;">No data yet</div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Attribution by Symbol - Waterfall Chart %>
+<% if @by_symbol.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">label</span> P&L by Symbol</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @by_symbol.length %> symbols</span>
+    </div>
+    <div style="padding: 1.25rem;">
+      <%
+        top_symbols = @by_symbol.first(15)
+        max_abs = top_symbols.map { |s| s[:total_pnl].abs }.max
+        max_abs = [max_abs, 1].max
+      %>
+      <% top_symbols.each do |sym| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem; font-size: 0.8125rem;">
+          <div style="width: 60px; text-align: right; font-weight: 600; flex-shrink: 0;"><%= sym[:name] %></div>
+          <div style="flex: 1; display: flex; align-items: center;">
+            <% if sym[:total_pnl] >= 0 %>
+              <div style="width: 50%;"></div>
+              <div style="width: 50%; position: relative;">
+                <div style="height: 20px; width: <%= (sym[:total_pnl] / max_abs * 100).abs %>%; background: var(--positive); border-radius: 0 3px 3px 0; opacity: 0.8;"></div>
+              </div>
+            <% else %>
+              <div style="width: 50%; display: flex; justify-content: flex-end;">
+                <div style="height: 20px; width: <%= (sym[:total_pnl] / max_abs * 100).abs %>%; background: var(--negative); border-radius: 3px 0 0 3px; opacity: 0.8;"></div>
+              </div>
+              <div style="width: 50%;"></div>
+            <% end %>
+          </div>
+          <div style="width: 80px; text-align: right; font-weight: 600; flex-shrink: 0; color: <%= sym[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= number_to_currency(sym[:total_pnl], precision: 0) %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Attribution Tables %>
+<%
+  dimension_tables = [
+    { title: "By Side", icon: "swap_horiz", data: @by_side, color: "#1a73e8" },
+    { title: "By Asset Class", icon: "category", data: @by_asset_class, color: "#00897b" },
+    { title: "By Day of Week", icon: "date_range", data: @by_day_of_week, color: "#7b1fa2" },
+    { title: "By Time of Day", icon: "schedule", data: @by_time_of_day, color: "#e65100" },
+    { title: "By Hold Time", icon: "timer", data: @by_hold_time, color: "#5d4037" },
+    { title: "By Tag", icon: "sell", data: @by_tag, color: "#c62828" }
+  ]
+%>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+  <% dimension_tables.each do |dim| %>
+    <% next if dim[:data].empty? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: <%= dim[:color] %>;"><%= dim[:icon] %></span> <%= dim[:title] %></h2>
+      </div>
+      <div style="padding: 0; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+              <th style="padding: 0.5rem 0.75rem; text-align: left;">Name</th>
+              <th style="padding: 0.5rem 0.5rem; text-align: center;">Trades</th>
+              <th style="padding: 0.5rem 0.5rem; text-align: center;">Win%</th>
+              <th style="padding: 0.5rem 0.75rem; text-align: right;">P&L</th>
+              <th style="padding: 0.5rem 0.75rem; text-align: right;">Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% dim[:data].first(10).each do |row| %>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 0.5rem 0.75rem; font-weight: 500;"><%= row[:name] %></td>
+                <td style="padding: 0.5rem 0.5rem; text-align: center;"><%= row[:count] %></td>
+                <td style="padding: 0.5rem 0.5rem; text-align: center; color: <%= row[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= row[:win_rate] %>%</td>
+                <td style="padding: 0.5rem 0.75rem; text-align: right; font-weight: 600; color: <%= row[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(row[:total_pnl], precision: 0) %></td>
+                <td style="padding: 0.5rem 0.75rem; text-align: right;">
+                  <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.375rem;">
+                    <div style="width: 40px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;">
+                      <div style="width: <%= row[:pnl_pct].abs.clamp(0, 100) %>%; height: 100%; background: <%= row[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"></div>
+                    </div>
+                    <span><%= row[:pnl_pct] %>%</span>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Monthly Attribution %>
+<% if @by_month.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1a73e8;">calendar_month</span> Monthly Attribution</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <%
+        max_monthly = @by_month.map { |m| m[:total_pnl].abs }.max
+        max_monthly = [max_monthly, 1].max
+      %>
+      <div style="display: flex; gap: 6px; align-items: center; height: 160px;">
+        <% @by_month.last(12).each do |m| %>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: center;">
+            <% bar_h = (m[:total_pnl].abs / max_monthly * 60).round %>
+            <% if m[:total_pnl] >= 0 %>
+              <div style="display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 50%;">
+                <div style="font-size: 0.5625rem; color: var(--positive);"><%= number_to_currency(m[:total_pnl], precision: 0) %></div>
+                <div style="width: 100%; max-width: 40px; height: <%= bar_h %>px; background: var(--positive); border-radius: 3px 3px 0 0; opacity: 0.8;"></div>
+              </div>
+              <div style="height: 50%;"></div>
+            <% else %>
+              <div style="height: 50%;"></div>
+              <div style="display: flex; flex-direction: column; align-items: center; height: 50%;">
+                <div style="width: 100%; max-width: 40px; height: <%= bar_h %>px; background: var(--negative); border-radius: 0 0 3px 3px; opacity: 0.8;"></div>
+                <div style="font-size: 0.5625rem; color: var(--negative);"><%= number_to_currency(m[:total_pnl], precision: 0) %></div>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      <div style="display: flex; gap: 6px;">
+        <% @by_month.last(12).each do |m| %>
+          <div style="flex: 1; text-align: center; font-size: 0.5625rem; color: var(--text-secondary);"><%= m[:name].sub(/^\d{4}-/, '') %></div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "By Symbol", reports_by_symbol_path, class: "btn" %>
+  <%= link_to "By Tag", reports_by_tag_path, class: "btn" %>
+  <%= link_to "By Time", reports_by_time_path, class: "btn" %>
+  <%= link_to "Benchmarks", performance_benchmarks_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+</div>

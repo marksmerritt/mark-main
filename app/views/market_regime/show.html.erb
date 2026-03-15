@@ -1,0 +1,430 @@
+<% content_for(:title) { "Market Regimes" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #6200ea;">waterfall_chart</span>
+    Market Regime Detector
+  </h1>
+</div>
+
+<% if @trades.blank? || @trades.empty? || @monthly_regimes.blank? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem;">waterfall_chart</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No trades to analyze</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades to detect market regime patterns.</div>
+  </div>
+<% else %>
+
+  <%# === Current Regime Indicator === %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid <%= regime_color(@current_regime) %>;">
+    <div style="padding: 1.5rem; display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+      <div style="flex-shrink: 0;">
+        <div style="width: 80px; height: 80px; border-radius: 50%; background: <%= regime_color(@current_regime) %>15; display: flex; align-items: center; justify-content: center;">
+          <span class="material-icons-outlined" style="font-size: 2.5rem; color: <%= regime_color(@current_regime) %>;"><%= regime_icon(@current_regime) %></span>
+        </div>
+      </div>
+      <div style="flex: 1; min-width: 200px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Current Estimated Regime</div>
+        <div style="font-size: 1.75rem; font-weight: 700; color: <%= regime_color(@current_regime) %>; margin: 0.25rem 0;"><%= regime_label(@current_regime) %></div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+          Based on last <%= @current_regime_details[:trades] || 0 %> trades
+          <% if @current_regime_details[:std_dev] %>
+            &middot; Volatility: <%= @current_regime_details[:std_dev] %>
+          <% end %>
+          <% if @current_regime_details[:long_pct] %>
+            &middot; Long bias: <%= @current_regime_details[:long_pct] %>%
+          <% end %>
+        </div>
+      </div>
+      <% if @current_regime_details[:win_rate] %>
+        <div style="text-align: center; padding: 0.75rem 1.25rem; background: var(--bg-secondary, #f5f5f5); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Recent Win Rate</div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: <%= @current_regime_details[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @current_regime_details[:win_rate] %>%</div>
+        </div>
+      <% end %>
+      <% if @current_regime_details[:avg_pnl] %>
+        <div style="text-align: center; padding: 0.75rem 1.25rem; background: var(--bg-secondary, #f5f5f5); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Recent Avg P&L</div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: <%= @current_regime_details[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@current_regime_details[:avg_pnl]) %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# === Stats Strip === %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+      <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Months Analyzed</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @months_analyzed %></div>
+      </div>
+      <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Regime</div>
+        <% if @best_regime %>
+          <div style="font-size: 1.25rem; font-weight: 700; color: <%= regime_color(@best_regime[0]) %>;"><%= regime_label(@best_regime[0]) %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg P&L: <%= number_to_currency(@best_regime[1][:avg_pnl]) %></div>
+        <% else %>
+          <div style="font-size: 1.25rem; font-weight: 700;">--</div>
+        <% end %>
+      </div>
+      <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Regime</div>
+        <% if @worst_regime %>
+          <div style="font-size: 1.25rem; font-weight: 700; color: <%= regime_color(@worst_regime[0]) %>;"><%= regime_label(@worst_regime[0]) %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg P&L: <%= number_to_currency(@worst_regime[1][:avg_pnl]) %></div>
+        <% else %>
+          <div style="font-size: 1.25rem; font-weight: 700;">--</div>
+        <% end %>
+      </div>
+      <div style="padding: 1.25rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Adaptation Score</div>
+        <%
+          adapt_color = case @adaptation_score
+                        when 60..100 then "var(--positive)"
+                        when 30..59 then "#ffc107"
+                        else "var(--negative)"
+                        end
+        %>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= adapt_color %>;"><%= @adaptation_score %>%</div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Position sizing variance</div>
+      </div>
+    </div>
+  </div>
+
+  <%# === Regime Timeline === %>
+  <% if @regime_timeline.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">timeline</span> Regime Timeline</h2>
+      </div>
+      <div style="padding: 1.25rem; overflow-x: auto;">
+        <%
+          tl = @regime_timeline
+          bar_w = [60, (700.0 / [tl.length, 1].max).floor].max
+          svg_tl_w = tl.length * bar_w + 60
+          svg_tl_h = 140
+        %>
+        <svg viewBox="0 0 <%= svg_tl_w %> <%= svg_tl_h %>" style="width: 100%; min-width: <%= svg_tl_w %>px; height: auto; display: block;" preserveAspectRatio="xMidYMid meet">
+          <% tl.each_with_index do |(month, data), i| %>
+            <%
+              x = 10 + i * bar_w
+              color = regime_color(data[:regime])
+              label = month.slice(2, 5) # e.g., "24-03"
+            %>
+            <rect x="<%= x %>" y="20" width="<%= bar_w - 4 %>" height="60" rx="4" fill="<%= color %>" opacity="0.85"/>
+            <text x="<%= x + (bar_w - 4) / 2 %>" y="46" text-anchor="middle" fill="white" font-size="9" font-weight="600"><%= regime_label(data[:regime]).split(" ").first %></text>
+            <text x="<%= x + (bar_w - 4) / 2 %>" y="60" text-anchor="middle" fill="white" font-size="8" opacity="0.9"><%= data[:win_rate] %>% WR</text>
+            <text x="<%= x + (bar_w - 4) / 2 %>" y="72" text-anchor="middle" fill="white" font-size="8" opacity="0.9"><%= data[:trades] %> trades</text>
+            <text x="<%= x + (bar_w - 4) / 2 %>" y="100" text-anchor="middle" fill="var(--text-secondary)" font-size="9"><%= label %></text>
+            <text x="<%= x + (bar_w - 4) / 2 %>" y="114" text-anchor="middle" fill="<%= data[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>" font-size="9" font-weight="600"><%= number_to_currency(data[:total_pnl], precision: 0) %></text>
+          <% end %>
+          <%# Legend %>
+          <% legend_items = [["Trending Up", "#4caf50"], ["Trending Down", "#f44336"], ["Ranging", "#ffc107"], ["High Vol", "#ff9800"]] %>
+          <% legend_items.each_with_index do |(lbl, clr), i| %>
+            <rect x="<%= 10 + i * 120 %>" y="<%= svg_tl_h - 16 %>" width="10" height="10" rx="2" fill="<%= clr %>"/>
+            <text x="<%= 24 + i * 120 %>" y="<%= svg_tl_h - 7 %>" fill="var(--text-secondary)" font-size="9"><%= lbl %></text>
+          <% end %>
+        </svg>
+      </div>
+    </div>
+  <% end %>
+
+  <%# === Performance Comparison Table === %>
+  <% if @regime_performance.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">compare</span> Performance by Regime</h2>
+      </div>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+              <th style="padding: 0.75rem 1rem; text-align: left;">Regime</th>
+              <th style="padding: 0.75rem 1rem; text-align: center;">Months</th>
+              <th style="padding: 0.75rem 1rem; text-align: center;">Trades</th>
+              <th style="padding: 0.75rem 1rem; text-align: center;">Win Rate</th>
+              <th style="padding: 0.75rem 1rem; text-align: right;">Avg P&L</th>
+              <th style="padding: 0.75rem 1rem; text-align: right;">Total P&L</th>
+              <th style="padding: 0.75rem 1rem; text-align: center;">Profit Factor</th>
+              <th style="padding: 0.75rem 1rem; text-align: right;">Max Drawdown</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @regime_performance.sort_by { |_, v| -v[:avg_pnl] }.each do |regime, data| %>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 0.75rem 1rem;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="width: 10px; height: 10px; border-radius: 50%; background: <%= regime_color(regime) %>; flex-shrink: 0;"></span>
+                    <span class="material-icons-outlined" style="font-size: 1rem; color: <%= regime_color(regime) %>;"><%= regime_icon(regime) %></span>
+                    <strong><%= regime_label(regime) %></strong>
+                  </div>
+                </td>
+                <td style="padding: 0.75rem 1rem; text-align: center;"><%= data[:months] %></td>
+                <td style="padding: 0.75rem 1rem; text-align: center;"><%= data[:trades] %></td>
+                <td style="padding: 0.75rem 1rem; text-align: center; color: <%= data[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= data[:win_rate] %>%</td>
+                <td style="padding: 0.75rem 1rem; text-align: right; color: <%= data[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= number_to_currency(data[:avg_pnl]) %></td>
+                <td style="padding: 0.75rem 1rem; text-align: right; color: <%= data[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= number_to_currency(data[:total_pnl]) %></td>
+                <td style="padding: 0.75rem 1rem; text-align: center; color: <%= data[:profit_factor] >= 1 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= data[:profit_factor] %></td>
+                <td style="padding: 0.75rem 1rem; text-align: right; color: var(--negative);"><%= number_to_currency(data[:max_drawdown]) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+
+  <%# === Best / Worst Regime Cards === %>
+  <% if @best_regime && @worst_regime %>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+      <%# Best %>
+      <div class="card" style="border-left: 4px solid var(--positive);">
+        <div class="card-header">
+          <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">emoji_events</span> Best Regime: <%= regime_label(@best_regime[0]) %></h2>
+        </div>
+        <div style="padding: 1rem 1.25rem;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+              <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= @best_regime[1][:win_rate] %>%</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg P&L</div>
+              <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@best_regime[1][:avg_pnl]) %></div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profit Factor</div>
+              <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= @best_regime[1][:profit_factor] %></div>
+            </div>
+          </div>
+          <div style="padding: 0.75rem; background: var(--bg-secondary, #f5f5f5); border-radius: 6px; font-size: 0.8125rem; color: var(--text-secondary);">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--positive);">lightbulb</span>
+            <%= regime_recommendation(@best_regime[0], true) %>
+          </div>
+        </div>
+      </div>
+      <%# Worst %>
+      <div class="card" style="border-left: 4px solid var(--negative);">
+        <div class="card-header">
+          <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">warning</span> Worst Regime: <%= regime_label(@worst_regime[0]) %></h2>
+        </div>
+        <div style="padding: 1rem 1.25rem;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+              <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= @worst_regime[1][:win_rate] %>%</div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg P&L</div>
+              <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@worst_regime[1][:avg_pnl]) %></div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profit Factor</div>
+              <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= @worst_regime[1][:profit_factor] %></div>
+            </div>
+          </div>
+          <div style="padding: 0.75rem; background: var(--bg-secondary, #f5f5f5); border-radius: 6px; font-size: 0.8125rem; color: var(--text-secondary);">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--negative);">tips_and_updates</span>
+            <%= regime_recommendation(@worst_regime[0], false) %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# === Trade Frequency by Regime (SVG Bar Chart) === %>
+  <% if @trade_frequency.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Avg Trades per Month by Regime</h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <%
+          freq = @trade_frequency.sort_by { |_, v| -v }
+          freq_max = freq.map { |_, v| v }.max.to_f
+          freq_max = 1 if freq_max == 0
+          bar_height = 36
+          svg_freq_w = 600
+          svg_freq_h = freq.length * (bar_height + 12) + 30
+          chart_left = 140
+          chart_right = 60
+          chart_w = svg_freq_w - chart_left - chart_right
+        %>
+        <svg viewBox="0 0 <%= svg_freq_w %> <%= svg_freq_h %>" style="width: 100%; max-width: <%= svg_freq_w %>px; height: auto; display: block;" preserveAspectRatio="xMidYMid meet">
+          <% freq.each_with_index do |(regime, avg_per_month), i| %>
+            <%
+              y = 10 + i * (bar_height + 12)
+              w = (avg_per_month / freq_max * chart_w).round(1)
+              w = [w, 4].max
+              color = regime_color(regime)
+            %>
+            <text x="<%= chart_left - 8 %>" y="<%= y + bar_height / 2 + 4 %>" text-anchor="end" fill="var(--text-primary)" font-size="12" font-weight="500"><%= regime_label(regime) %></text>
+            <rect x="<%= chart_left %>" y="<%= y %>" width="<%= w %>" height="<%= bar_height %>" rx="4" fill="<%= color %>" opacity="0.85"/>
+            <text x="<%= chart_left + w + 8 %>" y="<%= y + bar_height / 2 + 5 %>" fill="var(--text-primary)" font-size="12" font-weight="600"><%= avg_per_month %></text>
+          <% end %>
+          <%# X-axis label %>
+          <text x="<%= chart_left + chart_w / 2 %>" y="<%= svg_freq_h - 4 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="10">Average trades per month</text>
+        </svg>
+      </div>
+    </div>
+  <% end %>
+
+  <%# === Adaptation Analysis === %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">psychology</span> Adaptation Analysis</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Adaptation Score</div>
+          <%
+            adapt_color2 = case @adaptation_score
+                           when 60..100 then "var(--positive)"
+                           when 30..59 then "#ffc107"
+                           else "var(--negative)"
+                           end
+          %>
+          <div style="font-size: 2rem; font-weight: 700; color: <%= adapt_color2 %>;"><%= @adaptation_score %>%</div>
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+          <%# Progress bar %>
+          <div style="height: 12px; background: var(--border); border-radius: 6px; overflow: hidden;">
+            <div style="height: 100%; width: <%= @adaptation_score %>%; background: <%= adapt_color2 %>; border-radius: 6px; transition: width 0.5s;"></div>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            <% if @adaptation_score >= 60 %>
+              Strong adaptation -- you meaningfully adjust position sizes between regimes.
+            <% elsif @adaptation_score >= 30 %>
+              Moderate adaptation -- some position sizing adjustment detected between regimes.
+            <% else %>
+              Low adaptation -- consider varying position sizes based on market conditions.
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <%# Position sizes by regime %>
+      <% if @regime_performance.any? %>
+        <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.5rem; color: var(--text-secondary);">Average Position Size by Regime</div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem;">
+          <% @regime_performance.each do |regime, data| %>
+            <div style="padding: 0.75rem; background: var(--bg-secondary, #f5f5f5); border-radius: 6px; text-align: center; border-top: 3px solid <%= regime_color(regime) %>;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;"><%= regime_label(regime) %></div>
+              <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(data[:avg_position_size], precision: 0) %></div>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# === Drawdown by Regime === %>
+  <% if @regime_performance.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">trending_down</span> Drawdown by Regime</h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <%
+          dd_data = @regime_performance.sort_by { |_, v| -v[:max_drawdown] }
+          dd_max = dd_data.map { |_, v| v[:max_drawdown] }.max.to_f
+          dd_max = 1 if dd_max == 0
+        %>
+        <div style="display: grid; gap: 0.75rem;">
+          <% dd_data.each do |regime, data| %>
+            <%
+              dd_pct = (data[:max_drawdown] / dd_max * 100).round(1)
+            %>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              <div style="width: 120px; font-size: 0.8125rem; font-weight: 500; flex-shrink: 0;">
+                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: <%= regime_color(regime) %>; margin-right: 0.375rem;"></span>
+                <%= regime_label(regime) %>
+              </div>
+              <div style="flex: 1; height: 20px; background: var(--border); border-radius: 4px; overflow: hidden;">
+                <div style="height: 100%; width: <%= dd_pct %>%; background: var(--negative); border-radius: 4px; opacity: 0.75;"></div>
+              </div>
+              <div style="width: 80px; font-size: 0.8125rem; font-weight: 600; color: var(--negative); text-align: right;"><%= number_to_currency(data[:max_drawdown]) %></div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# === Monthly Detail Table === %>
+  <% if @regime_timeline.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">calendar_month</span> Monthly Regime Detail</h2>
+      </div>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+              <th style="padding: 0.625rem 0.75rem; text-align: left;">Month</th>
+              <th style="padding: 0.625rem 0.75rem; text-align: center;">Regime</th>
+              <th style="padding: 0.625rem 0.75rem; text-align: center;">Volatility</th>
+              <th style="padding: 0.625rem 0.75rem; text-align: center;">Trades</th>
+              <th style="padding: 0.625rem 0.75rem; text-align: center;">Win Rate</th>
+              <th style="padding: 0.625rem 0.75rem; text-align: right;">Avg P&L</th>
+              <th style="padding: 0.625rem 0.75rem; text-align: right;">Total P&L</th>
+              <th style="padding: 0.625rem 0.75rem; text-align: center;">Long %</th>
+              <th style="padding: 0.625rem 0.75rem; text-align: right;">Std Dev</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @regime_timeline.reverse.each do |month, data| %>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 0.625rem 0.75rem; font-weight: 600;"><%= month %></td>
+                <td style="padding: 0.625rem 0.75rem; text-align: center;">
+                  <span style="display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.5rem; background: <%= regime_color(data[:regime]) %>15; color: <%= regime_color(data[:regime]) %>; border-radius: 12px; font-size: 0.75rem; font-weight: 600;">
+                    <span class="material-icons-outlined" style="font-size: 0.875rem;"><%= regime_icon(data[:regime]) %></span>
+                    <%= regime_label(data[:regime]) %>
+                  </span>
+                </td>
+                <td style="padding: 0.625rem 0.75rem; text-align: center;">
+                  <%
+                    vol_label = case data[:volatility]
+                                when "low_vol" then "Low"
+                                when "medium_vol" then "Med"
+                                when "high_vol" then "High"
+                                else "?"
+                                end
+                    vol_color = case data[:volatility]
+                                when "low_vol" then "var(--positive)"
+                                when "medium_vol" then "#ffc107"
+                                when "high_vol" then "var(--negative)"
+                                else "var(--text-secondary)"
+                                end
+                  %>
+                  <span style="font-size: 0.75rem; font-weight: 600; color: <%= vol_color %>;"><%= vol_label %></span>
+                </td>
+                <td style="padding: 0.625rem 0.75rem; text-align: center;"><%= data[:trades] %></td>
+                <td style="padding: 0.625rem 0.75rem; text-align: center; color: <%= data[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= data[:win_rate] %>%</td>
+                <td style="padding: 0.625rem 0.75rem; text-align: right; color: <%= data[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(data[:avg_pnl]) %></td>
+                <td style="padding: 0.625rem 0.75rem; text-align: right; color: <%= data[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= number_to_currency(data[:total_pnl]) %></td>
+                <td style="padding: 0.625rem 0.75rem; text-align: center;"><%= data[:long_pct] %>%</td>
+                <td style="padding: 0.625rem 0.75rem; text-align: right;"><%= number_to_currency(data[:std_dev]) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+
+  <%# === Bottom Nav === %>
+  <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; margin-top: 2rem;">
+    <%= link_to reports_index_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">hub</span> Reports Hub
+    <% end %>
+    <%= link_to account_summary_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">assessment</span> Account Summary
+    <% end %>
+    <%= link_to trading_grades_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem;" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">grade</span> Report Card
+    <% end %>
+  </div>
+
+<% end %>

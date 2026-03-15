@@ -1,0 +1,168 @@
+<% content_for(:title) { "Recurring Analyzer" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">autorenew</span>
+    Recurring Transaction Analyzer
+  </h1>
+</div>
+
+<%# Summary Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Recurring</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@monthly_total) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Annual Cost</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@annual_total) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Detected Subs</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @detected_subscriptions.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Price Increases</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @price_increases.any? ? 'var(--negative)' : 'var(--positive)' %>;"><%= @price_increases.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Sub Creep</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @creep_amount > 0 ? 'var(--negative)' : 'var(--positive)' %>;">
+        <%= @creep_amount > 0 ? '+' : '' %><%= number_to_currency(@creep_amount) %>/mo
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Price Increase Alerts %>
+<% if @price_increases.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">trending_up</span> Price Increases Detected</h2>
+    </div>
+    <div style="padding: 0;">
+      <% @price_increases.each do |s| %>
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-weight: 600;"><%= s[:merchant] %></span>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.5rem;">since <%= s[:first_seen].strftime("%b %Y") %></span>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-weight: 700; color: var(--negative);">+<%= number_to_currency(s[:price_change]) %></span>
+            <span style="font-size: 0.6875rem; color: var(--negative); margin-left: 0.25rem;">(+<%= s[:price_change_pct] %>%)</span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Upcoming Renewals %>
+<% if @upcoming.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">event</span> Upcoming (Next 7 Days)</h2>
+    </div>
+    <div style="padding: 0;">
+      <% @upcoming.each do |r| %>
+        <div style="padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-weight: 600;"><%= r["name"] || r["description"] %></span>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.5rem;"><%= r["next_date"] || r["next_occurrence"] %></span>
+          </div>
+          <span style="font-weight: 700;"><%= number_to_currency(r["amount"]) %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Detected Subscriptions %>
+<% if @detected_subscriptions.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">subscriptions</span> Detected Recurring Charges</h2>
+    </div>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.625rem 1rem;">Merchant</th>
+            <th style="text-align: right; padding: 0.625rem;">Current</th>
+            <th style="text-align: right; padding: 0.625rem;">Average</th>
+            <th style="text-align: center; padding: 0.625rem;">Frequency</th>
+            <th style="text-align: center; padding: 0.625rem;">Charges</th>
+            <th style="text-align: right; padding: 0.625rem;">Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @detected_subscriptions.each do |s| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem 1rem; font-weight: 600;">
+                <%= s[:merchant] %>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">Since <%= s[:first_seen].strftime("%b %Y") %></div>
+              </td>
+              <td style="text-align: right; padding: 0.5rem; font-weight: 700;"><%= number_to_currency(s[:last_amount]) %></td>
+              <td style="text-align: right; padding: 0.5rem; color: var(--text-secondary);"><%= number_to_currency(s[:avg_amount]) %></td>
+              <td style="text-align: center; padding: 0.5rem;">~<%= s[:avg_gap_days] %>d</td>
+              <td style="text-align: center; padding: 0.5rem;"><%= s[:count] %></td>
+              <td style="text-align: right; padding: 0.5rem;">
+                <% if s[:has_increased] %>
+                  <span style="color: var(--negative); font-weight: 600;">+<%= number_to_currency(s[:price_change]) %></span>
+                <% elsif s[:price_change] < -1 %>
+                  <span style="color: var(--positive); font-weight: 600;"><%= number_to_currency(s[:price_change]) %></span>
+                <% else %>
+                  <span style="color: var(--text-secondary);">—</span>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Category Breakdown %>
+<% if @by_category.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">category</span> Recurring by Category</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% cat_max = @by_category.values.map { |v| v[:total] }.max.to_f; cat_max = 1 if cat_max == 0 %>
+      <% @by_category.each do |cat, data| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+          <span style="width: 7rem; font-size: 0.8125rem; text-align: right;"><%= cat %></span>
+          <div style="flex: 1; height: 1rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= (data[:total] / cat_max * 100).round(1) %>%; background: var(--primary); opacity: 0.5; border-radius: 4px;"></div>
+          </div>
+          <span style="min-width: 5rem; text-align: right; font-size: 0.8125rem; font-weight: 600;"><%= number_to_currency(data[:total]) %></span>
+          <span style="min-width: 1.5rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary);"><%= data[:count] %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Subscription Creep Alert %>
+<% if @creep_amount > 10 %>
+  <div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem; border-left: 4px solid var(--negative); display: flex; align-items: center; gap: 1rem;">
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--negative);">warning</span>
+    <div>
+      <div style="font-weight: 600;">Subscription Creep Alert</div>
+      <div style="font-size: 0.875rem; color: var(--text-secondary);">
+        Your recurring charges have increased by <strong style="color: var(--negative);"><%= number_to_currency(@creep_amount) %>/mo</strong>
+        (<%= number_to_currency(@creep_amount * 12) %>/yr) over the past 6 months. Review subscriptions you no longer use.
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Recurring Bills", budget_recurring_index_path, class: "btn" %>
+  <%= link_to "Subscription Audit", budget_reports_subscription_audit_path, class: "btn" %>
+  <%= link_to "Spending Anomalies", budget_spending_anomalies_path, class: "btn" %>
+  <%= link_to "Budget Dashboard", budget_dashboard_path, class: "btn" %>
+</div>

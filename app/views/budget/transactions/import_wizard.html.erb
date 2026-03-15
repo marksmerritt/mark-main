@@ -1,0 +1,150 @@
+<% content_for(:title) { "Import Transactions" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px;">upload_file</span>
+    Import Transactions
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Back to Transactions", budget_transactions_path, class: "btn" %>
+  </div>
+</div>
+
+<div data-controller="budget-import-wizard">
+
+  <%# Step indicators %>
+  <div style="display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 1.5rem;">
+    <% [
+      { num: 1, label: "Upload CSV" },
+      { num: 2, label: "Map Columns" },
+      { num: 3, label: "Review & Import" }
+    ].each_with_index do |step, i| %>
+      <% if i > 0 %>
+        <div style="width: 40px; height: 2px; background: var(--border);"></div>
+      <% end %>
+      <div data-step-indicator="<%= step[:num] %>" style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; border-radius: var(--radius); transition: all 0.2s;" class="<%= step[:num] == 1 ? 'active' : '' %>">
+        <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; font-size: 0.8125rem; font-weight: 700; border: 2px solid var(--border); color: var(--text-secondary); transition: all 0.2s;"><%= step[:num] %></span>
+        <span style="font-size: 0.8125rem; font-weight: 500; color: var(--text-secondary);"><%= step[:label] %></span>
+      </div>
+    <% end %>
+  </div>
+
+  <style>
+    [data-step-indicator].active span:first-child { border-color: var(--primary); background: var(--primary); color: #fff; }
+    [data-step-indicator].active span:last-child { color: var(--text); font-weight: 600; }
+    [data-step-indicator].completed span:first-child { border-color: var(--positive); background: var(--positive); color: #fff; }
+    .drag-over { border-color: var(--primary) !important; background: rgba(26,115,232,0.05) !important; }
+  </style>
+
+  <%# Step 1: Upload %>
+  <div data-budget-import-wizard-target="step1">
+    <div class="card">
+      <div style="padding: 2rem; text-align: center;">
+        <div data-budget-import-wizard-target="dropZone"
+             data-action="dragover->budget-import-wizard#dragOver dragleave->budget-import-wizard#dragLeave drop->budget-import-wizard#drop click->budget-import-wizard#selectFile"
+             style="border: 2px dashed var(--border); border-radius: var(--radius); padding: 3rem 2rem; cursor: pointer; transition: all 0.2s;">
+          <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); display: block; margin-bottom: 1rem;">cloud_upload</span>
+          <h3 style="margin-bottom: 0.5rem;">Drop your CSV file here</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 1rem;">or click to browse</p>
+          <span class="btn btn-primary">Choose File</span>
+          <input type="file" accept=".csv" class="hidden" data-budget-import-wizard-target="fileInput" data-action="change->budget-import-wizard#fileSelected">
+        </div>
+        <div style="margin-top: 1.25rem; font-size: 0.8125rem; color: var(--text-secondary);">
+          <p style="margin-bottom: 0.5rem;"><strong>Supported formats:</strong> CSV exports from banks, credit cards, Mint, YNAB, etc.</p>
+          <p>Expected columns: Date, Amount, Description/Merchant. Other columns will be auto-detected.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Step 2: Map columns %>
+  <div data-budget-import-wizard-target="step2" class="hidden">
+    <div class="card" style="margin-bottom: 1rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">description</span>
+          File: <span data-budget-import-wizard-target="fileName"></span>
+        </h2>
+        <span style="font-size: 0.8125rem; color: var(--text-secondary);">
+          <span data-budget-import-wizard-target="rowCount"></span> rows &middot;
+          <span data-budget-import-wizard-target="headerCount"></span> columns
+        </span>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom: 1rem;">
+      <div class="card-header">
+        <h2>Map Columns</h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);"><span style="color: var(--negative);">*</span> = required</span>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="data-table" style="width: 100%; font-size: 0.875rem;">
+          <thead>
+            <tr>
+              <th style="padding: 0.625rem 1rem;">Field</th>
+              <th style="padding: 0.625rem 0.5rem;">CSV Column</th>
+              <th style="padding: 0.625rem 1rem;">Sample Data</th>
+            </tr>
+          </thead>
+          <tbody data-budget-import-wizard-target="mappingBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 0.5rem;">
+      <button class="btn" data-action="budget-import-wizard#backToUpload">Back</button>
+      <button class="btn btn-primary" data-action="budget-import-wizard#goToPreview">Continue to Preview</button>
+    </div>
+  </div>
+
+  <%# Step 3: Review & Import %>
+  <div data-budget-import-wizard-target="step3" class="hidden">
+    <div class="card" style="margin-bottom: 1rem;">
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-bottom: 1px solid var(--border);">
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Rows</div>
+          <div style="font-size: 1.25rem; font-weight: 700;" data-budget-import-wizard-target="previewCount">0</div>
+        </div>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Valid</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);" data-budget-import-wizard-target="validCount">0</div>
+        </div>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Errors</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);" data-budget-import-wizard-target="errorCount">0</div>
+        </div>
+      </div>
+
+      <div data-budget-import-wizard-target="errorList" class="hidden" style="max-height: 200px; overflow-y: auto; border-bottom: 1px solid var(--border);"></div>
+
+      <div style="overflow-x: auto;">
+        <table class="data-table" style="width: 100%; font-size: 0.875rem;">
+          <thead>
+            <tr>
+              <th style="padding: 0.625rem 1rem;">Date</th>
+              <th style="padding: 0.625rem 0.5rem;">Amount</th>
+              <th style="padding: 0.625rem 0.5rem;">Description</th>
+              <th style="padding: 0.625rem 0.5rem;">Merchant</th>
+              <th style="padding: 0.625rem 0.5rem;">Type</th>
+              <th style="padding: 0.625rem 1rem;">Status</th>
+            </tr>
+          </thead>
+          <tbody data-budget-import-wizard-target="previewBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <form action="<%= import_budget_transactions_path %>" method="post" enctype="multipart/form-data">
+      <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+      <input type="file" name="file" class="hidden" data-budget-import-wizard-target="hiddenFile">
+      <div style="display: flex; gap: 0.5rem;">
+        <button type="button" class="btn" data-action="budget-import-wizard#backToMapping">Back</button>
+        <button type="button" class="btn btn-primary" data-budget-import-wizard-target="submitBtn" data-action="budget-import-wizard#submitImport">
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">upload</span>
+          Import Transactions
+        </button>
+      </div>
+    </form>
+  </div>
+
+</div>

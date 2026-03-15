@@ -1,0 +1,348 @@
+<% content_for(:title) { "Portfolio Overview" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #1a73e8;">account_balance</span>
+    Portfolio Overview
+  </h1>
+</div>
+
+<%# === Total Net Worth Hero Card === %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem 1.75rem; border-left: 4px solid #1a73e8; background: rgba(26, 115, 232, 0.04);">
+  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+    <div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em;">Total Net Worth</div>
+      <div style="font-size: 2.25rem; font-weight: 700; margin-top: 0.25rem; color: var(--text-primary);">
+        <%= number_to_currency(@total_net_worth, precision: 0) %>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.375rem; margin-top: 0.375rem;">
+        <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= @net_worth_trend == :up ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @net_worth_trend == :up ? 'arrow_upward' : 'arrow_downward' %>
+        </span>
+        <span style="font-size: 0.875rem; font-weight: 600; color: <%= @net_worth_trend == :up ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @net_worth_change >= 0 ? '+' : '' %><%= number_to_currency(@net_worth_change, precision: 0) %>
+        </span>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">30-day change</span>
+      </div>
+    </div>
+    <div style="text-align: right;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Monthly Cash Flow</div>
+      <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;" class="<%= pnl_class(@monthly_cash_flow) %>">
+        <%= @monthly_cash_flow >= 0 ? '+' : '' %><%= number_to_currency(@monthly_cash_flow) %>
+      </div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= Date.current.strftime("%B %Y") %></div>
+    </div>
+  </div>
+</div>
+
+<%# === 3-Column Grid: Trading / Budget / Combined === %>
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+  <%# Trading Account %>
+  <div class="card" style="padding: 1.25rem; border-top: 3px solid var(--primary);">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--primary);">show_chart</span>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Trading Account</div>
+    </div>
+    <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@trading_equity) %></div>
+    <div style="margin-top: 0.75rem; font-size: 0.8125rem;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 0.375rem;">
+        <span style="color: var(--text-secondary);">This Month P&L</span>
+        <span style="font-weight: 600;" class="<%= pnl_class(@trading_pnl_this_month) %>"><%= number_to_currency(@trading_pnl_this_month) %></span>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 0.375rem;">
+        <span style="color: var(--text-secondary);">Win Rate</span>
+        <span style="font-weight: 600;"><%= @trading_overview.is_a?(Hash) ? @trading_overview["win_rate"].to_s : "0" %>%</span>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--text-secondary);">Total P&L</span>
+        <% total_pnl = @trading_overview.is_a?(Hash) ? @trading_overview["total_pnl"].to_f : 0 %>
+        <span style="font-weight: 600;" class="<%= pnl_class(total_pnl) %>"><%= number_to_currency(total_pnl) %></span>
+      </div>
+    </div>
+  </div>
+
+  <%# Budget / Savings %>
+  <div class="card" style="padding: 1.25rem; border-top: 3px solid #0d904f;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 1.125rem; color: #0d904f;">account_balance_wallet</span>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Budget / Savings</div>
+    </div>
+    <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@budget_net_worth) %></div>
+    <div style="margin-top: 0.75rem; font-size: 0.8125rem;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 0.375rem;">
+        <span style="color: var(--text-secondary);">Assets</span>
+        <span style="font-weight: 600;"><%= number_to_currency(@budget_assets) %></span>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 0.375rem;">
+        <span style="color: var(--text-secondary);">Liabilities</span>
+        <span style="font-weight: 600; color: var(--negative);"><%= number_to_currency(@budget_liabilities) %></span>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--text-secondary);">Monthly Savings</span>
+        <% monthly_savings = @budget_income - @budget_expenses %>
+        <span style="font-weight: 600;" class="<%= pnl_class(monthly_savings) %>"><%= number_to_currency(monthly_savings) %></span>
+      </div>
+    </div>
+  </div>
+
+  <%# Combined %>
+  <div class="card" style="padding: 1.25rem; border-top: 3px solid #7c3aed;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 1.125rem; color: #7c3aed;">pie_chart</span>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Combined</div>
+    </div>
+    <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@total_net_worth) %></div>
+    <div style="margin-top: 0.75rem; font-size: 0.8125rem;">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 0.375rem;">
+        <span style="color: var(--text-secondary);">Risk Exposure</span>
+        <span style="font-weight: 600; color: <%= @risk_exposure > 50 ? 'var(--negative)' : @risk_exposure > 25 ? '#fbbc04' : 'var(--positive)' %>;"><%= @risk_exposure %>%</span>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-bottom: 0.375rem;">
+        <span style="color: var(--text-secondary);">Open Positions</span>
+        <span style="font-weight: 600;"><%= @open_trades.count %></span>
+      </div>
+      <div style="display: flex; justify-content: space-between;">
+        <span style="color: var(--text-secondary);">Active Goals</span>
+        <span style="font-weight: 600;"><%= @goals.count %></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# === Equity Curve SVG === %>
+<% if @equity_curve.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Portfolio Equity Curve</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <%
+        ec = @equity_curve.last(60)
+        ec_values = ec.map { |p| p.is_a?(Hash) ? p["equity"].to_f : p.to_f }
+        if ec_values.any?
+          min_val = ec_values.min
+          max_val = ec_values.max
+          range = max_val - min_val
+          range = 1 if range == 0
+          svg_w = 600
+          svg_h = 200
+          pad_t = 20
+          pad_b = 25
+          pad_l = 55
+          pad_r = 15
+          chart_w = svg_w - pad_l - pad_r
+          chart_h = svg_h - pad_t - pad_b
+          points = ec_values.each_with_index.map do |val, i|
+            x = pad_l + (i.to_f / [ec_values.length - 1, 1].max * chart_w)
+            y = pad_t + chart_h - ((val - min_val) / range * chart_h)
+            [x.round(1), y.round(1)]
+          end
+          line_path = points.map { |x, y| "#{x},#{y}" }.join(" ")
+          area_path = "M#{points.first[0]},#{pad_t + chart_h} L#{line_path} L#{points.last[0]},#{pad_t + chart_h} Z"
+          final_val = ec_values.last
+          trend_positive = final_val >= ec_values.first
+        end
+      %>
+      <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; height: auto; display: block;" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="po-eq-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="<%= trend_positive ? '#4caf50' : '#f44336' %>" stop-opacity="0.25"/>
+            <stop offset="100%" stop-color="<%= trend_positive ? '#4caf50' : '#f44336' %>" stop-opacity="0.02"/>
+          </linearGradient>
+        </defs>
+        <%# Grid lines %>
+        <% 5.times do |i| %>
+          <% gy = pad_t + (chart_h * i / 4.0) %>
+          <line x1="<%= pad_l %>" y1="<%= gy.round(1) %>" x2="<%= svg_w - pad_r %>" y2="<%= gy.round(1) %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <% label_val = max_val - (range * i / 4.0) %>
+          <text x="<%= pad_l - 5 %>" y="<%= gy.round(1) + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="9"><%= number_to_currency(label_val, precision: 0) %></text>
+        <% end %>
+        <%# Area fill %>
+        <path d="<%= area_path %>" fill="url(#po-eq-fill)"/>
+        <%# Line %>
+        <polyline points="<%= line_path %>" fill="none" stroke="<%= trend_positive ? '#4caf50' : '#f44336' %>" stroke-width="2" stroke-linejoin="round"/>
+        <%# End dot %>
+        <circle cx="<%= points.last[0] %>" cy="<%= points.last[1] %>" r="3.5" fill="<%= trend_positive ? '#4caf50' : '#f44336' %>" stroke="white" stroke-width="1.5"/>
+        <%# Labels %>
+        <text x="<%= pad_l %>" y="<%= svg_h - 4 %>" fill="var(--text-secondary)" font-size="9">Last 60 points</text>
+        <text x="<%= svg_w - pad_r %>" y="<%= svg_h - 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="9"><%= number_to_currency(final_val, precision: 0) %></text>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<%# === Asset Allocation Stacked Bar === %>
+<% if @total_assets > 0 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">donut_small</span> Asset Allocation</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <%# Stacked horizontal bar %>
+      <div style="display: flex; height: 32px; border-radius: 6px; overflow: hidden; margin-bottom: 1rem;">
+        <% if @allocation[:trading] > 0 %>
+          <div style="width: <%= @allocation[:trading] %>%; background: var(--primary); display: flex; align-items: center; justify-content: center; color: white; font-size: 0.6875rem; font-weight: 600;">
+            <%= @allocation[:trading] > 8 ? "#{@allocation[:trading]}%" : '' %>
+          </div>
+        <% end %>
+        <% if @allocation[:savings] > 0 %>
+          <div style="width: <%= @allocation[:savings] %>%; background: #0d904f; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.6875rem; font-weight: 600;">
+            <%= @allocation[:savings] > 8 ? "#{@allocation[:savings]}%" : '' %>
+          </div>
+        <% end %>
+        <% if @allocation[:investments] > 0 %>
+          <div style="width: <%= @allocation[:investments] %>%; background: #7c3aed; display: flex; align-items: center; justify-content: center; color: white; font-size: 0.6875rem; font-weight: 600;">
+            <%= @allocation[:investments] > 8 ? "#{@allocation[:investments]}%" : '' %>
+          </div>
+        <% end %>
+      </div>
+      <%# Legend %>
+      <div style="display: flex; gap: 1.5rem; font-size: 0.8125rem;">
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <div style="width: 10px; height: 10px; border-radius: 2px; background: var(--primary);"></div>
+          <span style="color: var(--text-secondary);">Trading</span>
+          <span style="font-weight: 600;"><%= number_to_currency(@trading_equity, precision: 0) %></span>
+          <span style="color: var(--text-secondary);">(<%= @allocation[:trading] %>%)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <div style="width: 10px; height: 10px; border-radius: 2px; background: #0d904f;"></div>
+          <span style="color: var(--text-secondary);">Savings</span>
+          <span style="font-weight: 600;"><%= number_to_currency(@savings, precision: 0) %></span>
+          <span style="color: var(--text-secondary);">(<%= @allocation[:savings] %>%)</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <div style="width: 10px; height: 10px; border-radius: 2px; background: #7c3aed;"></div>
+          <span style="color: var(--text-secondary);">Investments</span>
+          <span style="font-weight: 600;"><%= number_to_currency(@investments, precision: 0) %></span>
+          <span style="color: var(--text-secondary);">(<%= @allocation[:investments] %>%)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# === Monthly Performance Table === %>
+<% if @monthly_performance.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">calendar_month</span> Monthly Performance</h2>
+    </div>
+    <div style="padding: 0;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.75rem 1.25rem; text-align: left; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.6875rem;">Month</th>
+            <th style="padding: 0.75rem 1.25rem; text-align: right; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.6875rem;">Trading P&L</th>
+            <th style="padding: 0.75rem 1.25rem; text-align: right; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.6875rem;">Budget Savings</th>
+            <th style="padding: 0.75rem 1.25rem; text-align: right; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.6875rem;">Net Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @monthly_performance.each do |row| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.625rem 1.25rem; font-weight: 500;"><%= row[:month] %></td>
+              <td style="padding: 0.625rem 1.25rem; text-align: right; font-weight: 600;" class="<%= pnl_class(row[:trading_pnl]) %>"><%= number_to_currency(row[:trading_pnl]) %></td>
+              <td style="padding: 0.625rem 1.25rem; text-align: right; font-weight: 600;" class="<%= pnl_class(row[:budget_savings]) %>"><%= number_to_currency(row[:budget_savings]) %></td>
+              <td style="padding: 0.625rem 1.25rem; text-align: right; font-weight: 700;" class="<%= pnl_class(row[:net_change]) %>"><%= number_to_currency(row[:net_change]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# === Open Positions Summary === %>
+<% if @open_trades.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">swap_vert</span>
+        Open Positions
+        <span style="float: right; font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: <%= @unrealized_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>; color: white; font-weight: 600;">
+          Unrealized: <%= @unrealized_pnl >= 0 ? '+' : '' %><%= number_to_currency(@unrealized_pnl) %>
+        </span>
+      </h2>
+    </div>
+    <div style="padding: 0;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.625rem 1.25rem; text-align: left; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.6875rem;">Symbol</th>
+            <th style="padding: 0.625rem 1.25rem; text-align: left; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.6875rem;">Side</th>
+            <th style="padding: 0.625rem 1.25rem; text-align: right; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.6875rem;">Size</th>
+            <th style="padding: 0.625rem 1.25rem; text-align: right; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.6875rem;">Entry</th>
+            <th style="padding: 0.625rem 1.25rem; text-align: right; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; font-size: 0.6875rem;">Unrealized P&L</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @open_trades.each do |trade| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.625rem 1.25rem; font-weight: 600;">
+                <%= link_to trade["symbol"], "/trades/#{trade["id"]}", style: "color: var(--primary); text-decoration: none;" %>
+              </td>
+              <td style="padding: 0.625rem 1.25rem;">
+                <span style="font-size: 0.6875rem; padding: 0.125rem 0.375rem; border-radius: 4px; font-weight: 600; background: <%= trade["side"]&.downcase == 'long' ? 'rgba(76,175,80,0.15)' : 'rgba(244,67,54,0.15)' %>; color: <%= trade["side"]&.downcase == 'long' ? 'var(--positive)' : 'var(--negative)' %>;">
+                  <%= trade["side"]&.upcase %>
+                </span>
+              </td>
+              <td style="padding: 0.625rem 1.25rem; text-align: right;"><%= trade["quantity"] || trade["shares"] %></td>
+              <td style="padding: 0.625rem 1.25rem; text-align: right;"><%= number_to_currency(trade["entry_price"].to_f) %></td>
+              <% upnl = trade["unrealized_pnl"].to_f %>
+              <td style="padding: 0.625rem 1.25rem; text-align: right; font-weight: 600;" class="<%= pnl_class(upnl) %>"><%= upnl >= 0 ? '+' : '' %><%= number_to_currency(upnl) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+    <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 0.8125rem;">
+      <span style="color: var(--text-secondary);">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">info</span>
+        Risk Exposure: <strong><%= @risk_exposure %>%</strong> of portfolio
+      </span>
+      <span style="color: var(--text-secondary);">
+        <%= @open_trades.count %> open position<%= @open_trades.count != 1 ? 's' : '' %>
+      </span>
+    </div>
+  </div>
+<% end %>
+
+<%# === Goals Summary === %>
+<% if @goals.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">flag</span> Financial Goals</h2>
+    </div>
+    <div style="padding: 0.75rem 1.25rem;">
+      <% @goals.first(5).each do |goal| %>
+        <% next unless goal.is_a?(Hash) %>
+        <% pct = goal["percentage_complete"].to_f %>
+        <div style="margin-bottom: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem; font-size: 0.8125rem;">
+            <span style="font-weight: 500;"><%= goal["name"] %></span>
+            <span style="color: var(--text-secondary);"><%= pct.round(0) %>%</span>
+          </div>
+          <div style="height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+            <div style="height: 100%; width: <%= [pct, 100].min %>%; background: <%= pct >= 100 ? 'var(--positive)' : pct >= 50 ? 'var(--primary)' : '#fbbc04' %>; border-radius: 3px; transition: width 0.3s;"></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# === Empty State === %>
+<% if !api_token.present? && !budget_api_token.present? && !notes_api_token.present? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem;">account_balance</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Connect your APIs</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Configure API tokens in <%= link_to "Settings", settings_path %> to see your portfolio overview.</div>
+  </div>
+<% end %>
+
+<%# === Bottom Navigation === %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Account Summary", account_summary_path, class: "btn" %>
+  <%= link_to "Budget Dashboard", budget_dashboard_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+</div>

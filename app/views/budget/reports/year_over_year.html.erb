@@ -1,0 +1,245 @@
+<% content_for(:title) { "Year over Year — Budget" } %>
+
+<div class="page-header">
+  <h1>Year over Year</h1>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <%= form_with url: budget_reports_year_over_year_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :month, "Month" %>
+        <%= f.select :month, (1..12).map { |m| [Date::MONTHNAMES[m], m] }, { selected: @month }, class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :year, "Year" %>
+        <%= f.number_field :year, value: @year, class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Compare", class: "btn btn-primary" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @data.is_a?(Hash) && @data["current"] %>
+  <% current = @data["current"] %>
+  <% previous = @data["previous"] %>
+  <% deltas = @data["deltas"] || {} %>
+
+  <h2 style="margin-bottom: 1rem;">
+    <%= Date::MONTHNAMES[@month] %> <%= @year %> vs <%= @year - 1 %>
+  </h2>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Income</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(current["income"]) %></div>
+        <% if deltas["income_pct"] %>
+          <div style="font-size: 0.6875rem;" class="<%= deltas["income"].to_f >= 0 ? 'positive' : 'negative' %>">
+            <%= deltas["income"].to_f >= 0 ? "+" : "" %><%= deltas["income_pct"] %>% vs last year
+          </div>
+        <% end %>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Expenses</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(current["expenses"]) %></div>
+        <% if deltas["expenses_pct"] %>
+          <div style="font-size: 0.6875rem;" class="<%= deltas["expenses"].to_f <= 0 ? 'positive' : 'negative' %>">
+            <%= deltas["expenses"].to_f >= 0 ? "+" : "" %><%= deltas["expenses_pct"] %>%
+          </div>
+        <% end %>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net Savings</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= current["net"].to_f >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(current["net"]) %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+          vs <%= number_to_currency(previous["net"]) %> last year
+        </div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= current["savings_rate"] %>%</div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+          vs <%= previous["savings_rate"] %>% last year
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Transactions (<%= @year %>)</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= current["transaction_count"] %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg: <%= number_to_currency(current["avg_transaction"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Transactions (<%= @year - 1 %>)</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= previous["transaction_count"] %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg: <%= number_to_currency(previous["avg_transaction"]) %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Visual comparison bars %>
+  <%
+    inc_c = current["income"].to_f
+    inc_p = previous["income"].to_f
+    exp_c = current["expenses"].to_f
+    exp_p = previous["expenses"].to_f
+    net_c = current["net"].to_f
+    net_p = previous["net"].to_f
+    max_yoy = [inc_c, inc_p, exp_c, exp_p].max
+    max_yoy = 1 if max_yoy == 0
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Side-by-Side</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <% [
+        { label: "Income", curr: inc_c, prev: inc_p, curr_class: "positive", prev_class: "positive" },
+        { label: "Expenses", curr: exp_c, prev: exp_p, curr_class: "negative", prev_class: "negative" },
+        { label: "Net Savings", curr: net_c, prev: net_p, curr_class: net_c >= 0 ? "positive" : "negative", prev_class: net_p >= 0 ? "positive" : "negative" }
+      ].each do |row| %>
+        <div style="margin-bottom: 1rem;">
+          <div style="font-size: 0.75rem; font-weight: 600; margin-bottom: 0.375rem;"><%= row[:label] %></div>
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+            <span style="width: 32px; font-size: 0.6875rem; font-weight: 600; color: var(--primary);"><%= @year %></span>
+            <div style="flex: 1; height: 16px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+              <div style="height: 100%; width: <%= max_yoy > 0 ? (row[:curr].abs / max_yoy * 100).clamp(0, 100).round(1) : 0 %>%;
+                          background: var(--primary); opacity: 0.7; border-radius: 3px;"></div>
+            </div>
+            <span style="width: 80px; text-align: right; font-size: 0.8125rem;" class="<%= row[:curr_class] %>"><%= number_to_currency(row[:curr]) %></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="width: 32px; font-size: 0.6875rem; font-weight: 600; color: var(--text-secondary);"><%= @year - 1 %></span>
+            <div style="flex: 1; height: 16px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+              <div style="height: 100%; width: <%= max_yoy > 0 ? (row[:prev].abs / max_yoy * 100).clamp(0, 100).round(1) : 0 %>%;
+                          background: var(--text-secondary); opacity: 0.4; border-radius: 3px;"></div>
+            </div>
+            <span style="width: 80px; text-align: right; font-size: 0.8125rem;" class="<%= row[:prev_class] %>"><%= number_to_currency(row[:prev]) %></span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <% # Yearly trend chart %>
+  <% yearly = @data["yearly_trend"] %>
+  <% if yearly.is_a?(Array) && yearly.any? %>
+    <div class="card" style="margin-bottom: 2rem;">
+      <div class="card-header"><h2>Monthly Spending: <%= @year %> vs <%= @year - 1 %></h2></div>
+      <div style="padding: 1.25rem;">
+        <canvas id="yoy-chart" height="300"
+                data-controller="chart"
+                data-chart-type-value="bar"
+                data-chart-data-value='<%= {
+                  labels: yearly.map { |t| t["label"] },
+                  datasets: [
+                    { label: @year.to_s, data: yearly.map { |t| t["current_year"] }, backgroundColor: "rgba(99, 102, 241, 0.7)" },
+                    { label: (@year - 1).to_s, data: yearly.map { |t| t["previous_year"] }, backgroundColor: "rgba(156, 163, 175, 0.5)" }
+                  ]
+                }.to_json %>'></canvas>
+      </div>
+    </div>
+  <% end %>
+
+  <% # Category breakdown %>
+  <% categories = @data["categories"] %>
+  <% if categories.is_a?(Array) && categories.any? %>
+    <%
+      max_cat = categories.map { |c| [c["current"].to_f, c["previous"].to_f].max }.max.to_f
+      max_cat = 1 if max_cat == 0
+      increased = categories.count { |c| c["change_amount"].to_f > 0 }
+      decreased = categories.count { |c| c["change_amount"].to_f < 0 }
+    %>
+    <% if categories.length >= 3 %>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header"><h2>Category Summary</h2></div>
+        <div style="padding: 1rem 1.25rem; font-size: 0.875rem;">
+          <span class="positive"><%= decreased %> categories</span> decreased spending,
+          <span class="negative"><%= increased %> categories</span> increased.
+          <% biggest_increase = categories.max_by { |c| c["change_amount"].to_f } %>
+          <% biggest_decrease = categories.min_by { |c| c["change_amount"].to_f } %>
+          <% if biggest_increase && biggest_decrease %>
+            Biggest increase: <strong class="negative"><%= biggest_increase["name"] %> (+<%= number_to_currency(biggest_increase["change_amount"]) %>)</strong>.
+            Biggest cut: <strong class="positive"><%= biggest_decrease["name"] %> (<%= number_to_currency(biggest_decrease["change_amount"]) %>)</strong>.
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <div class="card">
+      <div class="card-header"><h2>Category Comparison</h2></div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th style="text-align: right;"><%= @year %></th>
+            <th style="text-align: right;"><%= @year - 1 %></th>
+            <th>Comparison</th>
+            <th style="text-align: right;">Change</th>
+            <th style="text-align: right;">%</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% categories.each do |cat| %>
+            <%
+              curr_pct = (cat["current"].to_f / max_cat * 100).round(1)
+              prev_pct = (cat["previous"].to_f / max_cat * 100).round(1)
+            %>
+            <tr>
+              <td><strong><%= cat["name"] %></strong></td>
+              <td style="text-align: right;"><%= number_to_currency(cat["current"]) %></td>
+              <td style="text-align: right;"><%= number_to_currency(cat["previous"]) %></td>
+              <td style="min-width: 100px;">
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                  <div style="height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; width: <%= curr_pct %>%; background: var(--primary); opacity: 0.7; border-radius: 3px;"></div>
+                  </div>
+                  <div style="height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; width: <%= prev_pct %>%; background: var(--text-secondary); opacity: 0.3; border-radius: 3px;"></div>
+                  </div>
+                </div>
+              </td>
+              <td style="text-align: right;">
+                <% change = cat["change_amount"].to_f %>
+                <span class="<%= change <= 0 ? 'positive' : 'negative' %>">
+                  <%= change >= 0 ? "+" : "" %><%= number_to_currency(change) %>
+                </span>
+              </td>
+              <td style="text-align: right;">
+                <% if cat["change_pct"] %>
+                  <span class="badge badge-<%= cat["change_pct"].to_f <= 0 ? 'success' : 'danger' %>">
+                    <%= cat["change_pct"] > 0 ? "+" : "" %><%= cat["change_pct"] %>%
+                  </span>
+                <% else %>
+                  <span class="text-muted">New</span>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+        <tfoot>
+          <tr style="font-weight: 600;">
+            <td>Total</td>
+            <td style="text-align: right;"><%= number_to_currency(categories.sum { |c| c["current"].to_f }) %></td>
+            <td style="text-align: right;"><%= number_to_currency(categories.sum { |c| c["previous"].to_f }) %></td>
+            <td style="text-align: right;">
+              <% total_change = categories.sum { |c| c["change_amount"].to_f } %>
+              <span class="<%= total_change <= 0 ? 'positive' : 'negative' %>">
+                <%= total_change >= 0 ? "+" : "" %><%= number_to_currency(total_change) %>
+              </span>
+            </td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p>No data available for this comparison. Make sure you have transactions in both years.</p>
+  </div>
+<% end %>

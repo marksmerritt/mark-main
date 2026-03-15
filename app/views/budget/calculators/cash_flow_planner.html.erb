@@ -1,0 +1,401 @@
+<% content_for(:title) { "Cash Flow Planner" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #00bcd4;">water_drop</span>
+    Cash Flow Planner
+  </h1>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Surplus</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @avg_monthly_surplus >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <%= @avg_monthly_surplus >= 0 ? '+' : '' %><%= number_to_currency(@avg_monthly_surplus) %>
+      </div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Runway (Months)</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @runway_months >= 3 ? 'var(--positive)' : (@runway_months >= 1 ? '#ff9800' : 'var(--negative)') %>;">
+        <%= @runway_months %>
+      </div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Float Days</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #00bcd4;"><%= @float_days %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Next Cash Crunch</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @next_crunch ? 'var(--negative)' : 'var(--positive)' %>;">
+        <%= @next_crunch_label %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Monthly Cash Flow Chart %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00bcd4;">bar_chart</span> Monthly Cash Flow</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% chart_data = @monthly_cash_flow %>
+    <% chart_max = [chart_data.map { |d| [d[:income], d[:expenses]].max }.max || 1, 1].max %>
+    <% surplus_max = [chart_data.map { |d| d[:surplus].abs }.max || 1, 1].max %>
+    <svg viewBox="0 0 660 260" style="width: 100%; height: auto; overflow: visible;" xmlns="http://www.w3.org/2000/svg">
+      <%# Grid lines %>
+      <% 5.times do |i| %>
+        <% y = 190 - (i * 42) %>
+        <line x1="60" y1="<%= y %>" x2="640" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4,4" />
+        <text x="55" y="<%= y + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="9"><%= number_to_currency(chart_max * i / 4.0, precision: 0) %></text>
+      <% end %>
+
+      <%# Bars: income (green) and expenses (red) side by side %>
+      <% bar_width = 32 %>
+      <% pair_gap = 6 %>
+      <% group_gap = 30 %>
+      <% start_x = 80 %>
+      <% chart_data.each_with_index do |d, i| %>
+        <% group_x = start_x + i * (bar_width * 2 + pair_gap + group_gap) %>
+
+        <%# Income bar %>
+        <% inc_height = chart_max > 0 ? (d[:income] / chart_max * 168).round(1) : 0 %>
+        <% inc_y = 190 - inc_height %>
+        <rect x="<%= group_x %>" y="<%= inc_y %>" width="<%= bar_width %>" height="<%= inc_height %>"
+              fill="rgba(52,168,83,0.6)" stroke="#34a853" stroke-width="1" rx="3" />
+        <text x="<%= group_x + bar_width / 2 %>" y="<%= inc_y - 5 %>" text-anchor="middle" fill="var(--positive)" font-size="8" font-weight="600">
+          <%= number_to_currency(d[:income], precision: 0) %>
+        </text>
+
+        <%# Expense bar %>
+        <% exp_x = group_x + bar_width + pair_gap %>
+        <% exp_height = chart_max > 0 ? (d[:expenses] / chart_max * 168).round(1) : 0 %>
+        <% exp_y = 190 - exp_height %>
+        <rect x="<%= exp_x %>" y="<%= exp_y %>" width="<%= bar_width %>" height="<%= exp_height %>"
+              fill="rgba(234,67,53,0.5)" stroke="#ea4335" stroke-width="1" rx="3" />
+        <text x="<%= exp_x + bar_width / 2 %>" y="<%= exp_y - 5 %>" text-anchor="middle" fill="var(--negative)" font-size="8" font-weight="600">
+          <%= number_to_currency(d[:expenses], precision: 0) %>
+        </text>
+
+        <%# Month label %>
+        <% label_x = group_x + bar_width + pair_gap / 2 %>
+        <text x="<%= label_x %>" y="208" text-anchor="middle" fill="var(--text-secondary)" font-size="10">
+          <%= Date.parse("#{d[:month]}-01").strftime("%b") rescue d[:month] %>
+        </text>
+      <% end %>
+
+      <%# Surplus/deficit line %>
+      <% line_baseline = 235 %>
+      <% line_scale = surplus_max > 0 ? 20.0 / surplus_max : 0 %>
+      <% points = chart_data.each_with_index.map { |d, i|
+        x = start_x + i * (bar_width * 2 + pair_gap + group_gap) + bar_width + pair_gap / 2
+        y = line_baseline - (d[:surplus] * line_scale)
+        "#{x},#{y.round(1)}"
+      }.join(" ") %>
+      <polyline points="<%= points %>" fill="none" stroke="#00bcd4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      <% chart_data.each_with_index do |d, i| %>
+        <% x = start_x + i * (bar_width * 2 + pair_gap + group_gap) + bar_width + pair_gap / 2 %>
+        <% y = line_baseline - (d[:surplus] * line_scale) %>
+        <circle cx="<%= x %>" cy="<%= y.round(1) %>" r="3" fill="<%= d[:surplus] >= 0 ? '#00bcd4' : '#ea4335' %>" />
+        <text x="<%= x %>" y="<%= y.round(1) - 6 %>" text-anchor="middle" fill="<%= d[:surplus] >= 0 ? '#00bcd4' : 'var(--negative)' %>" font-size="8" font-weight="600">
+          <%= d[:surplus] >= 0 ? '+' : '' %><%= number_to_currency(d[:surplus], precision: 0) %>
+        </text>
+      <% end %>
+
+      <%# Zero line for surplus %>
+      <line x1="60" y1="<%= line_baseline %>" x2="640" y2="<%= line_baseline %>" stroke="var(--text-secondary)" stroke-width="0.5" stroke-dasharray="2,2" opacity="0.4" />
+    </svg>
+
+    <div style="display: flex; gap: 1.5rem; justify-content: center; margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+      <div style="display: flex; align-items: center; gap: 0.375rem;">
+        <span style="width: 14px; height: 10px; background: rgba(52,168,83,0.6); border-radius: 2px; display: inline-block;"></span>
+        Income
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.375rem;">
+        <span style="width: 14px; height: 10px; background: rgba(234,67,53,0.5); border-radius: 2px; display: inline-block;"></span>
+        Expenses
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.375rem;">
+        <span style="width: 14px; height: 2px; background: #00bcd4; display: inline-block;"></span>
+        Surplus/Deficit
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# 3-Month Forecast %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00bcd4;">auto_graph</span> 3-Month Forecast</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+      <% @forecast_months.each do |fm| %>
+        <div style="background: var(--bg); border-radius: 8px; padding: 1rem; border: 1px solid var(--border);">
+          <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.75rem; color: #00bcd4;"><%= fm[:month_name] %></div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.375rem;">
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">Income</span>
+            <span style="font-size: 0.8125rem; font-weight: 600; color: var(--positive);"><%= number_to_currency(fm[:projected_income]) %></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.375rem;">
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">Expenses</span>
+            <span style="font-size: 0.8125rem; font-weight: 600; color: var(--negative);"><%= number_to_currency(fm[:projected_expenses]) %></span>
+          </div>
+          <div style="border-top: 1px solid var(--border); padding-top: 0.375rem; margin-top: 0.25rem; display: flex; justify-content: space-between;">
+            <span style="font-size: 0.75rem; font-weight: 600;">Surplus</span>
+            <span style="font-size: 0.875rem; font-weight: 700; color: <%= fm[:projected_surplus] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+              <%= fm[:projected_surplus] >= 0 ? '+' : '' %><%= number_to_currency(fm[:projected_surplus]) %>
+            </span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Bill Calendar: Timeline within a typical month %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00bcd4;">calendar_month</span> Bill Calendar</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% if @bill_timing.any? || @typical_income_days.any? %>
+      <%# Month timeline bar %>
+      <div style="position: relative; height: 60px; background: var(--bg); border-radius: 8px; margin-bottom: 1rem; border: 1px solid var(--border);">
+        <%# Day markers %>
+        <% [1, 5, 10, 15, 20, 25, 30].each do |day| %>
+          <div style="position: absolute; left: <%= ((day - 1) / 30.0 * 100).round(1) %>%; top: 0; height: 100%; border-left: 1px solid var(--border); opacity: 0.4;">
+            <span style="position: absolute; bottom: -18px; left: -6px; font-size: 0.625rem; color: var(--text-secondary);"><%= day %></span>
+          </div>
+        <% end %>
+
+        <%# Income markers (green triangles) %>
+        <% @typical_income_days.each do |inc| %>
+          <div style="position: absolute; left: <%= ((inc[:day] - 1) / 30.0 * 100).round(1) %>%; top: 4px; z-index: 2;" title="Income arrives ~day <%= inc[:day] %>">
+            <div style="width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 12px solid #34a853;"></div>
+          </div>
+        <% end %>
+
+        <%# Bill markers (red dots) %>
+        <% @bill_timing.first(15).each do |bill| %>
+          <div style="position: absolute; left: <%= ((bill[:day] - 1) / 30.0 * 100).round(1) %>%; top: 28px; z-index: 1;" title="<%= bill[:name] %>: <%= number_to_currency(bill[:amount]) %> (day <%= bill[:day] %>)">
+            <div style="width: 10px; height: 10px; border-radius: 50%; background: #ea4335; border: 1.5px solid #fff;"></div>
+          </div>
+        <% end %>
+      </div>
+
+      <div style="display: flex; gap: 1.5rem; font-size: 0.75rem; color: var(--text-secondary); margin-top: 1.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #34a853;"></div>
+          Income
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <div style="width: 8px; height: 8px; border-radius: 50%; background: #ea4335;"></div>
+          Bills
+        </div>
+      </div>
+
+      <%# Bill list %>
+      <% if @bill_timing.any? %>
+        <div style="margin-top: 1rem;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border);">
+                <th style="padding: 0.5rem 0.75rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Day</th>
+                <th style="padding: 0.5rem 0.75rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Bill</th>
+                <th style="padding: 0.5rem 0.75rem; text-align: right; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @bill_timing.first(10).each do |bill| %>
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 0.5rem 0.75rem;">
+                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(234,67,53,0.1); font-weight: 600; font-size: 0.75rem; color: var(--negative);"><%= bill[:day] %></span>
+                  </td>
+                  <td style="padding: 0.5rem 0.75rem; font-weight: 500;"><%= bill[:name] %></td>
+                  <td style="padding: 0.5rem 0.75rem; text-align: right; font-weight: 600;"><%= number_to_currency(bill[:amount]) %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% end %>
+    <% else %>
+      <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+        <span class="material-icons-outlined" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">event_busy</span>
+        No recurring bills detected. Add recurring transactions to see your bill calendar.
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Cash Crunch Alerts %>
+<% if @cash_crunches.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">warning</span> Cash Crunch Alerts</h2>
+    </div>
+    <div style="padding: 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+      <% @cash_crunches.each do |crunch| %>
+        <% severity_bg = crunch[:severity] == "high" ? "rgba(234,67,53,0.08)" : "rgba(255,152,0,0.08)" %>
+        <% severity_border = crunch[:severity] == "high" ? "rgba(234,67,53,0.25)" : "rgba(255,152,0,0.25)" %>
+        <% severity_color = crunch[:severity] == "high" ? "var(--negative)" : "#ff9800" %>
+        <div style="background: <%= severity_bg %>; border: 1px solid <%= severity_border %>; border-radius: 8px; padding: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= severity_color %>;">
+              <%= crunch[:severity] == "high" ? "error" : "warning" %>
+            </span>
+            <span style="font-weight: 600; font-size: 0.875rem;"><%= crunch[:period] %></span>
+            <span style="margin-left: auto; font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 4px; background: <%= severity_color %>; color: #fff; font-weight: 600; text-transform: uppercase;"><%= crunch[:severity] %></span>
+          </div>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+            <%= crunch[:description] %>
+          </div>
+          <% if crunch[:bills]&.any? %>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              <% crunch[:bills].each do |b| %>
+                <div style="display: flex; justify-content: space-between; padding: 0.125rem 0;">
+                  <span><%= b[:name] %> (day <%= b[:day] %>)</span>
+                  <span style="font-weight: 600;"><%= number_to_currency(b[:amount]) %></span>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Optimization Tips %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00bcd4;">lightbulb</span> Cash Flow Optimization</h2>
+  </div>
+  <div style="padding: 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+    <% @optimization_tips.each do |tip| %>
+      <div style="background: rgba(0,188,212,0.06); border: 1px solid rgba(0,188,212,0.2); border-radius: 8px; padding: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 1.25rem; color: #00bcd4;"><%= tip[:icon] %></span>
+          <span style="font-weight: 600; font-size: 0.875rem;"><%= tip[:title] %></span>
+        </div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+          <%= tip[:description] %>
+        </div>
+        <div style="font-size: 0.6875rem; font-weight: 600; color: #00bcd4;">
+          <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px;">trending_up</span>
+          <%= tip[:impact] %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Runway Card %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00bcd4;">flight_takeoff</span> Financial Runway</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+      <div style="flex: 0 0 auto; text-align: center;">
+        <div style="font-size: 3rem; font-weight: 800; color: <%= @runway_months >= 6 ? 'var(--positive)' : (@runway_months >= 3 ? '#ff9800' : 'var(--negative)') %>;">
+          <%= @runway_months %>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Months</div>
+      </div>
+      <div style="flex: 1; min-width: 200px;">
+        <%# Gauge bar %>
+        <% gauge_max = 12.0 %>
+        <% gauge_pct = [(@runway_months / gauge_max * 100), 100].min.round(1) %>
+        <% gauge_color = @runway_months >= 6 ? '#34a853' : (@runway_months >= 3 ? '#ff9800' : '#ea4335') %>
+        <div style="position: relative; height: 20px; background: var(--bg); border-radius: 10px; overflow: hidden; border: 1px solid var(--border);">
+          <div style="height: 100%; width: <%= gauge_pct %>%; background: <%= gauge_color %>; border-radius: 10px; transition: width 0.5s ease;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-top: 0.375rem; font-size: 0.6875rem; color: var(--text-secondary);">
+          <span>0 months</span>
+          <span>
+            <% if @runway_months >= 6 %>
+              Healthy runway
+            <% elsif @runway_months >= 3 %>
+              Building up
+            <% else %>
+              Needs attention
+            <% end %>
+          </span>
+          <span>12 months</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top: 1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+      <div style="background: var(--bg); border-radius: 8px; padding: 0.75rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Income</div>
+        <div style="font-size: 1rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@avg_monthly_income) %></div>
+      </div>
+      <div style="background: var(--bg); border-radius: 8px; padding: 0.75rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Expenses</div>
+        <div style="font-size: 1rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@avg_monthly_expenses) %></div>
+      </div>
+      <div style="background: var(--bg); border-radius: 8px; padding: 0.75rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Burn</div>
+        <div style="font-size: 1rem; font-weight: 700;"><%= number_to_currency(@avg_monthly_expenses) %>/mo</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Seasonal Cash Flow %>
+<% tight_months = @seasonal_data.select { |s| s[:status] == "tight" } %>
+<% flush_months = @seasonal_data.select { |s| s[:status] == "flush" } %>
+<% if tight_months.any? || flush_months.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff9800;">wb_sunny</span> Seasonal Cash Flow</h2>
+    </div>
+    <div style="padding: 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem;">
+      <% @seasonal_data.each do |s| %>
+        <% bg = s[:status] == "flush" ? "rgba(52,168,83,0.08)" : (s[:status] == "tight" ? "rgba(234,67,53,0.08)" : "var(--bg)") %>
+        <% border = s[:status] == "flush" ? "rgba(52,168,83,0.2)" : (s[:status] == "tight" ? "rgba(234,67,53,0.2)" : "var(--border)") %>
+        <div style="background: <%= bg %>; border: 1px solid <%= border %>; border-radius: 8px; padding: 0.75rem; text-align: center;">
+          <div style="font-size: 0.75rem; font-weight: 600; margin-bottom: 0.25rem;"><%= s[:month_name] %></div>
+          <div style="font-size: 1rem; font-weight: 700; color: <%= s[:surplus] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= s[:surplus] >= 0 ? '+' : '' %><%= number_to_currency(s[:surplus], precision: 0) %>
+          </div>
+          <div style="font-size: 0.625rem; text-transform: uppercase; font-weight: 600; margin-top: 0.25rem; color: <%= s[:status] == 'flush' ? 'var(--positive)' : (s[:status] == 'tight' ? 'var(--negative)' : 'var(--text-secondary)') %>;">
+            <%= s[:status] %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Empty State %>
+<% if @monthly_cash_flow.all? { |m| m[:income] == 0 && m[:expenses] == 0 } %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 1rem;">water_drop</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No Cash Flow Data Available</div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
+      Add transactions to see your cash flow analysis, forecasts, and optimization tips.
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Navigation %>
+<div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem;">
+  <%= link_to budget_dashboard_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary); display: block; margin-bottom: 0.25rem;">dashboard</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Dashboard</span>
+  <% end %>
+  <%= link_to budget_reports_spending_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #2196f3; display: block; margin-bottom: 0.25rem;">pie_chart</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Spending Report</span>
+  <% end %>
+  <%= link_to budget_expense_forecast_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #00bcd4; display: block; margin-bottom: 0.25rem;">auto_graph</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Expense Forecast</span>
+  <% end %>
+</div>

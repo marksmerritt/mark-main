@@ -19,33 +19,490 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
     <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
+    <script>
+      // Apply theme before paint to prevent flash
+      (function() {
+        var t = localStorage.getItem("theme");
+        if (t === "dark") document.documentElement.setAttribute("data-theme", "dark");
+      })();
+    </script>
   </head>
 
-  <body>
-    <nav class="navbar">
+  <body data-controller="shortcuts">
+    <nav class="navbar" data-controller="nav">
       <div class="navbar-inner">
         <%= link_to "Mark Main", root_path, class: "brand" %>
-        <div class="nav-links">
+        <button class="nav-toggle" data-action="click->nav#toggle" aria-label="Menu">
+          <span class="material-icons-outlined">menu</span>
+        </button>
+        <div class="nav-links" data-nav-target="links">
           <div class="nav-dropdown">
             <span class="nav-link nav-link-dropdown">Trading</span>
             <div class="nav-dropdown-content">
               <%= link_to "Dashboard", root_path %>
+              <%= link_to "Pre-Market", pre_market_path %>
+              <%= link_to "Pre-Trade Checklist", trade_checklist_path %>
               <%= link_to "Trades", trades_path %>
+              <%= link_to "Trade Plans", trade_plans_path %>
+              <%= link_to "Watchlist", watchlists_path %>
+              <%= link_to "Playbooks", playbooks_path %>
+              <%= link_to "Calculator", position_calculator_path %>
+              <%= link_to "Exposure", exposure_path %>
+              <%= link_to "Risk Dashboard", risk_dashboard_path %>
+              <%= link_to "Position Risk", position_risk_path %>
               <%= link_to "Journal", journal_entries_path %>
+              <%= link_to "Journal Calendar", calendar_journal_entries_path %>
+              <%= link_to journal_templates_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">description</span> Journal Templates<% end %>
+              <%= link_to journal_prompts_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #9c27b0;">psychology</span> Journal Prompts<% end %>
+              <%= link_to market_session_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #1a73e8;">schedule</span> Market Session<% end %>
               <%= link_to "Tags", tags_path %>
+              <%= link_to "Milestones", milestones_path %>
+              <%= link_to trade_feed_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">rss_feed</span> Activity Feed<% end %>
               <hr class="nav-divider">
+              <%= link_to "Reports Hub", reports_index_path %>
               <%= link_to "Overview", reports_overview_path %>
               <%= link_to "By Symbol", reports_by_symbol_path %>
+              <%= link_to "By Tag", reports_by_tag_path %>
               <%= link_to "Equity Curve", reports_equity_curve_path %>
+              <%= link_to "Risk Analysis", reports_risk_analysis_path %>
+              <%= link_to "Risk/Reward", reports_risk_reward_path %>
+              <%= link_to "By Time", reports_by_time_path %>
+              <%= link_to "By Duration", reports_by_duration_path %>
+              <%= link_to "Heatmap", reports_heatmap_path %>
+              <%= link_to "Monte Carlo", reports_monte_carlo_path %>
+              <%= link_to "Distribution", reports_distribution_path %>
+              <%= link_to "Weekly Summary", reports_weekly_summary_path %>
+              <%= link_to "Scorecard", reports_scorecard_path %>
+              <%= link_to "Setup Analysis", reports_setup_analysis_path %>
+              <%= link_to "Correlation", reports_correlation_path %>
+              <%= link_to "Streaks", reports_streak_analysis_path %>
+              <%= link_to "Monthly P&L", reports_monthly_performance_path %>
+              <%= link_to "P&L Calendar", reports_pnl_calendar_path %>
+              <%= link_to "Execution Quality", reports_execution_quality_path %>
+              <%= link_to "Fee Analysis", reports_fee_analysis_path %>
+              <%= link_to "Expectancy", reports_expectancy_path %>
+              <%= link_to "Risk of Ruin", reports_risk_of_ruin_path %>
+              <%= link_to "Discipline", reports_discipline_path %>
+              <%= link_to "Position Sizing", reports_position_sizing_path %>
+              <%= link_to "Leaderboard", reports_leaderboard_path %>
+              <%= link_to "Habits", reports_habits_path %>
+              <%= link_to "Session Log", reports_session_log_path %>
+              <%= link_to "Playbook Perf", reports_playbook_performance_path %>
+              <%= link_to "Equity Breakdown", reports_equity_breakdown_path %>
+              <%= link_to "What-If Simulator", reports_what_if_path %>
+              <%= link_to "Symbol Comparison", symbol_comparison_path %>
+              <%= link_to trade_correlations_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">bubble_chart</span> Correlations<% end %>
+              <%= link_to trade_compare_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #3949ab;">compare</span> Compare Trades<% end %>
+              <%= link_to "Trade Replay", trade_replay_path %>
+              <%= link_to "Journal Insights", journal_insights_path %>
+              <%= link_to "Report Card", trading_grades_path %>
+              <%= link_to "Account Summary", account_summary_path %>
+              <%= link_to "Challenges", trading_challenges_path %>
+              <%= link_to loss_recovery_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #00796b;">healing</span> Recovery Plan<% end %>
+              <%= link_to trading_mentor_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">psychology</span> Trading Mentor<% end %>
+              <%= link_to "Tax Estimator", tax_estimator_path %>
+              <%= link_to "Cost Analysis", trading_costs_path %>
+              <%= link_to "Market Regimes", market_regime_path %>
+              <%= link_to edge_finder_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">gps_fixed</span> Edge Finder<% end %>
+              <%= link_to performance_heatmap_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">grid_on</span> Heatmap<% end %>
+              <%= link_to trade_simulator_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">science</span> Simulator<% end %>
+              <%= link_to rr_optimizer_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #1565c0;">tune</span> R:R Optimizer<% end %>
+              <%= link_to session_analyzer_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #4527a0;">view_timeline</span> Sessions<% end %>
+              <%= link_to breakeven_analyzer_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #5d4037;">balance</span> Breakeven<% end %>
+              <%= link_to wl_patterns_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #7b1fa2;">casino</span> W/L Patterns<% end %>
+              <%= link_to entry_timing_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #e65100;">timer</span> Entry Timing<% end %>
+              <%= link_to performance_benchmarks_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #1565c0;">leaderboard</span> Benchmarks<% end %>
+              <%= link_to trend_analyzer_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #00897b;">insights</span> Trend Analyzer<% end %>
+              <%= link_to goal_tracker_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #4caf50;">flag</span> Goal Tracker<% end %>
+              <%= link_to habit_tracker_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #00bcd4;">self_improvement</span> Habits<% end %>
+              <%= link_to portfolio_overview_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #1a73e8;">account_balance</span> Portfolio<% end %>
+              <%= link_to mood_performance_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #e91e63;">psychology_alt</span> Mood Analysis<% end %>
+              <%= link_to sizing_advisor_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #2e7d32;">tune</span> Sizing Advisor<% end %>
+              <%= link_to smart_alerts_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #c62828;">notifications_active</span> Smart Alerts<% end %>
+              <%= link_to drawdown_tracker_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #c62828;">trending_down</span> Drawdown Tracker<% end %>
+              <%= link_to performance_attribution_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #1a73e8;">pie_chart</span> Attribution<% end %>
+              <%= link_to profit_targets_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #4caf50;">track_changes</span> Profit Targets<% end %>
+              <%= link_to achievements_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #f9a825;">emoji_events</span> Achievements<% end %>
+              <%= link_to strategy_builder_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #7b1fa2;">architecture</span> Strategy Builder<% end %>
+              <%= link_to risk_rules_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #5c6bc0;">gavel</span> Risk Rules<% end %>
+              <%= link_to correlation_matrix_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #7b1fa2;">grid_view</span> Correlation Matrix<% end %>
+              <%= link_to trade_calendar_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #00897b;">calendar_month</span> Trade Calendar<% end %>
+              <%= link_to win_loss_analysis_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #1565c0;">compare_arrows</span> Win/Loss Analysis<% end %>
+              <%= link_to trade_templates_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #5d4037;">content_copy</span> Trade Templates<% end %>
+              <%= link_to snapshot_report_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #1a73e8;">summarize</span> Snapshot Report<% end %>
+              <%= link_to spending_trading_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #e65100;">sync_alt</span> Spending vs Trading<% end %>
+              <%= link_to equity_simulator_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #1565c0;">science</span> Equity Simulator<% end %>
+              <%= link_to playbook_comparison_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #4527a0;">difference</span> Playbook Comparison<% end %>
+              <%= link_to sizing_backtest_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #00838f;">science</span> Sizing Backtest<% end %>
+              <%= link_to consistency_report_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #1a73e8;">verified</span> Consistency Report<% end %>
+              <%= link_to symbol_deep_dive_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #2e7d32;">query_stats</span> Symbol Deep Dive<% end %>
+              <%= link_to "Review Analytics", review_stats_trades_path %>
+              <hr class="nav-divider">
+              <%= link_to "Account Statement", data_export_account_statement_path %>
+              <%= link_to "Export Data", data_export_index_path %>
             </div>
+          </div>
+          <div class="nav-dropdown">
+            <span class="nav-link nav-link-dropdown">Notes</span>
+            <div class="nav-dropdown-content">
+              <%= link_to "Notes", notes_path %>
+              <%= link_to "Pinboard", pinboard_notes_path %>
+              <%= link_to "Notebooks", note_notebooks_path %>
+              <%= link_to "Templates", note_templates_path %>
+              <%= link_to "Tags", note_tags_path %>
+              <%= link_to "Reminders", reminders_path %>
+              <%= link_to "Trash", trash_index_path %>
+              <hr class="nav-divider">
+              <%= link_to "Knowledge Graph", knowledge_graph_notes_path %>
+              <%= link_to "Connections", note_links_path %>
+              <%= link_to "Productivity", productivity_notes_path %>
+              <%= link_to "Writing Stats", writing_stats_path %>
+              <%= link_to "Writing Digest", writing_digest_path %>
+              <%= link_to writing_goals_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #2e7d32;">flag</span> Writing Goals<% end %>
+              <%= link_to writing_prompts_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">lightbulb</span> Writing Prompts<% end %>
+              <%= link_to focus_timer_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">timer</span> Focus Timer<% end %>
+              <%= link_to reading_stats_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">menu_book</span> Reading Stats<% end %>
+              <%= link_to word_frequency_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">text_fields</span> Word Analysis<% end %>
+              <%= link_to note_sentiment_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #f9a825;">mood</span> Sentiment<% end %>
+              <%= link_to note_topics_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #00796b;">category</span> Topics<% end %>
+              <%= link_to note_flashcards_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">school</span> Flashcards<% end %>
+              <%= link_to note_maintenance_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">build</span> Maintenance<% end %>
+              <%= link_to note_export_center_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #1565c0;">cloud_download</span> Export Center<% end %>
+              <%= link_to note_bookmarks_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">bookmarks</span> Bookmarks<% end %>
+              <%= link_to "Search", notes_search_search_path %>
+            </div>
+          </div>
+          <div class="nav-dropdown">
+            <span class="nav-link nav-link-dropdown">Budget<% if unread_alerts_count > 0 %><span class="nav-badge"><%= unread_alerts_count %></span><% end %></span>
+            <div class="nav-dropdown-content">
+              <%= link_to "Dashboard", budget_dashboard_path %>
+              <%= link_to "Calendar", budget_calendar_path %>
+              <%= link_to "Financial Calendar", budget_financial_calendar_path %>
+              <%= link_to "Paycheck Allocator", budget_allocate_path %>
+              <%= link_to "Budgets", budget_budgets_path %>
+              <%= link_to "Transactions", budget_transactions_path %>
+              <hr class="nav-divider">
+              <%= link_to "Savings Dashboard", budget_savings_path %>
+              <%= link_to "Emergency Fund", budget_emergency_fund_path %>
+              <%= link_to "Sinking Funds", budget_funds_path %>
+              <%= link_to "Debt Accounts", budget_debt_accounts_path %>
+              <%= link_to "Debt Freedom", budget_debt_freedom_path %>
+              <%= link_to budget_debt_visualizer_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">trending_down</span> Debt Visualizer<% end %>
+              <%= link_to "Snowball Plan", snowball_budget_debt_accounts_path %>
+              <%= link_to "Avalanche Plan", avalanche_budget_debt_accounts_path %>
+              <%= link_to "Recurring", budget_recurring_index_path %>
+              <%= link_to "Bill Calendar", calendar_budget_recurring_index_path %>
+              <%= link_to "Goals", budget_goals_path %>
+              <%= link_to "Challenges", budget_challenges_path %>
+              <%= link_to "Tags", budget_tags_path %>
+              <%= link_to "Spending Rules", budget_spending_rules_path %>
+              <%= link_to "Merchant Insights", budget_merchant_insights_path %>
+              <%= link_to "Alerts", budget_alerts_path %>
+              <%= link_to budget_spending_watchdog_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #c62828;">notifications_active</span> Watchdog<% end %>
+              <hr class="nav-divider">
+              <%= link_to "Wellness Scorecard", budget_wellness_scorecard_path %>
+              <%= link_to "Spending Report", budget_reports_spending_path %>
+              <%= link_to "Net Worth", budget_reports_net_worth_path %>
+              <%= link_to "Income vs Expenses", budget_reports_income_vs_expenses_path %>
+              <%= link_to "Comparison", budget_reports_comparison_path %>
+              <%= link_to "Merchants", budget_reports_merchants_path %>
+              <%= link_to "Forecast", budget_reports_forecast_path %>
+              <%= link_to "Insights", budget_reports_insights_path %>
+              <%= link_to "Year over Year", budget_reports_year_over_year_path %>
+              <%= link_to "Monthly Digest", budget_reports_digest_path %>
+              <%= link_to "Cash Flow", budget_reports_cash_flow_path %>
+              <%= link_to "Subscription Audit", budget_reports_subscription_audit_path %>
+              <%= link_to "Bill Negotiation", budget_reports_bill_tracker_path %>
+              <%= link_to "Annual Review", budget_reports_annual_review_path %>
+              <%= link_to "Spending Velocity", budget_reports_spending_velocity_path %>
+              <%= link_to "Category Deep Dive", budget_reports_category_drill_path %>
+              <%= link_to "Income Tracker", budget_reports_income_tracker_path %>
+              <%= link_to "Spending Patterns", budget_reports_spending_patterns_path %>
+              <%= link_to "Spending Heatmap", budget_spending_heatmap_path %>
+              <%= link_to "Savings Projection", budget_savings_projection_path %>
+              <%= link_to "Spending Anomalies", budget_spending_anomalies_path %>
+              <%= link_to "Income Allocator", budget_income_allocator_path %>
+              <%= link_to "Goal Planner", budget_goal_planner_path %>
+              <%= link_to "Recurring Analyzer", budget_recurring_analyzer_path %>
+              <%= link_to "Net Worth Details", budget_reports_net_worth_details_path %>
+              <%= link_to "Net Worth Forecast", budget_net_worth_forecast_path %>
+              <%= link_to "Expense Forecast", budget_expense_forecast_path %>
+              <%= link_to "Bill Splitter", budget_bill_splitter_path %>
+              <%= link_to "Subscriptions", budget_subscription_manager_path %>
+              <%= link_to "Savings Challenges", budget_savings_challenges_path %>
+              <%= link_to "Cash Flow Planner", budget_cash_flow_planner_path %>
+              <%= link_to budget_spending_personality_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">face</span> Spending Profile<% end %>
+              <%= link_to budget_year_in_review_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">celebration</span> Year in Review<% end %>
+              <%= link_to budget_lifestyle_inflation_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem;">trending_up</span> Lifestyle Inflation<% end %>
+              <%= link_to budget_fire_calculator_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #e65100;">local_fire_department</span> FIRE Calculator<% end %>
+              <%= link_to budget_purchase_advisor_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #1976d2;">shopping_cart</span> Purchase Advisor<% end %>
+              <%= link_to budget_net_worth_dashboard_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #2e7d32;">account_balance</span> Net Worth<% end %>
+              <%= link_to budget_money_calendar_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #388e3c;">event_note</span> Money Calendar<% end %>
+              <%= link_to budget_impulse_tracker_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #ff8f00;">bolt</span> Impulse Tracker<% end %>
+              <%= link_to budget_paycheck_planner_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #2e7d32;">payments</span> Paycheck Planner<% end %>
+              <%= link_to budget_forecast_accuracy_path, style: "display: flex; align-items: center; gap: 0.375rem;" do %><span class="material-icons-outlined" style="font-size: 1rem; color: #1976d2;">fact_check</span> Forecast Accuracy<% end %>
+            </div>
+          </div>
+          <div class="nav-notifications" data-controller="notifications" data-notifications-url-value="<%= notifications_path %>">
+            <button class="nav-link" data-action="click->notifications#toggle" title="Notifications" style="position: relative;">
+              <span class="material-icons-outlined">notifications</span>
+              <span class="notif-badge hidden" data-notifications-target="badge"></span>
+            </button>
+            <div class="notif-dropdown hidden" data-notifications-target="dropdown">
+              <div class="notif-header">
+                <strong>Notifications</strong>
+                <%= link_to "View All", notifications_path, style: "font-size: 0.75rem; color: var(--primary); text-decoration: none;" %>
+              </div>
+              <div class="notif-list" data-notifications-target="list">
+                <div class="notif-empty">Loading...</div>
+              </div>
+            </div>
+          </div>
+          <%= link_to financial_pulse_path, class: "nav-link", title: "Financial Pulse" do %>
+            <span class="material-icons-outlined">monitor_heart</span>
+          <% end %>
+          <%= link_to timeline_path, class: "nav-link", title: "Activity Timeline" do %>
+            <span class="material-icons-outlined">timeline</span>
+          <% end %>
+          <%= link_to daily_review_path, class: "nav-link", title: "Daily Review" do %>
+            <span class="material-icons-outlined">today</span>
+          <% end %>
+          <%= link_to morning_briefing_path, class: "nav-link", title: "Morning Briefing" do %>
+            <span class="material-icons-outlined">wb_sunny</span>
+          <% end %>
+          <%= link_to account_health_path, class: "nav-link", title: "Account Health" do %>
+            <span class="material-icons-outlined">health_and_safety</span>
+          <% end %>
+          <%= link_to streak_calendar_path, class: "nav-link", title: "Streak Calendar" do %>
+            <span class="material-icons-outlined">local_fire_department</span>
+          <% end %>
+          <%= link_to cross_product_insights_path, class: "nav-link", title: "Cross-Product Insights" do %>
+            <span class="material-icons-outlined">hub</span>
+          <% end %>
+          <%= link_to weekly_report_path, class: "nav-link", title: "Weekly Report" do %>
+            <span class="material-icons-outlined">summarize</span>
+          <% end %>
+          <%= link_to monthly_report_path, class: "nav-link", title: "Monthly Report" do %>
+            <span class="material-icons-outlined">calendar_month</span>
+          <% end %>
+          <%= link_to digest_path, class: "nav-link", title: "Weekly Digest" do %>
+            <span class="material-icons-outlined">summarize</span>
+          <% end %>
+          <%= link_to settings_path, class: "nav-link", title: "Settings" do %>
+            <span class="material-icons-outlined">settings</span>
+          <% end %>
+          <%= link_to quick_search_path, class: "nav-link", title: "Quick Search (Cmd+K)" do %>
+            <span class="material-icons-outlined">manage_search</span>
+          <% end %>
+          <%= link_to search_path, class: "nav-link search-nav-link", title: "Search" do %>
+            <span class="material-icons-outlined">search</span>
+          <% end %>
+          <div data-controller="theme">
+            <button class="theme-toggle" data-action="click->theme#toggle" title="Toggle dark mode">
+              <span class="material-icons-outlined" data-theme-target="icon">dark_mode</span>
+            </button>
           </div>
         </div>
       </div>
     </nav>
 
+    <div class="toast-container">
+      <% flash.each do |type, message| %>
+        <div class="toast toast-<%= type %>" data-controller="toast" data-action="click->toast#dismiss">
+          <%= message %>
+        </div>
+      <% end %>
+    </div>
+
     <main class="main-content">
-      <%= render "shared/flash" %>
       <%= yield %>
     </main>
+
+    <div data-controller="quick-trade">
+      <div class="shortcuts-overlay hidden" data-quick-trade-target="modal">
+        <div class="shortcuts-dialog" style="max-width: 28rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2>Quick Add Trade</h2>
+            <button class="btn-icon" data-action="quick-trade#close" title="Close">
+              <span class="material-icons-outlined">close</span>
+            </button>
+          </div>
+          <form action="<%= trades_path %>" method="post" data-action="submit->quick-trade#submit">
+            <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+            <div class="form-group">
+              <label for="qt_symbol">Symbol</label>
+              <input type="text" id="qt_symbol" name="trade[symbol]" class="form-control" placeholder="AAPL" required>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+              <div class="form-group">
+                <label for="qt_side">Side</label>
+                <select id="qt_side" name="trade[side]" class="form-control">
+                  <option value="long">Long</option>
+                  <option value="short">Short</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="qt_quantity">Quantity</label>
+                <input type="number" id="qt_quantity" name="trade[quantity]" class="form-control" value="100">
+              </div>
+              <div class="form-group">
+                <label for="qt_entry">Entry Price</label>
+                <input type="number" id="qt_entry" name="trade[entry_price]" class="form-control" step="0.01" required>
+              </div>
+              <div class="form-group">
+                <label for="qt_asset">Asset Class</label>
+                <select id="qt_asset" name="trade[asset_class]" class="form-control">
+                  <option value="stocks">Stocks</option>
+                  <option value="options">Options</option>
+                  <option value="futures">Futures</option>
+                  <option value="forex">Forex</option>
+                  <option value="crypto">Crypto</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-actions" style="margin-top: 1rem;">
+              <button type="submit" class="btn btn-primary">Create Trade</button>
+              <button type="button" class="btn" data-action="quick-trade#close">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div data-controller="quick-journal">
+      <div class="shortcuts-overlay hidden" data-quick-journal-target="modal">
+        <div class="shortcuts-dialog" style="max-width: 32rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2>Quick Journal</h2>
+            <button class="btn-icon" data-action="quick-journal#close" title="Close">
+              <span class="material-icons-outlined">close</span>
+            </button>
+          </div>
+          <form action="<%= journal_entries_path %>" method="post" data-action="submit->quick-journal#submit">
+            <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+            <input type="hidden" name="journal_entry[date]" value="<%= Date.today.to_s %>">
+            <div class="form-group">
+              <label>How are you feeling?</label>
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                <% %w[Confident Disciplined Neutral Anxious Frustrated].each do |mood| %>
+                  <label style="cursor: pointer;">
+                    <input type="radio" name="journal_entry[mood]" value="<%= mood %>" style="display: none;" data-quick-journal-target="mood">
+                    <span class="preset-chip"><%= mood %></span>
+                  </label>
+                <% end %>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="qj_content">What's on your mind?</label>
+              <textarea id="qj_content" name="journal_entry[content]" class="form-control" rows="4" placeholder="Quick thoughts about today's trading..." data-quick-journal-target="content"></textarea>
+            </div>
+            <div class="form-actions" style="margin-top: 0.75rem;">
+              <button type="submit" class="btn btn-primary">Save Entry</button>
+              <button type="button" class="btn" data-action="quick-journal#close">Cancel</button>
+              <%= link_to "Full Form", new_journal_entry_path, class: "btn", style: "margin-left: auto;" %>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div data-controller="quick-capture">
+      <div class="shortcuts-overlay hidden" data-quick-capture-target="modal">
+        <div class="shortcuts-dialog" style="max-width: 32rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2>Quick Note</h2>
+            <button class="btn-icon" data-action="quick-capture#close" title="Close">
+              <span class="material-icons-outlined">close</span>
+            </button>
+          </div>
+          <form action="<%= notes_path %>" method="post" data-action="submit->quick-capture#submit">
+            <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+            <div class="form-group">
+              <label for="qn_title">Title</label>
+              <input type="text" id="qn_title" name="note[title]" class="form-control" placeholder="Quick thought..." data-quick-capture-target="title">
+            </div>
+            <div class="form-group">
+              <label for="qn_content">Content</label>
+              <textarea id="qn_content" name="note[content]" class="form-control" rows="4" placeholder="Capture your thought..." data-quick-capture-target="content"></textarea>
+            </div>
+            <div class="form-actions" style="margin-top: 0.75rem;">
+              <button type="submit" class="btn btn-primary">Save Note</button>
+              <button type="button" class="btn" data-action="quick-capture#close">Cancel</button>
+              <%= link_to "Full Editor", new_note_path, class: "btn", style: "margin-left: auto;" %>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div data-controller="quick-expense">
+      <div class="shortcuts-overlay hidden" data-quick-expense-target="modal">
+        <div class="shortcuts-dialog" style="max-width: 28rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2>Quick Expense</h2>
+            <button class="btn-icon" data-action="quick-expense#close" title="Close">
+              <span class="material-icons-outlined">close</span>
+            </button>
+          </div>
+          <form action="<%= budget_transactions_path %>" method="post" data-action="submit->quick-expense#submit">
+            <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+            <input type="hidden" name="transaction[transaction_type]" value="expense">
+            <input type="hidden" name="transaction[status]" value="cleared">
+            <input type="hidden" name="transaction[transaction_date]" value="<%= Date.today.to_s %>">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+              <div class="form-group">
+                <label for="qe_amount">Amount ($)</label>
+                <input type="number" id="qe_amount" name="transaction[amount]" class="form-control" step="0.01" min="0" required placeholder="0.00">
+              </div>
+              <div class="form-group">
+                <label for="qe_merchant">Merchant</label>
+                <input type="text" id="qe_merchant" name="transaction[merchant]" class="form-control" placeholder="e.g. Grocery Store">
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="qe_description">Description</label>
+              <input type="text" id="qe_description" name="transaction[description]" class="form-control" placeholder="What did you spend on?">
+            </div>
+            <div class="form-actions" style="margin-top: 1rem;">
+              <button type="submit" class="btn btn-primary">Log Expense</button>
+              <button type="button" class="btn" data-action="quick-expense#close">Cancel</button>
+              <%= link_to "Full Form", new_budget_transaction_path, class: "btn", style: "margin-left: auto;" %>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div data-controller="command-palette">
+      <div class="cmd-overlay hidden" data-command-palette-target="modal" data-action="click->command-palette#backdropClick">
+        <div class="cmd-dialog">
+          <div class="cmd-input-wrapper">
+            <span class="material-icons-outlined cmd-search-icon">search</span>
+            <input type="text" class="cmd-input" placeholder="Type a command or search..." data-command-palette-target="input" data-action="input->command-palette#filter" autocomplete="off" spellcheck="false">
+            <kbd class="cmd-esc">esc</kbd>
+          </div>
+          <div class="cmd-results" data-command-palette-target="results"></div>
+        </div>
+      </div>
+    </div>
+
+    <div data-controller="back-to-top">
+      <button class="back-to-top hidden" data-back-to-top-target="button" data-action="back-to-top#scrollToTop" title="Back to top">
+        <span class="material-icons-outlined">arrow_upward</span>
+      </button>
+    </div>
+
+    <footer class="app-footer">
+      <span>Press <kbd>⌘K</kbd> command palette &middot; <kbd>?</kbd> shortcuts &middot; <kbd>a</kbd> trade &middot; <kbd>q</kbd> journal &middot; <kbd>x</kbd> expense &middot; <kbd>g</kbd> budget &middot; <kbd>v</kbd> review</span>
+    </footer>
+
+    <script>
+      document.addEventListener("keydown", function(e) {
+        if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+          e.preventDefault();
+          window.location.href = "<%= quick_search_path %>";
+        }
+      });
+    </script>
   </body>
 </html>

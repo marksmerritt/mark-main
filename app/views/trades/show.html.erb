@@ -2,19 +2,290 @@
   <h1><%= @trade["symbol"] %> — <%= @trade["side"]&.capitalize %></h1>
   <div class="page-actions">
     <%= link_to "Edit", edit_trade_path(@trade["id"]), class: "btn btn-primary" %>
+    <%= link_to "Duplicate", new_trade_path(
+      "trade[symbol]" => @trade["symbol"],
+      "trade[side]" => @trade["side"],
+      "trade[asset_class]" => @trade["asset_class"],
+      "trade[quantity]" => @trade["quantity"],
+      "trade[entry_price]" => @trade["entry_price"],
+      "trade[setup]" => @trade["setup"]
+    ), class: "btn", title: "Create a new trade with same parameters" %>
+    <button onclick="window.print()" class="btn" title="Print trade report">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">print</span> Print
+    </button>
+    <%= link_to "Watch", new_watchlist_path(
+      "watchlist[symbol]" => @trade["symbol"],
+      "watchlist[asset_class]" => @trade["asset_class"]
+    ), class: "btn", title: "Add to watchlist" %>
     <%= link_to "Delete", trade_path(@trade["id"]), data: { turbo_method: :delete, turbo_confirm: "Are you sure you want to delete this trade?" }, class: "btn btn-danger" %>
     <%= link_to "Back to Trades", trades_path, class: "btn" %>
   </div>
 </div>
 
-<div class="trade-detail-grid">
-  <div class="trade-detail-main">
-    <div class="card">
-      <div class="card-header">
-        <h2>Trade Details</h2>
-        <span class="badge badge-<%= @trade["status"] %>"><%= @trade["status"]&.capitalize %></span>
+<%# Execution Summary Hero %>
+<% if @trade["status"] == "closed" && @trade["pnl"] %>
+  <%
+    pnl = @trade["pnl"].to_f
+    return_pct = @trade["return_percentage"].to_f
+    mfe = @trade["max_favorable_excursion"].to_f
+    mae = @trade["max_adverse_excursion"].to_f
+    capture_pct = mfe > 0 ? (pnl / mfe * 100).clamp(-100, 100).round(0) : 0
+    grade = @trade["trade_grade"]
+    grade_colors = { "A" => "#0d904f", "B" => "#1a73e8", "C" => "#f9ab00", "D" => "#e8710a", "F" => "#d93025" }
+    grade_color = grade ? (grade_colors[grade.to_s[0]] || "var(--text-secondary)") : nil
+  %>
+  <div class="card" style="display: flex; align-items: center; gap: 1.5rem; padding: 1.25rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+    <%# P&L visual %>
+    <div style="text-align: center; flex-shrink: 0;">
+      <div style="font-size: 1.75rem; font-weight: 700;" class="<%= pnl_class(pnl) %>"><%= number_to_currency(pnl) %></div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+        <%= return_pct >= 0 ? "+" : "" %><%= return_pct %>% return
+      </div>
+    </div>
+
+    <%# Quick metrics %>
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; flex: 1;">
+      <% if grade %>
+        <div style="text-align: center; padding: 0.25rem 0.75rem;">
+          <div style="width: 2.5rem; height: 2.5rem; border-radius: 50%; border: 3px solid <%= grade_color %>;
+                      display: flex; align-items: center; justify-content: center; margin: 0 auto 0.25rem;">
+            <span style="font-size: 1rem; font-weight: 700; color: <%= grade_color %>;"><%= grade %></span>
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary);">Grade</div>
+        </div>
+      <% end %>
+      <% if mfe > 0 %>
+        <div style="text-align: center; padding: 0.25rem 0.75rem;">
+          <div style="font-size: 1.125rem; font-weight: 700; color: <%= capture_pct >= 50 ? 'var(--positive)' : capture_pct >= 0 ? 'var(--text-secondary)' : 'var(--negative)' %>;">
+            <%= capture_pct %>%
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary);">MFE Captured</div>
+        </div>
+      <% end %>
+      <% if @trade["duration_in_minutes"] %>
+        <%
+          dur_min = @trade["duration_in_minutes"].to_i
+          dur_str = dur_min < 60 ? "#{dur_min}m" : dur_min < 1440 ? "#{dur_min / 60}h #{dur_min % 60}m" : "#{dur_min / 1440}d"
+        %>
+        <div style="text-align: center; padding: 0.25rem 0.75rem;">
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= dur_str %></div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary);">Duration</div>
+        </div>
+      <% end %>
+      <% if @trade["emotional_state"] %>
+        <%
+          emo_icons = { "calm" => "spa", "focused" => "center_focus_strong", "confident" => "thumb_up",
+                        "anxious" => "psychology", "fearful" => "warning", "greedy" => "attach_money",
+                        "fomo" => "speed", "revenge" => "gavel", "bored" => "hotel_class" }
+        %>
+        <div style="text-align: center; padding: 0.25rem 0.75rem;">
+          <span class="material-icons-outlined" style="font-size: 1.25rem;"><%= emo_icons[@trade["emotional_state"]] || "sentiment_neutral" %></span>
+          <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= @trade["emotional_state"]&.capitalize %></div>
+        </div>
+      <% end %>
+      <% unless @trade["followed_plan"].nil? %>
+        <div style="text-align: center; padding: 0.25rem 0.75rem;">
+          <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= @trade["followed_plan"] ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= @trade["followed_plan"] ? "check_circle" : "cancel" %>
+          </span>
+          <div style="font-size: 0.625rem; color: var(--text-secondary);">Plan</div>
+        </div>
+      <% end %>
+    </div>
+
+    <%# MFE/MAE mini-bar %>
+    <% if mfe > 0 || mae > 0 %>
+      <%
+        exc_max = [mfe, mae].max
+        exc_max = 1 if exc_max == 0
+      %>
+      <div style="width: 120px; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 0.25rem; margin-bottom: 0.25rem;">
+          <span style="font-size: 0.5625rem; width: 25px; color: var(--text-secondary);">MFE</span>
+          <div style="flex: 1; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= (mfe / exc_max * 100).round(0) %>%; background: var(--positive); opacity: 0.6; border-radius: 4px;"></div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.25rem;">
+          <span style="font-size: 0.5625rem; width: 25px; color: var(--text-secondary);">MAE</span>
+          <div style="flex: 1; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= (mae / exc_max * 100).round(0) %>%; background: var(--negative); opacity: 0.6; border-radius: 4px;"></div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# Execution Quality Scorecard — for closed trades with review data %>
+<% if @trade["status"] == "closed" && @trade["reviewed"] %>
+  <%
+    # Calculate execution quality dimensions
+    eq_scores = {}
+
+    # 1. Plan adherence
+    eq_scores[:plan] = @trade["followed_plan"] == true ? 100 : (@trade["followed_plan"] == false ? 20 : 50)
+
+    # 2. Risk management (had stop loss set?)
+    eq_rm = 0
+    eq_rm += 50 if @trade["stop_loss"].present?
+    eq_rm += 50 if @trade["take_profit"].present?
+    eq_scores[:risk] = eq_rm
+
+    # 3. MFE capture
+    mfe_val = @trade["max_favorable_excursion"].to_f
+    pnl_val = @trade["pnl"].to_f
+    eq_scores[:capture] = mfe_val > 0 ? [(pnl_val / mfe_val * 100).clamp(0, 100).round(0), 100].min : 50
+
+    # 4. Emotional discipline
+    calm_states = %w[calm focused disciplined confident]
+    emo = @trade["emotional_state"].to_s.downcase
+    eq_scores[:emotion] = calm_states.include?(emo) ? 100 : (emo.present? ? 40 : 50)
+
+    # 5. Trade grade
+    grade_map = { "A+" => 100, "A" => 95, "A-" => 90, "B+" => 85, "B" => 80, "B-" => 75, "C+" => 65, "C" => 60, "C-" => 55, "D" => 40, "F" => 20 }
+    eq_scores[:grade] = grade_map[@trade["trade_grade"].to_s] || 50
+
+    eq_overall = (eq_scores.values.sum / eq_scores.size.to_f).round(0)
+    eq_color = eq_overall >= 75 ? "var(--positive)" : eq_overall >= 50 ? "var(--primary)" : "var(--negative)"
+
+    eq_dimensions = [
+      { key: :plan, label: "Plan", icon: "assignment_turned_in" },
+      { key: :risk, label: "Risk Mgmt", icon: "shield" },
+      { key: :capture, label: "Capture", icon: "track_changes" },
+      { key: :emotion, label: "Discipline", icon: "psychology" },
+      { key: :grade, label: "Grade", icon: "grade" }
+    ]
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">insights</span> Execution Scorecard</h2>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <span style="font-size: 1.25rem; font-weight: 700; color: <%= eq_color %>;"><%= eq_overall %></span>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">/ 100</span>
+      </div>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.75rem;">
+        <% eq_dimensions.each do |dim| %>
+          <%
+            score = eq_scores[dim[:key]]
+            dim_color = score >= 75 ? "var(--positive)" : score >= 50 ? "var(--primary)" : "var(--negative)"
+          %>
+          <div style="text-align: center;">
+            <%# Circular mini gauge %>
+            <%
+              eq_r = 22; eq_cx = 28; eq_cy = 28
+              eq_circum = 2 * Math::PI * eq_r
+              eq_filled = eq_circum * score / 100.0
+            %>
+            <svg width="56" height="56" viewBox="0 0 56 56">
+              <circle cx="<%= eq_cx %>" cy="<%= eq_cy %>" r="<%= eq_r %>" fill="none" stroke="var(--border)" stroke-width="4" />
+              <circle cx="<%= eq_cx %>" cy="<%= eq_cy %>" r="<%= eq_r %>" fill="none" stroke="<%= dim_color %>" stroke-width="4"
+                      stroke-dasharray="<%= eq_filled.round(1) %> <%= eq_circum.round(1) %>"
+                      stroke-linecap="round" transform="rotate(-90 <%= eq_cx %> <%= eq_cy %>)" />
+              <text x="<%= eq_cx %>" y="<%= eq_cy + 4 %>" text-anchor="middle" font-size="12" font-weight="700" fill="<%= dim_color %>"><%= score %></text>
+            </svg>
+            <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= dim[:label] %></div>
+          </div>
+        <% end %>
       </div>
 
+      <%# Overall bar %>
+      <div style="margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">
+          <span style="color: var(--text-secondary);">Overall Execution Quality</span>
+          <span style="font-weight: 600; color: <%= eq_color %>;"><%= eq_overall %>%</span>
+        </div>
+        <div style="height: 0.5rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: <%= eq_overall %>%; background: <%= eq_color %>; opacity: 0.7; border-radius: 4px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div class="trade-detail-grid">
+  <div class="trade-detail-main">
+    <%# P&L & Cost Breakdown %>
+    <div class="card">
+      <div class="card-header">
+        <h2>P&L Breakdown</h2>
+        <%= badge_for(@trade["status"]) %>
+      </div>
+      <% if @trade["status"] == "closed" && @trade["pnl"] %>
+        <%
+          gross = @trade["gross_pnl"].to_f
+          net = @trade["pnl"].to_f
+          comms = @trade["commissions"].to_f
+          fees_val = @trade["fees"].to_f
+          total_costs = comms + fees_val
+          cost_pct = gross != 0 ? (total_costs / gross.abs * 100).round(1) : 0
+        %>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-bottom: 1px solid var(--border);">
+          <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Gross P&L</div>
+            <div style="font-size: 1.25rem; font-weight: 700;" class="<%= pnl_class(gross) %>"><%= number_to_currency(gross) %></div>
+          </div>
+          <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Costs</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(total_costs) %></div>
+            <% if cost_pct > 0 %>
+              <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= cost_pct %>% of gross</div>
+            <% end %>
+          </div>
+          <div style="padding: 1rem; text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net P&L</div>
+            <div style="font-size: 1.25rem; font-weight: 700;" class="<%= pnl_class(net) %>"><%= number_to_currency(net) %></div>
+            <div style="font-size: 0.625rem; color: var(--text-secondary);">
+              <%= @trade["return_percentage"] ? "#{@trade["return_percentage"]}% return" : "" %>
+            </div>
+          </div>
+        </div>
+        <% if total_costs > 0 %>
+          <div style="padding: 0.75rem 1.25rem; display: flex; gap: 1.5rem; font-size: 0.8125rem;">
+            <% if comms > 0 %>
+              <div>
+                <span style="color: var(--text-secondary);">Commissions:</span>
+                <span style="font-weight: 600;"><%= number_to_currency(comms) %></span>
+              </div>
+            <% end %>
+            <% if fees_val > 0 %>
+              <div>
+                <span style="color: var(--text-secondary);">Fees:</span>
+                <span style="font-weight: 600;"><%= number_to_currency(fees_val) %></span>
+              </div>
+            <% end %>
+            <% if @trade["quantity"].to_f > 0 %>
+              <div>
+                <span style="color: var(--text-secondary);">Cost/share:</span>
+                <span style="font-weight: 600;"><%= number_to_currency(total_costs / @trade["quantity"].to_f) %></span>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      <% else %>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Gross P&L</span>
+            <span class="detail-value"><%= pnl_display(@trade["gross_pnl"]) %></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Net P&L</span>
+            <span class="detail-value"><%= pnl_display(@trade["pnl"]) %></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Return</span>
+            <span class="detail-value <%= pnl_class(@trade["return_percentage"]) %>">
+              <%= @trade["return_percentage"] ? "#{@trade["return_percentage"]}%" : "\u2014" %>
+            </span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Trade Details</h2></div>
       <div class="detail-grid">
         <div class="detail-item">
           <span class="detail-label">Symbol</span>
@@ -38,7 +309,7 @@
         </div>
         <div class="detail-item">
           <span class="detail-label">Exit Price</span>
-          <span class="detail-value"><%= @trade["exit_price"] ? number_to_currency(@trade["exit_price"]) : "—" %></span>
+          <span class="detail-value"><%= @trade["exit_price"] ? number_to_currency(@trade["exit_price"]) : "\u2014" %></span>
         </div>
         <div class="detail-item">
           <span class="detail-label">Entry Time</span>
@@ -46,49 +317,176 @@
         </div>
         <div class="detail-item">
           <span class="detail-label">Exit Time</span>
-          <span class="detail-value"><%= @trade["exit_time"] ? Time.parse(@trade["exit_time"]).strftime("%b %d, %Y %l:%M %p") : "—" %></span>
+          <span class="detail-value"><%= @trade["exit_time"] ? Time.parse(@trade["exit_time"]).strftime("%b %d, %Y %l:%M %p") : "\u2014" %></span>
         </div>
         <div class="detail-item">
           <span class="detail-label">Duration</span>
-          <span class="detail-value"><%= @trade["duration_in_minutes"] ? "#{@trade["duration_in_minutes"]} min" : "—" %></span>
+          <span class="detail-value"><%= @trade["duration_in_minutes"] ? "#{@trade["duration_in_minutes"]} min" : "\u2014" %></span>
         </div>
-        <div class="detail-item">
-          <span class="detail-label">Commissions</span>
-          <span class="detail-value"><%= @trade["commissions"] ? number_to_currency(@trade["commissions"]) : "—" %></span>
-        </div>
-        <div class="detail-item">
-          <span class="detail-label">Fees</span>
-          <span class="detail-value"><%= @trade["fees"] ? number_to_currency(@trade["fees"]) : "—" %></span>
-        </div>
+        <% if @trade["quantity"].to_f > 0 && @trade["entry_price"].to_f > 0 %>
+          <div class="detail-item">
+            <span class="detail-label">Position Value</span>
+            <span class="detail-value"><%= number_to_currency(@trade["quantity"].to_f * @trade["entry_price"].to_f) %></span>
+          </div>
+        <% end %>
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-header">
-        <h2>P&L</h2>
+    <% if @trade["stop_loss"] || @trade["take_profit"] %>
+      <div class="card">
+        <div class="card-header"><h2>Risk Management</h2></div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Stop Loss</span>
+            <span class="detail-value">
+              <%= @trade["stop_loss"] ? number_to_currency(@trade["stop_loss"]) : "\u2014" %>
+              <% if @trade["stop_hit"] == true %>
+                <span class="badge badge-warning" style="margin-left: 0.25rem;">Hit</span>
+              <% end %>
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Take Profit</span>
+            <span class="detail-value">
+              <%= @trade["take_profit"] ? number_to_currency(@trade["take_profit"]) : "\u2014" %>
+              <% if @trade["target_hit"] == true %>
+                <span class="badge badge-success" style="margin-left: 0.25rem;">Hit</span>
+              <% end %>
+            </span>
+          </div>
+          <% if @trade["planned_risk"] %>
+            <div class="detail-item">
+              <span class="detail-label">Planned Risk</span>
+              <span class="detail-value"><%= number_to_currency(@trade["planned_risk"]) %>/share</span>
+            </div>
+          <% end %>
+          <% if @trade["planned_reward"] %>
+            <div class="detail-item">
+              <span class="detail-label">Planned Reward</span>
+              <span class="detail-value"><%= number_to_currency(@trade["planned_reward"]) %>/share</span>
+            </div>
+          <% end %>
+          <% if @trade["planned_rr_ratio"] %>
+            <div class="detail-item">
+              <span class="detail-label">Risk/Reward</span>
+              <span class="detail-value"><%= @trade["planned_rr_ratio"] %>:1</span>
+            </div>
+          <% end %>
+        </div>
       </div>
+    <% end %>
 
-      <div class="detail-grid">
-        <div class="detail-item">
-          <span class="detail-label">Gross P&L</span>
-          <span class="detail-value <%= @trade["gross_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
-            <%= @trade["gross_pnl"] ? number_to_currency(@trade["gross_pnl"]) : "—" %>
-          </span>
+    <% if @trade["stop_loss"] && @trade["entry_price"] %>
+      <%
+        entry = @trade["entry_price"].to_f
+        stop = @trade["stop_loss"].to_f
+        tp = @trade["take_profit"]&.to_f
+        exit_p = @trade["exit_price"]&.to_f
+        is_long = @trade["side"] == "long"
+
+        risk = (entry - stop).abs
+        reward = tp ? (tp - entry).abs : nil
+        rr_ratio = reward && risk > 0 ? (reward / risk).round(2) : nil
+
+        prices = [stop, entry]
+        prices << tp if tp
+        prices << exit_p if exit_p
+        price_min = prices.min * 0.998
+        price_max = prices.max * 1.002
+        price_range = price_max - price_min
+        price_range = 1 if price_range == 0
+
+        to_y = ->(price) { ((price_max - price) / price_range * 100).round(2) }
+      %>
+      <div class="card">
+        <div class="card-header">
+          <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">straighten</span> Risk/Reward</h2>
+          <% if rr_ratio %>
+            <span style="font-size: 0.875rem; font-weight: 600;">1:<%= rr_ratio %></span>
+          <% end %>
         </div>
-        <div class="detail-item">
-          <span class="detail-label">Net P&L</span>
-          <span class="detail-value <%= @trade["pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
-            <%= @trade["pnl"] ? number_to_currency(@trade["pnl"]) : "—" %>
-          </span>
-        </div>
-        <div class="detail-item">
-          <span class="detail-label">Return</span>
-          <span class="detail-value <%= @trade["return_percentage"].to_f >= 0 ? 'positive' : 'negative' %>">
-            <%= @trade["return_percentage"] ? "#{@trade["return_percentage"]}%" : "—" %>
-          </span>
+        <div style="padding: 1rem 1.25rem;">
+          <svg viewBox="0 0 300 140" class="rr-chart" style="width: 100%; height: 140px;">
+            <defs>
+              <linearGradient id="riskZone" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="transparent"/>
+                <stop offset="100%" stop-color="rgba(217,48,37,0.15)"/>
+              </linearGradient>
+              <linearGradient id="rewardZone" x1="0" y1="1" x2="0" y2="0">
+                <stop offset="0%" stop-color="transparent"/>
+                <stop offset="100%" stop-color="rgba(13,144,79,0.15)"/>
+              </linearGradient>
+            </defs>
+
+            <% entry_y = to_y.call(entry) * 1.3 %>
+            <% stop_y = to_y.call(stop) * 1.3 %>
+
+            <%# Risk zone (entry to stop) %>
+            <% risk_top = [entry_y, stop_y].min %>
+            <% risk_h = (entry_y - stop_y).abs %>
+            <rect x="30" y="<%= risk_top %>" width="240" height="<%= risk_h %>"
+                  fill="rgba(217,48,37,0.08)" rx="2"/>
+
+            <%# Reward zone (entry to TP) %>
+            <% if tp %>
+              <% tp_y = to_y.call(tp) * 1.3 %>
+              <% rew_top = [entry_y, tp_y].min %>
+              <% rew_h = (entry_y - tp_y).abs %>
+              <rect x="30" y="<%= rew_top %>" width="240" height="<%= rew_h %>"
+                    fill="rgba(13,144,79,0.08)" rx="2"/>
+            <% end %>
+
+            <%# Entry line %>
+            <line x1="30" y1="<%= entry_y %>" x2="270" y2="<%= entry_y %>"
+                  stroke="var(--primary)" stroke-width="2" stroke-dasharray="6,3"/>
+            <text x="275" y="<%= entry_y + 4 %>" fill="var(--primary)" font-size="10" font-weight="600"><%= number_to_currency(entry) %></text>
+            <text x="4" y="<%= entry_y + 4 %>" fill="var(--primary)" font-size="9" font-weight="500">Entry</text>
+
+            <%# Stop loss line %>
+            <line x1="30" y1="<%= stop_y %>" x2="270" y2="<%= stop_y %>"
+                  stroke="var(--negative)" stroke-width="2"/>
+            <text x="275" y="<%= stop_y + 4 %>" fill="var(--negative)" font-size="10" font-weight="600"><%= number_to_currency(stop) %></text>
+            <text x="4" y="<%= stop_y + 4 %>" fill="var(--negative)" font-size="9" font-weight="500">Stop</text>
+
+            <%# Take profit line %>
+            <% if tp %>
+              <line x1="30" y1="<%= tp_y %>" x2="270" y2="<%= tp_y %>"
+                    stroke="var(--positive)" stroke-width="2"/>
+              <text x="275" y="<%= tp_y + 4 %>" fill="var(--positive)" font-size="10" font-weight="600"><%= number_to_currency(tp) %></text>
+              <text x="4" y="<%= tp_y + 4 %>" fill="var(--positive)" font-size="9" font-weight="500">Target</text>
+            <% end %>
+
+            <%# Actual exit marker %>
+            <% if exit_p %>
+              <% exit_y = to_y.call(exit_p) * 1.3 %>
+              <line x1="80" y1="<%= exit_y %>" x2="220" y2="<%= exit_y %>"
+                    stroke="<%= @trade["pnl"].to_f >= 0 ? "var(--positive)" : "var(--negative)" %>" stroke-width="2.5" stroke-dasharray="2,3"/>
+              <circle cx="150" cy="<%= exit_y %>" r="4" fill="<%= @trade["pnl"].to_f >= 0 ? "var(--positive)" : "var(--negative)" %>"/>
+              <text x="225" y="<%= exit_y + 4 %>" fill="var(--text-secondary)" font-size="9" font-weight="500">Exit <%= number_to_currency(exit_p) %></text>
+            <% end %>
+          </svg>
+
+          <div style="display: flex; gap: 1rem; margin-top: 0.5rem; font-size: 0.8125rem;">
+            <div>
+              <span class="text-muted">Risk:</span>
+              <span class="negative"><%= number_to_currency(risk) %>/share</span>
+            </div>
+            <% if reward %>
+              <div>
+                <span class="text-muted">Reward:</span>
+                <span class="positive"><%= number_to_currency(reward) %>/share</span>
+              </div>
+            <% end %>
+            <% if @trade["quantity"] %>
+              <div>
+                <span class="text-muted">$ at Risk:</span>
+                <span class="negative"><%= number_to_currency(risk * @trade["quantity"].to_f) %></span>
+              </div>
+            <% end %>
+          </div>
         </div>
       </div>
-    </div>
+    <% end %>
 
     <% if @trade["max_favorable_excursion"] || @trade["max_adverse_excursion"] %>
       <div class="card">
@@ -100,29 +498,134 @@
           <div class="detail-item">
             <span class="detail-label">Max Favorable Excursion (MFE)</span>
             <span class="detail-value">
-              <%= @trade["max_favorable_excursion"] ? number_to_currency(@trade["max_favorable_excursion"]) : "—" %>
+              <%= @trade["max_favorable_excursion"] ? number_to_currency(@trade["max_favorable_excursion"]) : "\u2014" %>
             </span>
           </div>
           <div class="detail-item">
             <span class="detail-label">Max Adverse Excursion (MAE)</span>
             <span class="detail-value">
-              <%= @trade["max_adverse_excursion"] ? number_to_currency(@trade["max_adverse_excursion"]) : "—" %>
+              <%= @trade["max_adverse_excursion"] ? number_to_currency(@trade["max_adverse_excursion"]) : "\u2014" %>
             </span>
           </div>
         </div>
       </div>
     <% end %>
 
-    <% if @trade["notes"].present? %>
-      <div class="card">
-        <div class="card-header"><h2>Notes</h2></div>
-        <div class="text-content"><%= simple_format(@trade["notes"]) %></div>
-      </div>
+    <%# Trade Timeline %>
+    <% if @trade["entry_time"] %>
+      <%
+        events = []
+        events << { time: @trade["entry_time"], label: "Entry", price: @trade["entry_price"], icon: "login", css: "primary" }
+
+        if @trade["stop_loss"].present?
+          events << { time: nil, label: "Stop Loss", price: @trade["stop_loss"], icon: "gpp_bad", css: "negative", type: "level" }
+        end
+        if @trade["take_profit"].present?
+          events << { time: nil, label: "Take Profit", price: @trade["take_profit"], icon: "flag", css: "positive", type: "level" }
+        end
+
+        if @trade["max_adverse_excursion"].present? && @trade["entry_price"].present?
+          mae_price = @trade["side"] == "long" ?
+            @trade["entry_price"].to_f - @trade["max_adverse_excursion"].to_f :
+            @trade["entry_price"].to_f + @trade["max_adverse_excursion"].to_f
+          events << { time: nil, label: "Max Drawdown", price: mae_price.round(2), icon: "arrow_downward", css: "negative", type: "excursion" }
+        end
+        if @trade["max_favorable_excursion"].present? && @trade["entry_price"].present?
+          mfe_price = @trade["side"] == "long" ?
+            @trade["entry_price"].to_f + @trade["max_favorable_excursion"].to_f :
+            @trade["entry_price"].to_f - @trade["max_favorable_excursion"].to_f
+          events << { time: nil, label: "Max Favorable", price: mfe_price.round(2), icon: "arrow_upward", css: "positive", type: "excursion" }
+        end
+
+        if @trade["exit_time"].present?
+          events << { time: @trade["exit_time"], label: "Exit", price: @trade["exit_price"], icon: "logout", css: @trade["pnl"].to_f >= 0 ? "positive" : "negative" }
+        end
+
+        timed_events = events.select { |e| e[:time].present? }
+        level_events = events.select { |e| e[:type] == "level" || e[:type] == "excursion" }
+      %>
+      <% if timed_events.length >= 1 %>
+        <div class="card">
+          <div class="card-header">
+            <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">timeline</span> Trade Timeline</h2>
+            <% if @trade["entry_time"] && @trade["exit_time"] %>
+              <%
+                dur = ((Time.parse(@trade["exit_time"]) - Time.parse(@trade["entry_time"])) / 60).round
+                dur_str = dur < 60 ? "#{dur}m" : "#{dur / 60}h #{dur % 60}m"
+              %>
+              <span class="text-muted" style="font-size: 0.8125rem;">Duration: <%= dur_str %></span>
+            <% end %>
+          </div>
+          <div class="trade-timeline">
+            <% timed_events.each_with_index do |event, i| %>
+              <div class="timeline-event">
+                <div class="timeline-dot timeline-dot-<%= event[:css] %>">
+                  <span class="material-icons-outlined"><%= event[:icon] %></span>
+                </div>
+                <div class="timeline-content">
+                  <div class="timeline-label"><strong><%= event[:label] %></strong></div>
+                  <div class="timeline-details">
+                    <% if event[:price] %>
+                      <span><%= number_to_currency(event[:price]) %></span>
+                    <% end %>
+                    <span class="text-muted"><%= Time.parse(event[:time]).strftime("%b %d, %I:%M %p") rescue event[:time] %></span>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+            <% level_events.each do |event| %>
+              <div class="timeline-event timeline-level">
+                <div class="timeline-dot timeline-dot-<%= event[:css] %>">
+                  <span class="material-icons-outlined"><%= event[:icon] %></span>
+                </div>
+                <div class="timeline-content">
+                  <div class="timeline-label"><%= event[:label] %></div>
+                  <div class="timeline-details">
+                    <span><%= number_to_currency(event[:price]) %></span>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
     <% end %>
+
+    <div class="card" data-controller="quick-note"
+         data-quick-note-url-value="<%= trade_path(@trade["id"]) %>"
+         data-quick-note-csrf-token-value="<%= form_authenticity_token %>">
+      <div class="card-header">
+        <h2>Notes</h2>
+        <button class="btn btn-sm" data-quick-note-target="trigger" data-action="quick-note#show">
+          <span class="material-icons-outlined" style="font-size: 14px; vertical-align: -2px;">add</span> Add Note
+        </button>
+      </div>
+      <% if @trade["notes"].present? %>
+        <div class="text-content" data-quick-note-target="display" data-current-notes="<%= @trade["notes"] %>"><%= simple_format(@trade["notes"]) %></div>
+      <% else %>
+        <div data-quick-note-target="display" data-current-notes="">
+          <p class="empty-state" style="padding: 0.75rem 1.25rem;">No notes yet. Click "Add Note" to start.</p>
+        </div>
+      <% end %>
+      <div class="hidden" data-quick-note-target="form" style="padding: 1rem 1.25rem; border-top: 1px solid var(--border);">
+        <textarea class="form-control" data-quick-note-target="textarea" rows="3" placeholder="Add a quick note..." style="margin-bottom: 0.5rem;"></textarea>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-primary btn-sm" data-action="quick-note#save">Save</button>
+          <button class="btn btn-sm" data-action="quick-note#cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
 
     <% if @trade["setup"].present? %>
       <div class="card">
-        <div class="card-header"><h2>Setup</h2></div>
+        <div class="card-header">
+          <h2>Setup</h2>
+          <% if @trade["setup"].present? %>
+            <%= link_to reports_setup_analysis_path, class: "btn btn-sm", title: "View setup analysis" do %>
+              <span class="material-icons-outlined" style="font-size: 14px; vertical-align: -2px;">analytics</span> Analysis
+            <% end %>
+          <% end %>
+        </div>
         <div class="text-content"><%= simple_format(@trade["setup"]) %></div>
       </div>
     <% end %>
@@ -140,17 +643,292 @@
         <div class="text-content"><%= simple_format(@trade["lessons"]) %></div>
       </div>
     <% end %>
+
+    <div class="card" data-controller="screenshots" data-screenshots-trade-id-value="<%= @trade["id"] %>" data-screenshots-csrf-value="<%= form_authenticity_token %>">
+      <div class="card-header">
+        <h2>Screenshots <% if @screenshots.any? %><span class="text-muted" style="font-size: 0.85rem; font-weight: normal;">(<%= @screenshots.length %>)</span><% end %></h2>
+        <button class="btn btn-sm" data-action="screenshots#toggleForm">
+          <span class="material-icons-outlined" style="font-size: 14px; vertical-align: -2px;">add_photo_alternate</span> Add
+        </button>
+      </div>
+
+      <div class="hidden" data-screenshots-target="form" style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+          <div class="form-group">
+            <label>Filename / URL</label>
+            <input type="text" class="form-control" data-screenshots-target="filename" placeholder="chart_screenshot.png">
+          </div>
+          <div class="form-group">
+            <label>Caption</label>
+            <input type="text" class="form-control" data-screenshots-target="caption" placeholder="Entry setup on 5min chart">
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+          <button class="btn btn-primary btn-sm" data-action="screenshots#add">Save Screenshot</button>
+          <button class="btn btn-sm" data-action="screenshots#toggleForm">Cancel</button>
+        </div>
+      </div>
+
+      <% if @screenshots.any? %>
+        <div class="screenshot-gallery" style="padding: 1rem 1.25rem;">
+          <% @screenshots.each do |ss| %>
+            <div class="screenshot-card" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border-light);">
+              <span class="material-icons-outlined" style="font-size: 2rem; color: var(--text-muted);">image</span>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 500;"><%= ss["filename"] %></div>
+                <% if ss["caption"].present? %>
+                  <div class="text-muted" style="font-size: 0.85rem;"><%= ss["caption"] %></div>
+                <% end %>
+                <div class="text-muted" style="font-size: 0.75rem;">
+                  <%= ss["content_type"] %>
+                  <% if ss["file_size"].to_i > 0 %>
+                    &middot; <%= number_to_human_size(ss["file_size"]) %>
+                  <% end %>
+                  &middot; <%= time_ago_in_words(Time.parse(ss["created_at"])) %> ago
+                </div>
+              </div>
+              <%= link_to trade_screenshot_path(trade_id: @trade["id"], id: ss["id"]), data: { turbo_method: :delete, turbo_confirm: "Remove this screenshot?" }, class: "btn btn-sm btn-danger", style: "flex-shrink: 0;" do %>
+                <span class="material-icons-outlined" style="font-size: 14px;">delete</span>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="empty-state" style="padding: 1rem 1.25rem;">No screenshots yet. Add chart images, setup screenshots, or exit confirmations.</p>
+      <% end %>
+    </div>
   </div>
 
   <div class="trade-detail-sidebar">
-    <% if @trade["tags"].present? && @trade["tags"].any? %>
-      <div class="card">
-        <div class="card-header"><h2>Tags</h2></div>
-        <div class="tag-list-horizontal">
+    <div class="card" data-controller="inline-tag"
+         data-inline-tag-url-value="<%= trade_path(@trade["id"]) %>"
+         data-inline-tag-csrf-token-value="<%= form_authenticity_token %>">
+      <div class="card-header">
+        <h2>Tags</h2>
+        <button class="btn btn-sm" data-action="inline-tag#toggleEditor">
+          <span class="material-icons-outlined" style="font-size: 14px; vertical-align: -2px;">edit</span>
+        </button>
+      </div>
+      <div class="tag-list-horizontal" data-inline-tag-target="display">
+        <% if @trade["tags"].present? && @trade["tags"].any? %>
           <% @trade["tags"].each do |tag| %>
             <span class="tag" <% if tag["color"].present? %>style="background-color: <%= tag["color"] %>"<% end %>><%= tag["name"] %></span>
           <% end %>
+        <% else %>
+          <span class="text-muted" style="padding: 0.5rem;">No tags</span>
+        <% end %>
+      </div>
+      <div class="hidden" data-inline-tag-target="editor" style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border);">
+        <div style="display: flex; flex-wrap: wrap; gap: 0.375rem; margin-bottom: 0.5rem;">
+          <% cached_tags.each do |tag| %>
+            <label style="cursor: pointer;">
+              <input type="checkbox" value="<%= tag["id"] %>" data-inline-tag-target="checkbox"
+                     style="display: none;"
+                     <%= "checked" if @trade["tags"]&.any? { |t| t["id"].to_s == tag["id"].to_s } %>>
+              <span class="preset-chip" <% if tag["color"].present? %>style="border-color: <%= tag["color"] %>"<% end %>><%= tag["name"] %></span>
+            </label>
+          <% end %>
         </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-primary btn-sm" data-action="inline-tag#save">Save</button>
+          <button class="btn btn-sm" data-action="inline-tag#toggleEditor">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <% if @trade["status"] == "closed" %>
+      <div class="card">
+        <div class="card-header">
+          <h2>Review</h2>
+          <% if @trade["reviewed"] %>
+            <span class="badge badge-success">Reviewed</span>
+          <% else %>
+            <%= link_to "Review Now", review_trades_path, class: "btn btn-primary btn-sm" %>
+          <% end %>
+        </div>
+        <% if @trade["reviewed"] %>
+          <div class="detail-grid">
+            <% if @trade["trade_grade"] %>
+              <div class="detail-item">
+                <span class="detail-label">Grade</span>
+                <span class="detail-value" style="font-size: 1.25rem; font-weight: 700;"><%= @trade["trade_grade"] %></span>
+              </div>
+            <% end %>
+            <% if @trade["emotional_state"] %>
+              <div class="detail-item">
+                <span class="detail-label">Emotional State</span>
+                <span class="detail-value"><%= @trade["emotional_state"]&.capitalize %></span>
+              </div>
+            <% end %>
+            <% unless @trade["followed_plan"].nil? %>
+              <div class="detail-item">
+                <span class="detail-label">Followed Plan</span>
+                <span class="detail-value <%= @trade["followed_plan"] ? 'positive' : 'negative' %>">
+                  <%= @trade["followed_plan"] ? "Yes" : "No" %>
+                </span>
+              </div>
+            <% end %>
+            <% if @trade["reviewed_at"] %>
+              <div class="detail-item">
+                <span class="detail-label">Reviewed</span>
+                <span class="detail-value text-muted"><%= Time.parse(@trade["reviewed_at"]).strftime("%b %d, %Y") %></span>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <p class="text-muted" style="padding: 0.75rem 1.25rem; font-size: 0.875rem;">This trade hasn't been reviewed yet. Review trades to track your execution quality.</p>
+        <% end %>
+      </div>
+    <% end %>
+
+    <%# Journal entry for trade date %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">auto_stories</span> Journal</h2>
+      </div>
+      <% if @trade_journal %>
+        <a href="<%= journal_entry_path(@trade_journal["id"]) %>" class="activity-item">
+          <span class="activity-icon" style="background: rgba(26,115,232,0.1); color: var(--primary);">
+            <span class="material-icons-outlined">auto_stories</span>
+          </span>
+          <div class="activity-content">
+            <span class="activity-title">Journal Entry</span>
+            <span class="activity-detail text-muted">
+              <%= @trade_journal["mood"].presence || Date.parse(@trade_journal["date"]).strftime("%b %d, %Y") rescue "View" %>
+            </span>
+          </div>
+        </a>
+      <% else %>
+        <%
+          trade_date = @trade["entry_time"]&.to_s&.slice(0, 10) || Date.current.to_s
+          journal_content = "## Trade Review: #{@trade["symbol"]}\n\n"
+          journal_content += "**Side:** #{@trade["side"]&.capitalize}\n"
+          journal_content += "**P&L:** #{@trade["pnl"] ? "$#{@trade["pnl"]}" : "Open"}\n"
+          journal_content += "**Setup:** #{@trade["setup"]}\n\n" if @trade["setup"].present?
+          journal_content += "### What went well\n\n\n### What to improve\n\n"
+        %>
+        <div style="padding: 0.75rem 1.25rem;">
+          <p class="text-muted" style="font-size: 0.8125rem; margin-bottom: 0.5rem;">No journal entry for this trading day.</p>
+          <%= link_to new_journal_entry_path(
+            "journal_entry[date]" => trade_date,
+            "journal_entry[content]" => journal_content
+          ), class: "btn btn-sm", style: "width: 100%; justify-content: center;" do %>
+            <span class="material-icons-outlined" style="font-size: 1rem;">add</span> Journal This Trade
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Quick Actions</h2></div>
+      <div style="padding: 0.5rem 1.25rem; display: flex; flex-direction: column; gap: 0.375rem;">
+        <%= link_to new_trade_path(
+          "trade[symbol]" => @trade["symbol"],
+          "trade[side]" => @trade["side"],
+          "trade[asset_class]" => @trade["asset_class"],
+          "trade[setup]" => @trade["setup"]
+        ), class: "btn btn-sm", style: "justify-content: flex-start;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem;">content_copy</span> Trade Again
+        <% end %>
+        <%= link_to new_trade_plan_path(
+          "trade_plan[symbol]" => @trade["symbol"],
+          "trade_plan[side]" => @trade["side"],
+          "trade_plan[asset_class]" => @trade["asset_class"]
+        ), class: "btn btn-sm", style: "justify-content: flex-start;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem;">assignment</span> Create Plan
+        <% end %>
+        <%= link_to trades_path(symbol: @trade["symbol"]), class: "btn btn-sm", style: "justify-content: flex-start;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem;">history</span> Trade History
+        <% end %>
+        <%= link_to position_calculator_path(
+          entry_price: @trade["entry_price"],
+          stop_loss: @trade["stop_loss"]
+        ), class: "btn btn-sm", style: "justify-content: flex-start;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem;">calculate</span> Calculator
+        <% end %>
+      </div>
+    </div>
+
+    <% if @matched_playbooks.any? %>
+      <div class="card">
+        <div class="card-header">
+          <h2>Playbook</h2>
+        </div>
+        <% @matched_playbooks.each do |pb| %>
+          <a href="<%= playbook_path(pb["id"]) %>" class="activity-item">
+            <span class="activity-icon" style="background: rgba(99,102,241,0.1); color: #6366f1;">
+              <span class="material-icons-outlined">menu_book</span>
+            </span>
+            <div class="activity-content">
+              <span class="activity-title"><%= pb["name"] %></span>
+              <span class="activity-detail text-muted"><%= pb["description"].present? ? truncate(pb["description"], length: 60) : "View playbook" %></span>
+            </div>
+          </a>
+        <% end %>
+      </div>
+    <% end %>
+
+    <% if @linked_notes.present? && @linked_notes.any? %>
+      <div class="card">
+        <div class="card-header">
+          <h2>Related Notes</h2>
+          <span class="text-muted" style="font-size: 0.8125rem;"><%= @linked_notes.count %></span>
+        </div>
+        <% @linked_notes.first(5).each do |note| %>
+          <a href="<%= note_path(note["id"]) %>" class="activity-item">
+            <span class="activity-icon activity-icon-note">
+              <span class="material-icons-outlined">description</span>
+            </span>
+            <div class="activity-content">
+              <span class="activity-title"><%= note["title"].presence || "Untitled" %></span>
+              <span class="activity-detail text-muted"><%= note.dig("notebook", "name") || "Note" %></span>
+            </div>
+            <span class="activity-time"><%= time_ago_short(note["updated_at"]) if note["updated_at"] %></span>
+          </a>
+        <% end %>
+        <div style="padding: 0.375rem 1.25rem;">
+          <%= link_to new_note_path(
+            "note[title]" => "#{@trade["symbol"]} - #{@trade["side"]&.capitalize} Trade Notes",
+            "note[content]" => "Trade: #{@trade["symbol"]} #{@trade["side"]&.capitalize}\nEntry: #{@trade["entry_price"]}\nP&L: #{@trade["pnl"]}\n\n"
+          ), class: "btn btn-sm", style: "width: 100%; justify-content: center;" do %>
+            <span class="material-icons-outlined" style="font-size: 1rem;">note_add</span> New Note for <%= @trade["symbol"] %>
+          <% end %>
+        </div>
+      </div>
+    <% elsif notes_api_token.present? %>
+      <div class="card">
+        <div class="card-header">
+          <h2>Related Notes</h2>
+        </div>
+        <div style="padding: 0.75rem 1.25rem;">
+          <p class="text-muted" style="font-size: 0.875rem; margin-bottom: 0.5rem;">No notes found for "<%= @trade["symbol"] %>".</p>
+          <%= link_to new_note_path(
+            "note[title]" => "#{@trade["symbol"]} - #{@trade["side"]&.capitalize} Trade Notes",
+            "note[content]" => "Trade: #{@trade["symbol"]} #{@trade["side"]&.capitalize}\nEntry: #{@trade["entry_price"]}\nP&L: #{@trade["pnl"]}\n\n"
+          ), class: "btn btn-sm", style: "width: 100%; justify-content: center;" do %>
+            <span class="material-icons-outlined" style="font-size: 1rem;">note_add</span> Create Note
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @related_trades.present? && @related_trades.any? %>
+      <div class="card">
+        <div class="card-header">
+          <h2><%= @trade["symbol"] %> History</h2>
+        </div>
+        <% @related_trades.each do |rt| %>
+          <a href="<%= trade_path(rt["id"]) %>" class="activity-item">
+            <span class="activity-icon activity-icon-trade">
+              <span class="material-icons-outlined"><%= rt["pnl"].to_f >= 0 ? "trending_up" : "trending_down" %></span>
+            </span>
+            <div class="activity-content">
+              <span class="activity-title"><%= rt["side"]&.capitalize %></span>
+              <span class="activity-detail <%= pnl_class(rt["pnl"]) %>"><%= number_to_currency(rt["pnl"]) %></span>
+            </div>
+            <span class="activity-time"><%= Date.parse(rt["entry_time"]).strftime("%b %d") if rt["entry_time"] %></span>
+          </a>
+        <% end %>
       </div>
     <% end %>
 

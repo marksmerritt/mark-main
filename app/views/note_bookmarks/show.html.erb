@@ -1,0 +1,345 @@
+<% content_for(:title) { "Bookmarks" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #ff8f00;">bookmarks</span>
+    Bookmarks
+  </h1>
+  <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem;">
+    Your most important and frequently referenced notes at a glance
+  </p>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Pinned Notes</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #ff8f00;"><%= @total_pinned %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Favorites</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #e53935;"><%= @total_favorites %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notebooks</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #1565c0;"><%= @total_notebooks %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Quick Notes</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #00897b;"><%= @total_quick %></div>
+    </div>
+  </div>
+</div>
+
+<%# Pinned Notes %>
+<% if @pinned_notes.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff8f00;">push_pin</span> Pinned Notes</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @pinned_notes.count %> pinned</span>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem;">
+        <% @pinned_notes.each do |note| %>
+          <div style="border: 2px solid #ff8f00; border-radius: 8px; padding: 1rem; background: var(--bg-card); position: relative;">
+            <span class="material-icons-outlined" style="position: absolute; top: 0.5rem; right: 0.5rem; font-size: 0.875rem; color: #ff8f00;">push_pin</span>
+            <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.375rem; padding-right: 1.25rem;">
+              <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--text); text-decoration: none;" %>
+            </div>
+            <% if note["content"].present? %>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                <%= note["content"].to_s.gsub(/[#*_\[\]()]/, "").strip.truncate(120) %>
+              </div>
+            <% end %>
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+              <span style="font-size: 0.625rem; color: var(--text-secondary);">
+                <%= note["word_count"].to_i %> words
+              </span>
+              <% if note["favorited"] || note["is_favorited"] %>
+                <span class="material-icons-outlined" style="font-size: 0.75rem; color: #e53935;">star</span>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Favorite Notes %>
+<% if @favorite_notes.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e53935;">star</span> Favorites</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @favorite_notes.count %> favorited</span>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 0.75rem;">
+        <% @favorite_notes.each do |note| %>
+          <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; background: var(--bg-card); position: relative;">
+            <span class="material-icons-outlined" style="position: absolute; top: 0.5rem; right: 0.5rem; font-size: 0.875rem; color: #e53935;">star</span>
+            <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.375rem; padding-right: 1.25rem;">
+              <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--text); text-decoration: none;" %>
+            </div>
+            <% if note["content"].present? %>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                <%= note["content"].to_s.gsub(/[#*_\[\]()]/, "").strip.truncate(120) %>
+              </div>
+            <% end %>
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+              <span style="font-size: 0.625rem; color: var(--text-secondary);">
+                <%= note["word_count"].to_i %> words
+              </span>
+              <% if note["pinned"] || note["is_pinned"] %>
+                <span class="material-icons-outlined" style="font-size: 0.75rem; color: #ff8f00;">push_pin</span>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Recently Updated %>
+<% if @recently_updated.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1565c0;">update</span> Recently Updated</h2>
+    </div>
+    <div style="padding: 0.5rem 1.25rem;">
+      <% @recently_updated.each_with_index do |note, i| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0; <%= 'border-bottom: 1px solid var(--border);' unless i == @recently_updated.length - 1 %>">
+          <span class="material-icons-outlined" style="font-size: 1rem; color: #1565c0;">description</span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 0.8125rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--text); text-decoration: none;" %>
+            </div>
+          </div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); white-space: nowrap;">
+            <%= note["updated_at"].to_s.slice(0, 10) %>
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); min-width: 50px; text-align: right;">
+            <%= note["word_count"].to_i %> words
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Recently Created %>
+<% if @recently_created.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #4caf50;">add_circle</span> Recently Created</h2>
+    </div>
+    <div style="padding: 0.5rem 1.25rem;">
+      <% @recently_created.each_with_index do |note, i| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0; <%= 'border-bottom: 1px solid var(--border);' unless i == @recently_created.length - 1 %>">
+          <span class="material-icons-outlined" style="font-size: 1rem; color: #4caf50;">note_add</span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 0.8125rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--text); text-decoration: none;" %>
+            </div>
+          </div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); white-space: nowrap;">
+            <%= note["created_at"].to_s.slice(0, 10) %>
+          </div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); min-width: 50px; text-align: right;">
+            <%= note["word_count"].to_i %> words
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Reference Shelf — Book Spine Visual %>
+<% if @most_substantial.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #6a1b9a;">local_library</span> Reference Shelf</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Top 10 longest notes — your reference materials</span>
+    </div>
+    <div style="padding: 1.25rem;">
+      <%
+        shelf_colors = ["#1565c0", "#c62828", "#2e7d32", "#e65100", "#6a1b9a", "#00838f", "#ef6c00", "#283593", "#ad1457", "#4e342e"]
+        max_words = @most_substantial.map { |n| n["word_count"].to_i }.max
+        max_words = [max_words, 1].max
+      %>
+      <div style="display: flex; align-items: flex-end; gap: 6px; padding: 1rem 0.5rem; background: linear-gradient(to top, var(--border) 0px, var(--border) 4px, transparent 4px); min-height: 220px; overflow-x: auto;">
+        <% @most_substantial.each_with_index do |note, i| %>
+          <%
+            word_count = note["word_count"].to_i
+            height_pct = (word_count.to_f / max_words * 100).clamp(30, 100)
+            spine_height = (height_pct * 1.8 + 40).round
+            color = shelf_colors[i % shelf_colors.length]
+          %>
+          <%= link_to note_path(note["id"]), style: "text-decoration: none; color: inherit; display: block;" do %>
+            <div style="width: 48px; height: <%= spine_height %>px; background: <%= color %>; border-radius: 3px 3px 0 0; display: flex; align-items: center; justify-content: center; position: relative; cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; box-shadow: 2px 2px 4px rgba(0,0,0,0.15);"
+                 onmouseover="this.style.transform='translateY(-6px)'; this.style.boxShadow='3px 6px 12px rgba(0,0,0,0.25)';"
+                 onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='2px 2px 4px rgba(0,0,0,0.15)';"
+                 title="<%= (note['title'].presence || 'Untitled') %> (<%= word_count %> words)">
+              <div style="writing-mode: vertical-rl; text-orientation: mixed; transform: rotate(180deg); font-size: 0.5625rem; font-weight: 600; color: #fff; letter-spacing: 0.02em; overflow: hidden; text-overflow: ellipsis; max-height: <%= spine_height - 16 %>px; padding: 4px 2px; white-space: nowrap;">
+                <%= (note["title"].presence || "Untitled").truncate(30) %>
+              </div>
+              <div style="position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); font-size: 0.5rem; color: rgba(255,255,255,0.7); white-space: nowrap;">
+                <%= word_count %>
+              </div>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Quick Notes %>
+<% if @quick_notes.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00897b;">bolt</span> Quick Notes</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Short snippets under 50 words</span>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.625rem;">
+        <% @quick_notes.each do |note| %>
+          <div style="border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem; background: var(--bg); font-size: 0.8125rem;">
+            <div style="font-weight: 600; margin-bottom: 0.25rem;">
+              <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--text); text-decoration: none;" %>
+            </div>
+            <% if note["content"].present? %>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                <%= note["content"].to_s.gsub(/[#*_\[\]()]/, "").strip.truncate(100) %>
+              </div>
+            <% end %>
+            <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.375rem;">
+              <%= note["word_count"].to_i %> words
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Tag Cloud %>
+<% if @tag_cloud.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7b1fa2;">label</span> Tag Cloud</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @tag_cloud.keys.count %> tags</span>
+    </div>
+    <div style="padding: 1.25rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: center;">
+      <%
+        max_tag_count = @tag_cloud.values.max || 1
+        min_tag_count = @tag_cloud.values.min || 1
+        tag_colors = ["#1565c0", "#c62828", "#2e7d32", "#e65100", "#6a1b9a", "#00838f", "#ad1457", "#ef6c00", "#283593", "#4e342e"]
+      %>
+      <% @tag_cloud.each_with_index do |(tag_name, count), i| %>
+        <%
+          range = max_tag_count - min_tag_count
+          ratio = range > 0 ? (count - min_tag_count).to_f / range : 0.5
+          font_size = (0.6875 + ratio * 0.8125).round(4)
+          opacity = (0.6 + ratio * 0.4).round(2)
+          color = tag_colors[i % tag_colors.length]
+        %>
+        <span style="font-size: <%= font_size %>rem; font-weight: <%= ratio > 0.5 ? 600 : 400 %>; color: <%= color %>; opacity: <%= opacity %>; padding: 0.125rem 0.375rem; cursor: default; white-space: nowrap;"
+              title="<%= count %> note<%= count == 1 ? '' : 's' %>">
+          <%= tag_name %><sup style="font-size: 0.5em; opacity: 0.7;"><%= count %></sup>
+        </span>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Activity Heatmap %>
+<% if @activity_heatmap.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ef6c00;">local_fire_department</span> Activity Heatmap</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Notes updated by month (last 12 months)</span>
+    </div>
+    <div style="padding: 1.25rem;">
+      <%
+        max_activity = @activity_heatmap.values.max || 1
+        max_activity = [max_activity, 1].max
+      %>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 0.625rem;">
+        <% @activity_heatmap.each do |month_key, count| %>
+          <%
+            intensity = count.to_f / max_activity
+            if count == 0
+              bg_color = "var(--bg)"
+              text_color = "var(--text-secondary)"
+            elsif intensity < 0.25
+              bg_color = "rgba(239, 108, 0, 0.15)"
+              text_color = "#ef6c00"
+            elsif intensity < 0.5
+              bg_color = "rgba(239, 108, 0, 0.3)"
+              text_color = "#e65100"
+            elsif intensity < 0.75
+              bg_color = "rgba(239, 108, 0, 0.5)"
+              text_color = "#bf360c"
+            else
+              bg_color = "rgba(239, 108, 0, 0.75)"
+              text_color = "#fff"
+            end
+            month_label = begin
+              Date.parse("#{month_key}-01").strftime("%b %Y")
+            rescue
+              month_key
+            end
+          %>
+          <div style="border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 0.5rem; text-align: center; background: <%= bg_color %>;">
+            <div style="font-size: 0.625rem; color: <%= text_color %>; text-transform: uppercase; font-weight: 500;"><%= month_label %></div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: <%= text_color %>;"><%= count %></div>
+            <div style="font-size: 0.5625rem; color: <%= text_color %>; opacity: 0.7;">notes</div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# By Notebook %>
+<% if @by_notebook.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #455a64;">collections_bookmark</span> By Notebook</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Avg <%= @avg_per_notebook %> notes per notebook</span>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
+        <% @by_notebook.each do |notebook_name, notes| %>
+          <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; background: var(--bg-card);">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.625rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; color: #455a64;">book</span>
+              <span style="font-size: 0.875rem; font-weight: 600;"><%= notebook_name %></span>
+              <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: auto;"><%= notes.count %> notes</span>
+            </div>
+            <% notes.first(5).each do |note| %>
+              <div style="font-size: 0.75rem; padding: 0.25rem 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--text-secondary); text-decoration: none;" %>
+              </div>
+            <% end %>
+            <% if notes.count > 5 %>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                +<%= notes.count - 5 %> more
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Nav %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Notes", notes_path, class: "btn" %>
+  <%= link_to "Connections", note_links_path, class: "btn" %>
+  <%= link_to "Maintenance", note_maintenance_path, class: "btn" %>
+</div>

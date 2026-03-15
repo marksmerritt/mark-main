@@ -1,0 +1,322 @@
+<% content_for(:title) { "Session Analyzer" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #4527a0;">view_timeline</span>
+    Trading Session Analyzer
+  </h1>
+</div>
+
+<% if @trades.blank? || @sessions.blank? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem; color: #4527a0;">view_timeline</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Not enough trading data</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades with P&amp;L to analyze your trading sessions.</div>
+  </div>
+<% else %>
+
+  <%# ── Stats Strip ── %>
+  <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #4527a0;"><%= @total_sessions %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Total Sessions</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @avg_session_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@avg_session_pnl) %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Avg Session P&amp;L</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@best_session[:total_pnl]) %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Best Session</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @best_session[:date].strftime("%b %d") %></div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @session_win_rate >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @session_win_rate %>%</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Win %</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @positive_sessions %>W / <%= @negative_sessions %>L</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #4527a0;"><%= @session_streak %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Session Streak</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">consecutive wins</div>
+    </div>
+  </div>
+
+  <%# ── Optimal Session Length ── %>
+  <% if @pnl_by_trade_count.any? %>
+    <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #4527a0;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #4527a0;">bar_chart</span>
+          Optimal Session Length
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Average P&amp;L by number of trades per session. Find your optimal daily trade count.
+        </div>
+        <%
+          max_abs = @pnl_by_trade_count.map { |d| d[:avg_pnl].abs }.max
+          max_abs = 1 if max_abs == 0
+          chart_height = 160
+          best_bucket = @pnl_by_trade_count.max_by { |d| d[:avg_pnl] }
+        %>
+        <div style="display: flex; align-items: flex-end; gap: 0.25rem; height: <%= chart_height %>px; padding-bottom: 1.5rem; position: relative;">
+          <%# Zero line %>
+          <div style="position: absolute; left: 0; right: 0; bottom: calc(1.5rem + <%= chart_height / 2 %>px); height: 1px; background: var(--border); z-index: 1;"></div>
+          <% @pnl_by_trade_count.each do |d| %>
+            <%
+              bar_pct = (d[:avg_pnl].abs / max_abs * 50).round(1)
+              is_positive = d[:avg_pnl] >= 0
+              bar_color = is_positive ? "var(--positive)" : "var(--negative)"
+              is_best = d == best_bucket
+              bar_bottom = is_positive ? 50 : (50 - bar_pct)
+            %>
+            <div style="flex: 1; position: relative; height: 100%;">
+              <div style="position: absolute; bottom: <%= bar_bottom %>%; left: 10%; width: 80%; height: <%= bar_pct %>%; background: <%= bar_color %>; opacity: <%= is_best ? '1' : '0.6' %>; border-radius: 3px 3px 0 0; transition: opacity 0.2s;" title="<%= d[:trade_count] %> trades/day: avg P&L <%= number_to_currency(d[:avg_pnl]) %> (<%= d[:session_count] %> sessions)"></div>
+              <div style="position: absolute; bottom: 0; left: 0; right: 0; text-align: center; font-size: 0.6875rem; font-weight: 600; color: var(--text-secondary);"><%= d[:trade_count] %></div>
+              <% if is_best %>
+                <div style="position: absolute; top: 0; left: 0; right: 0; text-align: center; font-size: 0.625rem; color: #4527a0; font-weight: 700;">BEST</div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+        <div style="text-align: center; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Trades per session</div>
+        <% if best_bucket %>
+          <div style="margin-top: 1rem; padding: 0.75rem 1rem; background: rgba(69, 39, 160, 0.06); border-radius: 0.5rem; font-size: 0.8125rem; border-left: 4px solid #4527a0;">
+            <strong>Optimal:</strong> Sessions with <strong><%= best_bucket[:trade_count] %></strong> trade<%= best_bucket[:trade_count] == 1 ? "" : "s" %> averaged <strong style="color: var(--positive);"><%= number_to_currency(best_bucket[:avg_pnl]) %></strong> P&amp;L across <strong><%= best_bucket[:session_count] %></strong> sessions.
+            Your average is <strong><%= @avg_trades_per_session %></strong> trades/day.
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── First Trade Analysis ── %>
+  <% if @first_trade_stats && @first_trade_stats[:first_count] > 0 %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #4527a0;">first_page</span>
+          First Trade of Day Analysis
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+          <div style="padding: 1rem; background: var(--bg); border-radius: 0.5rem; text-align: center;">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.375rem;">First Trade</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: <%= @first_trade_stats[:first_avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@first_trade_stats[:first_avg_pnl]) %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= @first_trade_stats[:first_win_rate] %>% win rate &middot; <%= @first_trade_stats[:first_count] %> days</div>
+          </div>
+          <div style="padding: 1rem; background: var(--bg); border-radius: 0.5rem; text-align: center;">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.375rem;">Rest of Session</div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: <%= @first_trade_stats[:rest_avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@first_trade_stats[:rest_avg_pnl]) %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">avg total from remaining trades</div>
+          </div>
+        </div>
+        <%
+          first_better = @first_trade_stats[:first_avg_pnl] > @first_trade_stats[:rest_avg_pnl]
+        %>
+        <div style="margin-top: 1rem; padding: 0.75rem 1rem; background: rgba(69, 39, 160, 0.06); border-radius: 0.5rem; font-size: 0.8125rem; border-left: 4px solid #4527a0;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #4527a0;">lightbulb</span>
+          <% if first_better %>
+            Your first trade tends to outperform subsequent trades. Consider sizing up on your opening trade and being more selective afterwards.
+          <% else %>
+            You tend to warm up during the session. Your later trades outperform the first one. Allow yourself time to read the market before committing size.
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Session History Table ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #4527a0;">table_chart</span>
+        Session History
+      </h2>
+    </div>
+    <div style="padding: 0 0 0.5rem; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr>
+            <th style="padding: 0.625rem 0.75rem; text-align: left; border-bottom: 2px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Date</th>
+            <th style="padding: 0.625rem 0.5rem; text-align: center; border-bottom: 2px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Trades</th>
+            <th style="padding: 0.625rem 0.5rem; text-align: right; border-bottom: 2px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">P&amp;L</th>
+            <th style="padding: 0.625rem 0.5rem; text-align: center; border-bottom: 2px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</th>
+            <th style="padding: 0.625rem 0.5rem; text-align: center; border-bottom: 2px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">R-Multiple</th>
+            <th style="padding: 0.625rem 0.5rem; text-align: center; border-bottom: 2px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Duration</th>
+            <th style="padding: 0.625rem 0.5rem; text-align: center; border-bottom: 2px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Grade</th>
+            <th style="padding: 0.625rem 0.5rem; text-align: center; border-bottom: 2px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Flags</th>
+            <th style="padding: 0.625rem 0.5rem; text-align: center; border-bottom: 2px solid var(--border); font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Trend</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @sessions.reverse_each do |s| %>
+            <%
+              grade_color = case s[:grade]
+                            when "A" then "var(--positive)"
+                            when "B" then "#4527a0"
+                            when "C" then "#fbbc04"
+                            when "D" then "#ff5722"
+                            else "var(--negative)"
+                            end
+              dur = s[:duration_minutes]
+              duration_str = if dur >= 60
+                "#{dur / 60}h #{dur % 60}m"
+              else
+                "#{dur}m"
+              end
+            %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem 0.75rem; font-weight: 600;"><%= s[:date].strftime("%b %d, %Y") %></td>
+              <td style="padding: 0.5rem; text-align: center;"><%= s[:trade_count] %></td>
+              <td style="padding: 0.5rem; text-align: right; font-weight: 700; color: <%= s[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(s[:total_pnl]) %></td>
+              <td style="padding: 0.5rem; text-align: center;">
+                <span style="color: <%= s[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= s[:win_rate] %>%</span>
+              </td>
+              <td style="padding: 0.5rem; text-align: center;">
+                <% if s[:net_r] %>
+                  <span style="color: <%= s[:net_r] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= s[:net_r] %>R</span>
+                <% else %>
+                  <span style="color: var(--text-secondary);">&mdash;</span>
+                <% end %>
+              </td>
+              <td style="padding: 0.5rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);"><%= duration_str %></td>
+              <td style="padding: 0.5rem; text-align: center;">
+                <span style="display: inline-block; width: 1.75rem; height: 1.75rem; line-height: 1.75rem; border-radius: 50%; font-size: 0.75rem; font-weight: 700; color: #fff; background: <%= grade_color %>;"><%= s[:grade] %></span>
+              </td>
+              <td style="padding: 0.5rem; text-align: center;">
+                <% if s[:overtrading] %>
+                  <span style="font-size: 0.625rem; padding: 0.125rem 0.375rem; background: #ff5722; color: #fff; border-radius: 0.75rem; font-weight: 600; white-space: nowrap;" title="More trades than 1.5x your average">OVERTRADE</span>
+                <% end %>
+                <% if s[:tilt_detected] %>
+                  <span style="font-size: 0.625rem; padding: 0.125rem 0.375rem; background: var(--negative); color: #fff; border-radius: 0.75rem; font-weight: 600; white-space: nowrap; margin-left: 0.125rem;" title="Performance degraded after losses">TILT</span>
+                <% end %>
+              </td>
+              <td style="padding: 0.5rem; text-align: center;">
+                <% if s[:progression] == :improving %>
+                  <span class="material-icons-outlined" style="font-size: 1rem; color: var(--positive);" title="P&L improved through session">trending_up</span>
+                <% elsif s[:progression] == :deteriorating %>
+                  <span class="material-icons-outlined" style="font-size: 1rem; color: var(--negative);" title="P&L deteriorated through session">trending_down</span>
+                <% else %>
+                  <span class="material-icons-outlined" style="font-size: 1rem; color: var(--text-secondary);" title="Flat progression">trending_flat</span>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# ── Tilt Detection Section ── %>
+  <% if @tilt_sessions.any? %>
+    <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid var(--negative);">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">warning</span>
+          Tilt Detection
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Sessions where performance degraded after losses. <strong><%= @tilt_sessions.count %></strong> of <strong><%= @total_sessions %></strong> sessions (<%= (@tilt_sessions.count.to_f / @total_sessions * 100).round(0) %>%) showed signs of tilt.
+        </div>
+        <div style="display: grid; gap: 0.5rem;">
+          <% @tilt_sessions.sort_by { |s| s[:total_pnl] }.first(10).each do |s| %>
+            <div style="display: flex; align-items: center; gap: 1rem; padding: 0.625rem 0.75rem; background: var(--bg); border-radius: 0.5rem; border-left: 4px solid var(--negative);">
+              <span style="font-weight: 600; font-size: 0.8125rem; min-width: 5.5rem;"><%= s[:date].strftime("%b %d, %Y") %></span>
+              <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= s[:trade_count] %> trades</span>
+              <span style="font-weight: 700; font-size: 0.8125rem; color: var(--negative);"><%= number_to_currency(s[:total_pnl]) %></span>
+              <span style="font-size: 0.75rem; color: var(--text-secondary);">Win rate: <%= s[:win_rate] %>%</span>
+              <%# Mini sparkline of cumulative P&L %>
+              <% if s[:cumulative_pnl].length >= 2 %>
+                <%
+                  points = s[:cumulative_pnl]
+                  spark_w = 80
+                  spark_h = 24
+                  min_v = points.min
+                  max_v = points.max
+                  range = max_v - min_v
+                  range = 1 if range == 0
+                  coords = points.each_with_index.map { |v, i|
+                    x = (i.to_f / (points.length - 1) * spark_w).round(1)
+                    y = (spark_h - ((v - min_v) / range * spark_h)).round(1)
+                    "#{x},#{y}"
+                  }.join(" ")
+                %>
+                <svg width="<%= spark_w %>" height="<%= spark_h %>" style="flex-shrink: 0;">
+                  <polyline points="<%= coords %>" fill="none" stroke="var(--negative)" stroke-width="1.5" stroke-linejoin="round"/>
+                </svg>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+        <div style="margin-top: 1rem; padding: 0.75rem 1rem; background: rgba(211, 47, 47, 0.06); border-radius: 0.5rem; font-size: 0.8125rem; border-left: 4px solid var(--negative);">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--negative);">psychology</span>
+          <strong>Tip:</strong> When you notice losses compounding, step away for 15 minutes. Set a hard daily loss limit and honor it. The best trade after a loss is often no trade.
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Session Grade Distribution ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #4527a0;">grading</span>
+        Session Grade Distribution
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <%
+        max_grade_count = @grade_distribution.map { |g| g[:count] }.max
+        max_grade_count = 1 if max_grade_count == 0
+        grade_colors = { "A" => "var(--positive)", "B" => "#4527a0", "C" => "#fbbc04", "D" => "#ff5722", "F" => "var(--negative)" }
+      %>
+      <div style="display: flex; align-items: flex-end; gap: 1.5rem; height: 120px; padding-bottom: 1.5rem;">
+        <% @grade_distribution.each do |g| %>
+          <%
+            bar_pct = (g[:count].to_f / max_grade_count * 100).round(1)
+            color = grade_colors[g[:grade]] || "var(--text-secondary)"
+          %>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end;">
+            <div style="font-size: 0.75rem; font-weight: 700; color: <%= color %>; margin-bottom: 0.25rem;"><%= g[:count] %></div>
+            <div style="width: 100%; max-width: 3rem; height: <%= bar_pct %>%; background: <%= color %>; opacity: 0.7; border-radius: 4px 4px 0 0; min-height: 2px;"></div>
+            <div style="margin-top: 0.375rem; font-size: 0.875rem; font-weight: 700; color: <%= color %>;"><%= g[:grade] %></div>
+          </div>
+        <% end %>
+      </div>
+      <%
+        a_b_count = @grade_distribution.select { |g| %w[A B].include?(g[:grade]) }.sum { |g| g[:count] }
+        a_b_pct = @total_sessions > 0 ? (a_b_count.to_f / @total_sessions * 100).round(0) : 0
+      %>
+      <div style="margin-top: 0.5rem; font-size: 0.8125rem; color: var(--text-secondary); text-align: center;">
+        <strong><%= a_b_pct %>%</strong> of sessions graded A or B &middot;
+        <strong><%= @grade_distribution.find { |g| g[:grade] == "F" }&.dig(:count) || 0 %></strong> sessions failed
+      </div>
+    </div>
+  </div>
+
+<% end %>
+
+<%# ── Bottom Nav ── %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to account_summary_path, class: "btn" do %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">account_balance</span> Account Summary<% end %>
+  <%= link_to edge_finder_path, class: "btn" do %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">gps_fixed</span> Edge Finder<% end %>
+  <%= link_to trading_mentor_path, class: "btn" do %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">psychology</span> Mentor<% end %>
+</div>
+
+<style>
+  @media (max-width: 640px) {
+    div[style*="grid-template-columns: repeat(5"] { grid-template-columns: repeat(2, 1fr) !important; }
+    div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+  }
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>

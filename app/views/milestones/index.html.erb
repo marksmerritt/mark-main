@@ -1,0 +1,198 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #f9ab00;">emoji_events</span>
+    Trading Milestones
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Dashboard", root_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Progress overview %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="padding: 1.5rem; text-align: center;">
+    <div style="display: flex; align-items: center; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-bottom: 1rem;">
+      <%# Progress ring %>
+      <svg viewBox="0 0 100 100" style="width: 120px; transform: rotate(-90deg);">
+        <circle cx="50" cy="50" r="40" fill="none" stroke="var(--border)" stroke-width="8" />
+        <circle cx="50" cy="50" r="40" fill="none" stroke="#f9ab00" stroke-width="8"
+                stroke-dasharray="<%= (251.3 * @progress / 100).round(1) %> 251.3"
+                stroke-linecap="round" />
+      </svg>
+      <div>
+        <div style="font-size: 2.5rem; font-weight: 700; color: #f9ab00;"><%= @unlocked %><span style="font-size: 1rem; color: var(--text-secondary); font-weight: 400;"> / <%= @total_milestones %></span></div>
+        <div style="font-size: 0.875rem; color: var(--text-secondary);">Milestones Unlocked</div>
+        <div style="font-size: 1.125rem; font-weight: 600; margin-top: 0.25rem;"><%= @progress %>% Complete</div>
+      </div>
+    </div>
+
+    <%# Quick stats %>
+    <div style="display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; padding-top: 1rem; border-top: 1px solid var(--border);">
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Total Trades</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= @total_trades %></div>
+      </div>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Total P&L</div>
+        <div style="font-size: 1.125rem; font-weight: 700;" class="<%= @total_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(@total_pnl) %></div>
+      </div>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Win Rate</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= @win_rate.round(1) %>%</div>
+      </div>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Best Streak</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: var(--positive);"><%= @max_win_streak %>W</div>
+      </div>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Symbols</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= @symbols_traded %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Recently unlocked %>
+<% recent_unlocked = @milestones.select { |m| m[:unlocked] }.last(3) %>
+<% if recent_unlocked.any? %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 3px solid #f9ab00;">
+    <div style="padding: 0.75rem 1.25rem;">
+      <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.5rem;">
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px; color: #f9ab00;">celebration</span>
+        Latest Achievements
+      </div>
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <% recent_unlocked.each do |m| %>
+          <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0.75rem; background: rgba(249,171,0,0.08); border-radius: var(--radius);">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: #f9ab00;"><%= m[:icon] %></span>
+            <div>
+              <div style="font-size: 0.8125rem; font-weight: 600;"><%= m[:name] %></div>
+              <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= m[:description] %></div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Milestone categories %>
+<%
+  category_icons = {
+    "Volume" => "bar_chart",
+    "Profit" => "payments",
+    "Performance" => "emoji_events",
+    "Streaks" => "local_fire_department",
+    "Diversity" => "donut_small",
+    "Discipline" => "school",
+    "Big Moves" => "rocket_launch"
+  }
+  category_colors = {
+    "Volume" => "#1a73e8",
+    "Profit" => "#0d904f",
+    "Performance" => "#f9ab00",
+    "Streaks" => "#d93025",
+    "Diversity" => "#9334e6",
+    "Discipline" => "#00bcd4",
+    "Big Moves" => "#e8710a"
+  }
+%>
+
+<% @by_category.each do |category, milestones| %>
+  <%
+    cat_unlocked = milestones.count { |m| m[:unlocked] }
+    cat_total = milestones.count
+    cat_color = category_colors[category] || "var(--primary)"
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: <%= cat_color %>;"><%= category_icons[category] %></span>
+        <%= category %>
+      </h2>
+      <span style="font-size: 0.8125rem; font-weight: 600; color: <%= cat_color %>;"><%= cat_unlocked %> / <%= cat_total %></span>
+    </div>
+    <div style="padding: 0;">
+      <% milestones.each do |m| %>
+        <%
+          progress = if m[:threshold] > 0
+                       [(m[:current].to_f / m[:threshold] * 100), 100].min.round(0)
+                     else
+                       m[:unlocked] ? 100 : 0
+                     end
+          display_current = case m[:format]
+                            when :currency then number_to_currency(m[:current])
+                            when :pct then "#{m[:current]}%"
+                            else m[:current].to_s
+                            end
+          display_threshold = case m[:format]
+                              when :currency then number_to_currency(m[:threshold])
+                              when :pct then "#{m[:threshold]}%"
+                              else m[:threshold].to_s
+                              end
+        %>
+        <div style="display: flex; align-items: center; gap: 1rem; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);
+                    <%= m[:unlocked] ? '' : 'opacity: 0.6;' %>">
+          <%# Icon %>
+          <div style="width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+                      background: <%= m[:unlocked] ? "#{cat_color}20" : 'var(--bg)' %>;
+                      border: 2px solid <%= m[:unlocked] ? cat_color : 'var(--border)' %>;">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= m[:unlocked] ? cat_color : 'var(--text-secondary)' %>;">
+              <%= m[:unlocked] ? 'check' : m[:icon] %>
+            </span>
+          </div>
+
+          <%# Info %>
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 0.875rem; font-weight: 600;"><%= m[:name] %></span>
+              <% if m[:unlocked] %>
+                <span style="font-size: 0.5625rem; padding: 0.0625rem 0.375rem; background: <%= cat_color %>20; color: <%= cat_color %>; border-radius: 3px; font-weight: 600;">UNLOCKED</span>
+              <% end %>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= m[:description] %></div>
+          </div>
+
+          <%# Progress %>
+          <div style="min-width: 120px; text-align: right;">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+              <%= display_current %> / <%= display_threshold %>
+            </div>
+            <div style="height: 5px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+              <div style="height: 100%; width: <%= progress %>%; background: <%= m[:unlocked] ? cat_color : 'var(--border)' %>; border-radius: 3px; transition: width 0.3s;"></div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Next milestone to unlock %>
+<% next_milestone = @milestones.reject { |m| m[:unlocked] }.min_by { |m| m[:threshold] > 0 ? (m[:current].to_f / m[:threshold]) : 0 } %>
+<% if next_milestone %>
+  <%
+    next_progress = next_milestone[:threshold] > 0 ? (next_milestone[:current].to_f / next_milestone[:threshold] * 100).round(0) : 0
+    next_remaining = case next_milestone[:format]
+                     when :currency then number_to_currency([next_milestone[:threshold] - next_milestone[:current].to_f, 0].max)
+                     when :pct then "#{(next_milestone[:threshold] - next_milestone[:current].to_f).round(1)}%"
+                     else ([next_milestone[:threshold] - next_milestone[:current].to_i, 0].max).to_s
+                     end
+  %>
+  <div class="card" style="border-left: 3px solid var(--primary);">
+    <div style="padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary);">flag</span>
+      <div style="flex: 1;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Next Milestone</div>
+        <div style="font-size: 1rem; font-weight: 700;"><%= next_milestone[:name] %></div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);"><%= next_milestone[:description] %> &mdash; <%= next_remaining %> to go</div>
+      </div>
+      <div style="min-width: 100px;">
+        <div style="height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: <%= next_progress %>%; background: var(--primary); border-radius: 4px;"></div>
+        </div>
+        <div style="font-size: 0.6875rem; text-align: center; margin-top: 0.25rem;"><%= next_progress %>%</div>
+      </div>
+    </div>
+  </div>
+<% end %>

@@ -1,0 +1,237 @@
+<div class="page-header">
+  <h1><span class="material-icons-outlined" style="vertical-align: middle; margin-right: 0.25rem;">store</span> Merchant Insights</h1>
+</div>
+
+<%# Time filter %>
+<div class="card" style="margin-bottom: 1rem;">
+  <%= form_with url: budget_merchant_insights_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :months, "Time Period" %>
+        <%= f.select :months, [["3 Months", 3], ["6 Months", 6], ["12 Months", 12], ["All Time", 24]],
+            { selected: @months }, class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :sort, "Sort By" %>
+        <%= f.select :sort, [["Total Spent", "total"], ["Transactions", "count"], ["Avg Transaction", "avg"],
+            ["Name", "name"], ["Frequency", "frequency"], ["Trend", "trend"]],
+            { selected: @sort }, class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @merchants.present? %>
+  <%# Summary strip %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Merchants</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_merchants %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Spent</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(@total_spending) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg per Merchant</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@avg_per_merchant) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">New This Month</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);"><%= @new_merchants.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Churned</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= @churned_merchants.count %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Spending Concentration %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Spending Concentration</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.75rem;">
+        <div style="flex: 1;">
+          <div class="budget-progress-bar" style="height: 1.25rem; border-radius: var(--radius);">
+            <div style="width: <%= @top5_concentration %>%; height: 100%; background: <%= @top5_concentration > 80 ? 'var(--negative)' : @top5_concentration > 60 ? '#f9ab00' : 'var(--positive)' %>; border-radius: var(--radius); transition: width 0.3s;"></div>
+          </div>
+        </div>
+        <div style="font-size: 1.25rem; font-weight: 700; min-width: 4rem; text-align: right;">
+          <span class="<%= @top5_concentration > 80 ? 'negative' : '' %>"><%= @top5_concentration %>%</span>
+        </div>
+      </div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+        Top 5 merchants account for <strong><%= @top5_concentration %>%</strong> of total spending.
+        <%= if @top5_concentration > 80
+              "Highly concentrated — most spending goes to very few merchants."
+            elsif @top5_concentration > 60
+              "Moderately concentrated — consider diversifying if these are discretionary."
+            else
+              "Well diversified across multiple merchants."
+            end %>
+      </div>
+    </div>
+  </div>
+
+  <%# SVG Horizontal Bar Chart — Top 15 Merchants %>
+  <%
+    chart_merchants = @merchants.sort_by { |m| -m[:total] }.first(15)
+    max_bar = chart_merchants.first&.dig(:total).to_f
+    max_bar = 1 if max_bar == 0
+    bar_height = 28
+    bar_gap = 6
+    label_width = 140
+    chart_width = 700
+    chart_height = chart_merchants.count * (bar_height + bar_gap) + 10
+    bar_colors = ["#1a73e8", "#0d904f", "#d93025", "#f9ab00", "#7b1fa2", "#00796b", "#c62828", "#1565c0", "#e8710a", "#9334e6",
+                  "#1a73e8", "#0d904f", "#d93025", "#f9ab00", "#7b1fa2"]
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Top 15 Merchants by Spending</h2></div>
+    <div style="padding: 1rem 1.25rem; overflow-x: auto;">
+      <svg viewBox="0 0 <%= chart_width %> <%= chart_height %>" style="width: 100%; max-width: <%= chart_width %>px; height: auto; font-family: Inter, sans-serif;">
+        <% chart_merchants.each_with_index do |m, i| %>
+          <%
+            y = i * (bar_height + bar_gap) + 5
+            bar_w = max_bar > 0 ? ((m[:total] / max_bar) * (chart_width - label_width - 100)).round(1) : 0
+            bar_w = [bar_w, 2].max
+          %>
+          <text x="<%= label_width - 8 %>" y="<%= y + bar_height / 2 + 4 %>" text-anchor="end" fill="var(--text)" font-size="11" font-weight="500">
+            <%= m[:name].truncate(18) %>
+          </text>
+          <rect x="<%= label_width %>" y="<%= y %>" width="<%= bar_w %>" height="<%= bar_height %>" rx="4" fill="<%= bar_colors[i] %>" opacity="0.8"/>
+          <text x="<%= label_width + bar_w + 6 %>" y="<%= y + bar_height / 2 + 4 %>" fill="var(--text)" font-size="11" font-weight="600">
+            <%= number_to_currency(m[:total]) %>
+          </text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+
+  <%# Merchant Table %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>All Merchants</h2></div>
+    <div style="overflow-x: auto;">
+      <table class="table">
+        <thead>
+          <tr>
+            <th><%= link_to "Merchant", budget_merchant_insights_path(months: @months, sort: "name"), style: "color: inherit; text-decoration: none;" %></th>
+            <th style="text-align: right;"><%= link_to "Transactions", budget_merchant_insights_path(months: @months, sort: "count"), style: "color: inherit; text-decoration: none;" %></th>
+            <th style="text-align: right;"><%= link_to "Total Spent", budget_merchant_insights_path(months: @months, sort: "total"), style: "color: inherit; text-decoration: none;" %></th>
+            <th style="text-align: right;"><%= link_to "Avg Transaction", budget_merchant_insights_path(months: @months, sort: "avg"), style: "color: inherit; text-decoration: none;" %></th>
+            <th><%= link_to "Frequency", budget_merchant_insights_path(months: @months, sort: "frequency"), style: "color: inherit; text-decoration: none;" %></th>
+            <th style="text-align: right;"><%= link_to "Trend", budget_merchant_insights_path(months: @months, sort: "trend"), style: "color: inherit; text-decoration: none;" %></th>
+            <th>Category</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @merchants.each do |m| %>
+            <tr>
+              <td>
+                <strong><%= m[:name] %></strong>
+                <% if m[:is_new] %>
+                  <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--primary); vertical-align: middle;" title="New this month">new_releases</span>
+                <% end %>
+              </td>
+              <td style="text-align: right;"><%= m[:count] %></td>
+              <td style="text-align: right;" class="negative"><%= number_to_currency(m[:total]) %></td>
+              <td style="text-align: right;"><%= number_to_currency(m[:avg]) %></td>
+              <td>
+                <%
+                  freq_colors = {
+                    "daily" => "background: #d93025; color: white;",
+                    "weekly" => "background: #e8710a; color: white;",
+                    "biweekly" => "background: #f9ab00; color: #333;",
+                    "monthly" => "background: #1a73e8; color: white;",
+                    "quarterly" => "background: #7b1fa2; color: white;",
+                    "occasional" => "background: var(--surface); color: var(--text); border: 1px solid var(--border);"
+                  }
+                %>
+                <span style="display: inline-block; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 500; <%= freq_colors[m[:frequency]] %>">
+                  <%= m[:frequency].capitalize %>
+                </span>
+              </td>
+              <td style="text-align: right;">
+                <% if m[:trend_direction] == "up" %>
+                  <span class="negative" style="display: inline-flex; align-items: center; gap: 0.125rem;">
+                    <span class="material-icons-outlined" style="font-size: 1rem;">trending_up</span>
+                    +<%= m[:trend_pct] %>%
+                  </span>
+                <% elsif m[:trend_direction] == "down" %>
+                  <span class="positive" style="display: inline-flex; align-items: center; gap: 0.125rem;">
+                    <span class="material-icons-outlined" style="font-size: 1rem;">trending_down</span>
+                    <%= m[:trend_pct] %>%
+                  </span>
+                <% else %>
+                  <span style="color: var(--text-secondary); font-size: 0.8125rem;">Flat</span>
+                <% end %>
+              </td>
+              <td><span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= m[:category] %></span></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# New Merchants %>
+  <% if @new_merchants.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="vertical-align: middle; margin-right: 0.25rem; color: var(--primary);">new_releases</span> New Merchants This Month</h2>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem;">
+          <% @new_merchants.each do |m| %>
+            <div style="padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); background: rgba(26,115,232,0.04);">
+              <div style="font-weight: 600; margin-bottom: 0.25rem;"><%= m[:name] %></div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                <%= m[:count] %> transaction<%= m[:count] != 1 ? "s" : "" %> &middot; <%= number_to_currency(m[:total]) %>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                <%= m[:category] %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Churned Merchants %>
+  <% if @churned_merchants.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="vertical-align: middle; margin-right: 0.25rem; color: var(--negative);">remove_circle</span> Churned Merchants</h2>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          Merchants you visited in previous months but not in the current month.
+        </p>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem;">
+          <% @churned_merchants.sort_by { |m| -m[:total] }.first(12).each do |m| %>
+            <div style="padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius); background: rgba(217,48,37,0.04);">
+              <div style="font-weight: 600; margin-bottom: 0.25rem;"><%= m[:name] %></div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                Last visit: <%= m[:last_date]&.strftime("%b %d, %Y") || "Unknown" %>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                <%= m[:count] %> past transaction<%= m[:count] != 1 ? "s" : "" %> &middot; <%= number_to_currency(m[:total]) %> total
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+<% else %>
+  <div class="card empty-state">
+    <p>No merchant data available for the selected period. Add transactions with merchant names to see insights.</p>
+  </div>
+<% end %>

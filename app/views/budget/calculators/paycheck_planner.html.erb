@@ -1,0 +1,424 @@
+<% content_for(:title) { "Paycheck Planner" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #2e7d32;">payments</span>
+    Paycheck Planner
+  </h1>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Paycheck</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@avg_paycheck) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @pay_frequency.capitalize %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Fixed Expenses</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@fixed_per_paycheck) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">per paycheck</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Variable Expenses</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #fb8c00;"><%= number_to_currency(@variable_per_paycheck) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">per paycheck</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Discretionary</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #1565c0;"><%= number_to_currency(@discretionary) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">per paycheck</div>
+    </div>
+  </div>
+</div>
+
+<%# Zero-Based Allocation Chart %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2e7d32;">donut_large</span> Zero-Based Allocation</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="margin-bottom: 0.75rem; display: flex; justify-content: space-between; font-size: 0.8125rem;">
+      <span style="font-weight: 600;">Every dollar has a job</span>
+      <span style="color: var(--text-secondary);"><%= number_to_currency(@total_allocated) %> of <%= number_to_currency(@avg_paycheck) %> allocated</span>
+    </div>
+
+    <%# Stacked bar %>
+    <% bar_total = [@avg_paycheck, 0.01].max %>
+    <div style="display: flex; height: 36px; border-radius: 8px; overflow: hidden; background: var(--bg); border: 1px solid var(--border);">
+      <% @allocation.each do |key, alloc| %>
+        <% pct = (alloc[:amount] / bar_total * 100).round(1) %>
+        <% next if pct <= 0 %>
+        <div style="width: <%= pct %>%; background: <%= alloc[:color] %>; display: flex; align-items: center; justify-content: center; min-width: 24px; transition: width 0.3s ease;" title="<%= alloc[:label] %>: <%= number_to_currency(alloc[:amount]) %> (<%= pct %>%)">
+          <% if pct > 8 %>
+            <span style="font-size: 0.625rem; color: #fff; font-weight: 600;"><%= pct %>%</span>
+          <% end %>
+        </div>
+      <% end %>
+      <% if @unallocated > 0 %>
+        <% unalloc_pct = (@unallocated / bar_total * 100).round(1) %>
+        <div style="width: <%= unalloc_pct %>%; background: repeating-linear-gradient(45deg, var(--bg), var(--bg) 4px, var(--border) 4px, var(--border) 8px); display: flex; align-items: center; justify-content: center;" title="Unallocated: <%= number_to_currency(@unallocated) %>">
+          <% if unalloc_pct > 8 %>
+            <span style="font-size: 0.625rem; color: var(--text-secondary); font-weight: 600;"><%= unalloc_pct %>%</span>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <%# Legend %>
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem; font-size: 0.75rem;">
+      <% @allocation.each do |key, alloc| %>
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <span style="width: 12px; height: 12px; border-radius: 3px; background: <%= alloc[:color] %>; display: inline-block;"></span>
+          <span style="color: var(--text-secondary);"><%= alloc[:label] %></span>
+          <span style="font-weight: 600;"><%= number_to_currency(alloc[:amount]) %></span>
+        </div>
+      <% end %>
+      <% if @unallocated > 0 %>
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <span style="width: 12px; height: 12px; border-radius: 3px; background: var(--border); display: inline-block;"></span>
+          <span style="color: var(--text-secondary);">Unallocated</span>
+          <span style="font-weight: 600;"><%= number_to_currency(@unallocated) %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Paycheck Breakdown Card %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2e7d32;">receipt_long</span> Per-Paycheck Breakdown</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+      <thead>
+        <tr style="border-bottom: 2px solid var(--border);">
+          <th style="padding: 0.5rem 0.75rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Category</th>
+          <th style="padding: 0.5rem 0.75rem; text-align: right; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Per Paycheck</th>
+          <th style="padding: 0.5rem 0.75rem; text-align: right; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Monthly</th>
+          <th style="padding: 0.5rem 0.75rem; text-align: right; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">% of Paycheck</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @allocation.each do |key, alloc| %>
+          <% pct = @avg_paycheck > 0 ? (alloc[:amount] / @avg_paycheck * 100).round(1) : 0 %>
+          <% monthly = (alloc[:amount] * @paychecks_per_month).round(2) %>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.5rem 0.75rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span class="material-icons-outlined" style="font-size: 1rem; color: <%= alloc[:color] %>;"><%= alloc[:icon] %></span>
+                <span style="font-weight: 500;"><%= alloc[:label] %></span>
+              </div>
+            </td>
+            <td style="padding: 0.5rem 0.75rem; text-align: right; font-weight: 600;"><%= number_to_currency(alloc[:amount]) %></td>
+            <td style="padding: 0.5rem 0.75rem; text-align: right; color: var(--text-secondary);"><%= number_to_currency(monthly) %></td>
+            <td style="padding: 0.5rem 0.75rem; text-align: right;">
+              <span style="display: inline-block; padding: 0.125rem 0.5rem; border-radius: 4px; background: <%= alloc[:color] %>15; color: <%= alloc[:color] %>; font-weight: 600; font-size: 0.75rem;"><%= pct %>%</span>
+            </td>
+          </tr>
+        <% end %>
+
+        <%# Variable spending category detail %>
+        <% @category_per_paycheck.first(8).each do |cat, amount| %>
+          <% pct = @avg_paycheck > 0 ? (amount / @avg_paycheck * 100).round(1) : 0 %>
+          <% monthly = @category_monthly[cat] || 0 %>
+          <tr style="border-bottom: 1px solid var(--border); background: var(--bg);">
+            <td style="padding: 0.375rem 0.75rem; padding-left: 2.25rem;">
+              <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= cat %></span>
+            </td>
+            <td style="padding: 0.375rem 0.75rem; text-align: right; font-size: 0.75rem; color: var(--text-secondary);"><%= number_to_currency(amount) %></td>
+            <td style="padding: 0.375rem 0.75rem; text-align: right; font-size: 0.75rem; color: var(--text-secondary);"><%= number_to_currency(monthly) %></td>
+            <td style="padding: 0.375rem 0.75rem; text-align: right; font-size: 0.75rem; color: var(--text-secondary);"><%= pct %>%</td>
+          </tr>
+        <% end %>
+
+        <tr style="border-top: 2px solid var(--border); font-weight: 700;">
+          <td style="padding: 0.75rem;">Total</td>
+          <td style="padding: 0.75rem; text-align: right;"><%= number_to_currency(@total_allocated) %></td>
+          <td style="padding: 0.75rem; text-align: right;"><%= number_to_currency((@total_allocated * @paychecks_per_month).round(2)) %></td>
+          <td style="padding: 0.75rem; text-align: right;">
+            <% total_pct = @avg_paycheck > 0 ? (@total_allocated / @avg_paycheck * 100).round(1) : 0 %>
+            <span style="font-weight: 700;"><%= total_pct %>%</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%# Bill Timing Calendar %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2e7d32;">calendar_month</span> Bill Timing Calendar</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% if @fixed_bills.any? || @typical_pay_days.any? %>
+      <%# Month timeline bar %>
+      <div style="position: relative; height: 60px; background: var(--bg); border-radius: 8px; margin-bottom: 1rem; border: 1px solid var(--border);">
+        <%# Day markers %>
+        <% [1, 5, 10, 15, 20, 25, 30].each do |day| %>
+          <div style="position: absolute; left: <%= ((day - 1) / 30.0 * 100).round(1) %>%; top: 0; height: 100%; border-left: 1px solid var(--border); opacity: 0.4;">
+            <span style="position: absolute; bottom: -18px; left: -6px; font-size: 0.625rem; color: var(--text-secondary);"><%= day %></span>
+          </div>
+        <% end %>
+
+        <%# Pay day markers (green triangles) %>
+        <% @typical_pay_days.each do |pd| %>
+          <div style="position: absolute; left: <%= ((pd[:day] - 1) / 30.0 * 100).round(1) %>%; top: 4px; z-index: 2;" title="Payday ~day <%= pd[:day] %>">
+            <div style="width: 0; height: 0; border-left: 8px solid transparent; border-right: 8px solid transparent; border-top: 12px solid #2e7d32;"></div>
+          </div>
+        <% end %>
+
+        <%# Bill markers (red dots) %>
+        <% @fixed_bills.first(15).each do |bill| %>
+          <div style="position: absolute; left: <%= ((bill[:day] - 1) / 30.0 * 100).round(1) %>%; top: 28px; z-index: 1;" title="<%= bill[:name] %>: <%= number_to_currency(bill[:amount]) %> (day <%= bill[:day] %>)">
+            <div style="width: 10px; height: 10px; border-radius: 50%; background: #e53935; border: 1.5px solid #fff;"></div>
+          </div>
+        <% end %>
+
+        <% if @pay_frequency == "biweekly" %>
+          <%# Divider line at day 15 %>
+          <div style="position: absolute; left: 46.7%; top: 0; height: 100%; border-left: 2px dashed #2e7d32; opacity: 0.5;">
+            <span style="position: absolute; top: -16px; left: -30px; font-size: 0.5625rem; color: #2e7d32; font-weight: 600; white-space: nowrap;">PC1 | PC2</span>
+          </div>
+        <% end %>
+      </div>
+
+      <div style="display: flex; gap: 1.5rem; font-size: 0.75rem; color: var(--text-secondary); margin-top: 1.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #2e7d32;"></div>
+          Payday
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <div style="width: 8px; height: 8px; border-radius: 50%; background: #e53935;"></div>
+          Bills
+        </div>
+      </div>
+
+      <%# Bill list grouped by paycheck %>
+      <% if @fixed_bills.any? %>
+        <div style="margin-top: 1rem;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border);">
+                <th style="padding: 0.5rem 0.75rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Day</th>
+                <th style="padding: 0.5rem 0.75rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Bill</th>
+                <th style="padding: 0.5rem 0.75rem; text-align: right; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Amount</th>
+                <% if @pay_frequency == "biweekly" %>
+                  <th style="padding: 0.5rem 0.75rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Paycheck</th>
+                <% end %>
+              </tr>
+            </thead>
+            <tbody>
+              <% @fixed_bills.each do |bill| %>
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 0.5rem 0.75rem;">
+                    <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(229,57,53,0.1); font-weight: 600; font-size: 0.75rem; color: #e53935;"><%= bill[:day] %></span>
+                  </td>
+                  <td style="padding: 0.5rem 0.75rem; font-weight: 500;"><%= bill[:name] %></td>
+                  <td style="padding: 0.5rem 0.75rem; text-align: right; font-weight: 600;"><%= number_to_currency(bill[:amount]) %></td>
+                  <% if @pay_frequency == "biweekly" %>
+                    <td style="padding: 0.5rem 0.75rem; text-align: center;">
+                      <span style="display: inline-block; padding: 0.125rem 0.5rem; border-radius: 4px; font-size: 0.6875rem; font-weight: 600; background: <%= bill[:day] <= 14 ? 'rgba(46,125,50,0.1)' : 'rgba(21,101,192,0.1)' %>; color: <%= bill[:day] <= 14 ? '#2e7d32' : '#1565c0' %>;">
+                        PC <%= bill[:day] <= 14 ? '1' : '2' %>
+                      </span>
+                    </td>
+                  <% end %>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% end %>
+    <% else %>
+      <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
+        <span class="material-icons-outlined" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">event_busy</span>
+        No recurring bills detected. Add recurring transactions to see your bill timing calendar.
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Biweekly: Paycheck 1 vs Paycheck 2 Comparison %>
+<% if @pay_frequency == "biweekly" %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2e7d32;">compare_arrows</span> Paycheck 1 vs Paycheck 2</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+        <%# Paycheck 1 %>
+        <div style="background: var(--bg); border-radius: 8px; padding: 1.25rem; border: 1px solid rgba(46,125,50,0.3);">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: #2e7d32;">looks_one</span>
+            <span style="font-weight: 700; font-size: 1rem;">Paycheck 1</span>
+            <span style="margin-left: auto; font-size: 0.6875rem; color: var(--text-secondary);">Days 1-14</span>
+          </div>
+          <div style="font-size: 1.5rem; font-weight: 800; color: var(--positive); margin-bottom: 1rem;"><%= number_to_currency(@avg_paycheck) %></div>
+
+          <% pc1 = @paycheck_1_plan %>
+          <% [
+            { label: "Fixed Bills", amount: pc1[:fixed], color: "#e53935", icon: "receipt_long" },
+            { label: "Variable", amount: pc1[:variable], color: "#fb8c00", icon: "shopping_cart" },
+            { label: "Savings", amount: pc1[:savings], color: "#2e7d32", icon: "savings" },
+            { label: "Discretionary", amount: pc1[:discretionary], color: "#1565c0", icon: "wallet" }
+          ].each do |item| %>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.375rem 0; border-bottom: 1px solid var(--border);">
+              <div style="display: flex; align-items: center; gap: 0.375rem;">
+                <span class="material-icons-outlined" style="font-size: 0.875rem; color: <%= item[:color] %>;"><%= item[:icon] %></span>
+                <span style="font-size: 0.8125rem;"><%= item[:label] %></span>
+              </div>
+              <span style="font-weight: 600; font-size: 0.8125rem;"><%= number_to_currency(item[:amount]) %></span>
+            </div>
+          <% end %>
+
+          <% if @paycheck_1_bills.any? %>
+            <div style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);">
+              <div style="font-weight: 600; margin-bottom: 0.25rem;">Bills this paycheck:</div>
+              <% @paycheck_1_bills.each do |bill| %>
+                <div style="display: flex; justify-content: space-between; padding: 0.125rem 0;">
+                  <span>Day <%= bill[:day] %>: <%= bill[:name] %></span>
+                  <span><%= number_to_currency(bill[:amount]) %></span>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+
+        <%# Paycheck 2 %>
+        <div style="background: var(--bg); border-radius: 8px; padding: 1.25rem; border: 1px solid rgba(21,101,192,0.3);">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: #1565c0;">looks_two</span>
+            <span style="font-weight: 700; font-size: 1rem;">Paycheck 2</span>
+            <span style="margin-left: auto; font-size: 0.6875rem; color: var(--text-secondary);">Days 15-31</span>
+          </div>
+          <div style="font-size: 1.5rem; font-weight: 800; color: var(--positive); margin-bottom: 1rem;"><%= number_to_currency(@avg_paycheck) %></div>
+
+          <% pc2 = @paycheck_2_plan %>
+          <% [
+            { label: "Fixed Bills", amount: pc2[:fixed], color: "#e53935", icon: "receipt_long" },
+            { label: "Variable", amount: pc2[:variable], color: "#fb8c00", icon: "shopping_cart" },
+            { label: "Savings", amount: pc2[:savings], color: "#2e7d32", icon: "savings" },
+            { label: "Discretionary", amount: pc2[:discretionary], color: "#1565c0", icon: "wallet" }
+          ].each do |item| %>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.375rem 0; border-bottom: 1px solid var(--border);">
+              <div style="display: flex; align-items: center; gap: 0.375rem;">
+                <span class="material-icons-outlined" style="font-size: 0.875rem; color: <%= item[:color] %>;"><%= item[:icon] %></span>
+                <span style="font-size: 0.8125rem;"><%= item[:label] %></span>
+              </div>
+              <span style="font-weight: 600; font-size: 0.8125rem;"><%= number_to_currency(item[:amount]) %></span>
+            </div>
+          <% end %>
+
+          <% if @paycheck_2_bills.any? %>
+            <div style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);">
+              <div style="font-weight: 600; margin-bottom: 0.25rem;">Bills this paycheck:</div>
+              <% @paycheck_2_bills.each do |bill| %>
+                <div style="display: flex; justify-content: space-between; padding: 0.125rem 0;">
+                  <span>Day <%= bill[:day] %>: <%= bill[:name] %></span>
+                  <span><%= number_to_currency(bill[:amount]) %></span>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+      <%# Comparison summary %>
+      <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(46,125,50,0.05); border: 1px solid rgba(46,125,50,0.15); border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem;">
+          <span class="material-icons-outlined" style="font-size: 1rem; color: #2e7d32;">info</span>
+          <% heavier = @paycheck_1_fixed > @paycheck_2_fixed ? "Paycheck 1" : "Paycheck 2" %>
+          <% lighter = @paycheck_1_fixed > @paycheck_2_fixed ? "Paycheck 2" : "Paycheck 1" %>
+          <span style="color: var(--text-secondary);">
+            <strong><%= heavier %></strong> carries more fixed bills (<%= number_to_currency([@paycheck_1_fixed, @paycheck_2_fixed].max) %>),
+            so <strong><%= lighter %></strong> has more room for variable spending and savings.
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Weekly: Bill distribution across weeks %>
+<% if @pay_frequency == "weekly" && @weekly_bills&.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2e7d32;">view_week</span> Weekly Bill Distribution</h2>
+    </div>
+    <div style="padding: 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+      <% @weekly_bills.each do |week| %>
+        <div style="background: var(--bg); border-radius: 8px; padding: 1rem; border: 1px solid var(--border);">
+          <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.5rem; color: #2e7d32;">Week <%= week[:week] %></div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: var(--negative); margin-bottom: 0.5rem;"><%= number_to_currency(week[:total]) %></div>
+          <% week[:bills].each do |bill| %>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); display: flex; justify-content: space-between; padding: 0.125rem 0;">
+              <span><%= bill[:name] %></span>
+              <span><%= number_to_currency(bill[:amount]) %></span>
+            </div>
+          <% end %>
+          <% if week[:bills].empty? %>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); font-style: italic;">No bills</div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Buffer Recommendation Card %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff9800;">shield</span> Buffer Recommendation</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+      <div style="flex: 0 0 auto; text-align: center;">
+        <div style="font-size: 2.5rem; font-weight: 800; color: #ff9800;"><%= number_to_currency(@buffer_amount) %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600;">Suggested Buffer</div>
+      </div>
+      <div style="flex: 1; min-width: 200px;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 1rem; color: #ff9800;">schedule</span>
+          <span style="font-size: 0.875rem; font-weight: 600;">Keep <%= @buffer_days %> days of expenses as float</span>
+        </div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;"><%= @buffer_reason %></div>
+        <div style="background: rgba(255,152,0,0.08); border: 1px solid rgba(255,152,0,0.2); border-radius: 8px; padding: 0.75rem;">
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #ff9800;">lightbulb</span>
+            Keep this amount in your checking account at all times. It acts as a shock absorber between when bills hit and when your paycheck clears.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Empty State %>
+<% if @avg_paycheck == 0 %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 1rem;">payments</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No Paycheck Data Available</div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">
+      Add income transactions to see your paycheck allocation plan and zero-based budget.
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Navigation %>
+<div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem;">
+  <%= link_to budget_dashboard_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary); display: block; margin-bottom: 0.25rem;">dashboard</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Dashboard</span>
+  <% end %>
+  <%= link_to budget_cash_flow_planner_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #00bcd4; display: block; margin-bottom: 0.25rem;">water_drop</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Cash Flow Planner</span>
+  <% end %>
+  <%= link_to budget_income_allocator_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #2e7d32; display: block; margin-bottom: 0.25rem;">account_balance_wallet</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Income Allocator</span>
+  <% end %>
+</div>

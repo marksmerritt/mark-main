@@ -1,0 +1,138 @@
+<div class="page-header">
+  <h1>Monthly Performance</h1>
+</div>
+
+<% if @months.any? %>
+  <% total_pnl = @months.sum { |m| m["total_pnl"].to_f } %>
+  <% total_trades = @months.sum { |m| m["trade_count"].to_i } %>
+  <% total_wins = @months.sum { |m| m["wins"].to_i } %>
+  <% profitable_months = @months.count { |m| m["total_pnl"].to_f > 0 } %>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= total_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(total_pnl) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= total_trades %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= total_trades > 0 ? (total_wins.to_f / total_trades * 100).round(1) : 0 %>%</div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profitable Months</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= profitable_months %> / <%= @months.size %></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Monthly P&L</h2></div>
+    <div class="chart-container" data-controller="chart"
+         data-chart-type-value="bar"
+         data-chart-labels-value="<%= @months.map { |m| m["label"] }.to_json %>"
+         data-chart-data-value="<%= @months.map { |m| m["total_pnl"] }.to_json %>"
+         data-chart-color-value="var(--primary)"
+         style="height: 280px; padding: 1rem;">
+      <canvas data-chart-target="canvas"></canvas>
+    </div>
+  </div>
+
+  <%
+    cum = 0
+    cum_data = @months.reverse.map { |m| cum += m["total_pnl"].to_f; cum.round(2) }
+    cum_data_reversed = cum_data
+    # Build running total for each month row
+    running = 0
+    month_running = @months.reverse.map { |m| running += m["total_pnl"].to_f; running.round(2) }.reverse
+  %>
+
+  <div class="content-grid" style="margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1.25rem;">
+      <h3 style="margin-bottom: 0.5rem;">Cumulative P&L</h3>
+      <div data-controller="sparkline"
+           data-sparkline-data-value="<%= cum_data_reversed.to_json %>"
+           data-sparkline-width-value="260"
+           data-sparkline-height-value="48"
+           data-sparkline-fill-value="true"
+           data-sparkline-color-value="<%= cum > 0 ? 'var(--positive)' : 'var(--negative)' %>">
+      </div>
+    </div>
+    <div class="card" style="padding: 1.25rem;">
+      <h3 style="margin-bottom: 0.5rem;">Win Rate Trend</h3>
+      <div data-controller="sparkline"
+           data-sparkline-data-value="<%= @months.reverse.map { |m| m["win_rate"].to_f }.to_json %>"
+           data-sparkline-width-value="260"
+           data-sparkline-height-value="48"
+           data-sparkline-fill-value="true"
+           data-sparkline-color-value="var(--primary)">
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th style="text-align: right;">Trades</th>
+          <th style="text-align: right;">Wins</th>
+          <th style="text-align: right;">Win Rate</th>
+          <th style="text-align: right;">Gross P&L</th>
+          <th style="text-align: right;">Commissions</th>
+          <th style="text-align: right;">Net P&L</th>
+          <th style="text-align: right;">Running</th>
+          <th style="text-align: right;">Best</th>
+          <th style="text-align: right;">Worst</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @months.each_with_index do |m, idx| %>
+          <tr>
+            <td><strong><%= m["label"] %></strong></td>
+            <td style="text-align: right;"><%= m["trade_count"] %></td>
+            <td style="text-align: right;"><%= m["wins"] %>/<%= m["losses"] %></td>
+            <td style="text-align: right;"><%= m["win_rate"] %>%</td>
+            <td style="text-align: right;" class="<%= m["total_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+              <%= number_to_currency(m["total_pnl"]) %>
+            </td>
+            <td style="text-align: right;"><%= number_to_currency(m["commissions"]) %></td>
+            <td style="text-align: right;" class="<%= m["net_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+              <%= number_to_currency(m["net_pnl"]) %>
+            </td>
+            <td style="text-align: right;" class="<%= month_running[idx] >= 0 ? 'positive' : 'negative' %>">
+              <%= number_to_currency(month_running[idx]) %>
+            </td>
+            <td style="text-align: right;" class="positive"><%= m["best_trade"] ? number_to_currency(m["best_trade"]) : "-" %></td>
+            <td style="text-align: right;" class="negative"><%= m["worst_trade"] ? number_to_currency(m["worst_trade"]) : "-" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+      <tfoot>
+        <tr style="font-weight: 600;">
+          <td>Total</td>
+          <td style="text-align: right;"><%= total_trades %></td>
+          <td style="text-align: right;"><%= total_wins %>/<%= total_trades - total_wins %></td>
+          <td style="text-align: right;"><%= total_trades > 0 ? (total_wins.to_f / total_trades * 100).round(1) : 0 %>%</td>
+          <td style="text-align: right;" class="<%= total_pnl >= 0 ? 'positive' : 'negative' %>">
+            <%= number_to_currency(total_pnl) %>
+          </td>
+          <td style="text-align: right;"><%= number_to_currency(@months.sum { |m| m["commissions"].to_f }) %></td>
+          <td style="text-align: right;" class="<%= @months.sum { |m| m["net_pnl"].to_f } >= 0 ? 'positive' : 'negative' %>">
+            <%= number_to_currency(@months.sum { |m| m["net_pnl"].to_f }) %>
+          </td>
+          <td style="text-align: right;" class="<%= total_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(total_pnl) %></td>
+          <td></td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No trading data available. Add some trades to see monthly performance.</p>
+  </div>
+<% end %>

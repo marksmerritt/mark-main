@@ -1,0 +1,218 @@
+<% content_for(:title) { "Monthly Digest — #{Date::MONTHNAMES[@month]} #{@year}" } %>
+
+<style>
+  @media print {
+    .navbar, .app-footer, .page-actions, .no-print { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>
+
+<div class="page-header">
+  <h1>Monthly Digest</h1>
+  <div class="page-actions">
+    <button onclick="window.print()" class="btn">Print / Save PDF</button>
+    <%= link_to "Dashboard", budget_dashboard_path, class: "btn" %>
+  </div>
+</div>
+
+<div class="card no-print" style="margin-bottom: 1rem;">
+  <%= form_with url: budget_reports_digest_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :month, "Month" %>
+        <%= f.select :month, (1..12).map { |m| [Date::MONTHNAMES[m], m] }, { selected: @month }, class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :year, "Year" %>
+        <%= f.number_field :year, value: @year, class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "View", class: "btn btn-primary" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<div style="text-align: center; margin-bottom: 2rem;">
+  <h2 style="margin: 0; font-size: 1.75rem;"><%= Date::MONTHNAMES[@month] %> <%= @year %></h2>
+  <p class="text-muted">Financial Summary</p>
+</div>
+
+<% if @overview.is_a?(Hash) %>
+  <% income = @overview["actual_income"].to_f %>
+  <% expenses = @overview["total_spent"].to_f %>
+  <% savings = income - expenses %>
+  <% savings_rate = @overview["savings_rate"].to_f %>
+
+  <div class="card" style="margin-bottom: 2rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Income</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= number_to_currency(income) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Expenses</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(expenses) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Saved</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= savings >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(savings) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= savings_rate >= 0 ? 'positive' : 'negative' %>"><%= savings_rate %>%</div>
+      </div>
+    </div>
+  </div>
+
+  <% # Budget progress %>
+  <% if income > 0 %>
+    <div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+      <h3 style="margin-bottom: 0.75rem;">Budget Progress</h3>
+      <div class="budget-progress-bar" style="height: 1.5rem; margin-bottom: 0.5rem;">
+        <div class="budget-progress-fill <%= expenses <= income ? 'progress-safe' : 'progress-over' %>"
+             style="width: <%= [expenses / income * 100, 100].min.round(1) %>%"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 0.85rem;">
+        <span>Spent: <%= number_to_currency(expenses) %></span>
+        <span>Budget: <%= number_to_currency(income) %></span>
+      </div>
+    </div>
+  <% end %>
+<% end %>
+
+<% # Category breakdown %>
+<% if @categories.is_a?(Array) && @categories.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Spending by Category</h2></div>
+    <table class="table" style="font-size: 0.9rem;">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th style="text-align: right;">Planned</th>
+          <th style="text-align: right;">Actual</th>
+          <th style="text-align: right;">Remaining</th>
+          <th style="width: 6rem;"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @categories.each do |cat| %>
+          <tr>
+            <td><strong><%= cat["name"] %></strong></td>
+            <td style="text-align: right;"><%= number_to_currency(cat["planned"]) %></td>
+            <td style="text-align: right;"><%= number_to_currency(cat["actual"]) %></td>
+            <td style="text-align: right;">
+              <span class="<%= cat["remaining"].to_f >= 0 ? 'positive' : 'negative' %>">
+                <%= number_to_currency(cat["remaining"]) %>
+              </span>
+            </td>
+            <td>
+              <div class="budget-progress-bar" style="height: 0.5rem;">
+                <div class="budget-progress-fill <%= budget_progress_class(cat["percentage"]) %>"
+                     style="width: <%= [cat["percentage"].to_f, 100].min %>%"></div>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+  <% # Net worth %>
+  <% if @net_worth.is_a?(Hash) %>
+    <div class="card" style="padding: 1.25rem;">
+      <h3 style="margin-bottom: 0.75rem;">Net Worth</h3>
+      <div style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; color: <%= @net_worth["net_worth"].to_f >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <%= number_to_currency(@net_worth["net_worth"]) %>
+      </div>
+      <div style="font-size: 0.85rem;">
+        <div>Assets: <%= number_to_currency(@net_worth["assets"]) %></div>
+        <div>Liabilities: <%= number_to_currency(@net_worth["liabilities"]) %></div>
+      </div>
+    </div>
+  <% end %>
+
+  <% # Debt snapshot %>
+  <% if @debt.is_a?(Hash) && @debt["total_debt"].to_f > 0 %>
+    <div class="card" style="padding: 1.25rem;">
+      <h3 style="margin-bottom: 0.75rem;">Debt Status</h3>
+      <div class="negative" style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem;">
+        <%= number_to_currency(@debt["total_debt"]) %>
+      </div>
+      <div style="font-size: 0.85rem;">
+        <div><%= @debt["account_count"] %> active accounts</div>
+        <div>Min. payments: <%= number_to_currency(@debt["total_minimum_payments"]) %>/mo</div>
+        <% if @debt["paid_off_count"].to_i > 0 %>
+          <div class="positive"><%= @debt["paid_off_count"] %> paid off</div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% # Goals progress %>
+<% if @goals.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Goals</h2></div>
+    <table class="table" style="font-size: 0.9rem;">
+      <thead>
+        <tr>
+          <th>Goal</th>
+          <th style="text-align: right;">Progress</th>
+          <th style="text-align: right;">Target</th>
+          <th style="width: 8rem;"></th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @goals.each do |goal| %>
+          <tr>
+            <td><strong><%= goal["name"] %></strong></td>
+            <td style="text-align: right;"><%= number_to_currency(goal["effective_current_amount"]) %></td>
+            <td style="text-align: right;"><%= number_to_currency(goal["effective_target_amount"]) %></td>
+            <td>
+              <div class="budget-progress-bar" style="height: 0.5rem;">
+                <div class="budget-progress-fill progress-safe" style="width: <%= [goal["percentage_complete"].to_f, 100].min %>%"></div>
+              </div>
+            </td>
+            <td>
+              <% if goal["on_track"] %>
+                <span class="badge badge-success">On Track</span>
+              <% else %>
+                <span class="badge badge-warning">Behind</span>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<% # Forecast %>
+<% if @forecast.is_a?(Hash) && !@forecast["error"] %>
+  <div class="card" style="padding: 1.25rem;">
+    <h3 style="margin-bottom: 0.75rem;">Month Forecast</h3>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+      <div>
+        <span class="text-muted">Daily Spend Rate</span><br>
+        <strong><%= number_to_currency(@forecast["daily_spend_rate"]) %>/day</strong>
+      </div>
+      <div>
+        <span class="text-muted">Projected Total</span><br>
+        <strong class="<%= @forecast["on_track"] ? 'positive' : 'negative' %>"><%= number_to_currency(@forecast["projected_total_spend"]) %></strong>
+      </div>
+      <div>
+        <span class="text-muted">Safe to Spend</span><br>
+        <strong><%= number_to_currency(@forecast["safe_to_spend_daily"]) %>/day</strong>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 2rem; font-size: 0.8rem;" class="text-muted">
+  Generated <%= Date.current.strftime("%B %d, %Y") %>
+</div>

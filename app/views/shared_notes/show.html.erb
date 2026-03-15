@@ -1,0 +1,53 @@
+<% content_for(:title) { @note["title"].presence || "Shared Note" } %>
+
+<article style="max-width: 48rem; margin: 0 auto;">
+  <div class="page-header" style="margin-bottom: 0.5rem;">
+    <h1 style="font-size: 1.75rem;"><%= @note["title"].presence || "Untitled Note" %></h1>
+  </div>
+
+  <div style="display: flex; gap: 1rem; align-items: center; margin-bottom: 1.5rem; font-size: 0.85rem; color: var(--text-secondary); flex-wrap: wrap;">
+    <% if @note["created_at"] %>
+      <span><%= Time.parse(@note["created_at"]).strftime("%B %d, %Y") %></span>
+    <% end %>
+    <% if @note.dig("notebook", "name").present? %>
+      <span>&middot; <%= @note.dig("notebook", "name") %></span>
+    <% end %>
+    <% if @note["reading_time"].to_i > 0 %>
+      <span>&middot; <%= @note["reading_time"] %> min read</span>
+    <% end %>
+    <% if @note["word_count"].to_i > 0 %>
+      <span>&middot; <%= number_with_delimiter(@note["word_count"]) %> words</span>
+    <% end %>
+  </div>
+
+  <% if @note["share_expires_at"].present? %>
+    <% expires = Time.parse(@note["share_expires_at"]) %>
+    <% if expires > Time.current %>
+      <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+        This link expires <%= time_ago_in_words(expires) %> from now.
+      </div>
+    <% end %>
+  <% end %>
+
+  <div class="card" style="padding: 1.5rem 2rem;">
+    <% if @note["content_html"].present? %>
+      <div class="text-content shared-note-content" style="line-height: 1.7;"><%= raw @note["content_html"] %></div>
+    <% elsif @note["content"].present? %>
+      <div class="text-content shared-note-content" style="line-height: 1.7;"><%= simple_format(@note["content"]) %></div>
+    <% else %>
+      <p class="empty-state">This note has no content.</p>
+    <% end %>
+  </div>
+
+  <% if @note["tags"].present? && @note["tags"].any? %>
+    <div style="margin-top: 1rem; display: flex; gap: 0.375rem; flex-wrap: wrap;">
+      <% @note["tags"].each do |tag| %>
+        <span class="tag" <% if tag["color"].present? %>style="background-color: <%= tag["color"] %>"<% end %>><%= tag["name"] %></span>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div style="text-align: center; margin-top: 2rem; font-size: 0.75rem; color: var(--text-muted);">
+    Shared via Mark Main
+  </div>
+</article>

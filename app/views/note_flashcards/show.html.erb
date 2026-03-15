@@ -1,0 +1,374 @@
+<% content_for(:title) { "Flashcards" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #1565c0;">school</span>
+    Flashcards
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Notes", notes_path, class: "btn" %>
+    <%= link_to "Knowledge Graph", knowledge_graph_notes_path, class: "btn" %>
+    <%= link_to "Writing Stats", writing_stats_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Cards</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_cards %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Decks Available</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #1565c0;"><%= @total_decks %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Est. Study Time</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @estimated_time %> min</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Cards from Tags</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @cards_from_tags %></div>
+    </div>
+  </div>
+</div>
+
+<% if @flashcards.any? %>
+
+  <%# Deck Selector %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">library_books</span> Study Decks</h2>
+    </div>
+    <div style="padding: 1.25rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.75rem;">
+      <div style="border: 2px solid #1565c0; border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; background: var(--bg-card);"
+           onclick="filterDeck('all')">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">All Cards</div>
+        <div style="font-size: 1.75rem; font-weight: 700; color: #1565c0;"><%= @total_cards %></div>
+        <button class="btn btn-sm" style="margin-top: 0.5rem; background: #1565c0; color: #fff; border-color: #1565c0;" onclick="event.stopPropagation(); filterDeck('all'); startStudy();">Study</button>
+      </div>
+      <% @deck_stats.each do |deck_name, count| %>
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center; cursor: pointer; background: var(--bg-card);"
+             onclick="filterDeck('<%= j(deck_name) %>')">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= deck_name %></div>
+          <div style="font-size: 1.75rem; font-weight: 700;"><%= count %></div>
+          <button class="btn btn-sm" style="margin-top: 0.5rem;" onclick="event.stopPropagation(); filterDeck('<%= j(deck_name) %>'); startStudy();">Study</button>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Tag Filter %>
+  <% if @tag_groups.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">label</span> Filter by Tag</h2>
+      </div>
+      <div style="padding: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+        <button class="btn btn-sm" style="background: #1565c0; color: #fff; border-color: #1565c0;" onclick="filterTag('all')" id="tag-btn-all">All</button>
+        <% @tag_groups.each do |tag_name, ids| %>
+          <button class="btn btn-sm" onclick="filterTag('<%= j(tag_name) %>')" id="tag-btn-<%= tag_name.parameterize %>">
+            <%= tag_name %> (<%= ids.length %>)
+          </button>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Flashcard Viewer %>
+  <div class="card" style="margin-bottom: 1.5rem;" id="flashcard-viewer">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">style</span> Study Mode</h2>
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span style="font-size: 0.75rem; color: var(--text-secondary);" id="card-counter">1 of <%= @total_cards %></span>
+        <span id="difficulty-badge" style="font-size: 0.625rem; padding: 0.125rem 0.5rem; border-radius: 9999px; text-transform: uppercase; font-weight: 600;"></span>
+      </div>
+    </div>
+    <div style="padding: 2rem; min-height: 250px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <%# Flashcard with flip animation %>
+      <div id="flashcard" style="width: 100%; max-width: 600px; perspective: 1000px; cursor: pointer;" onclick="flipCard()">
+        <div id="flashcard-inner" style="position: relative; width: 100%; min-height: 200px; transition: transform 0.5s ease; transform-style: preserve-3d;">
+          <%# Front %>
+          <div id="card-front" style="position: absolute; width: 100%; min-height: 200px; backface-visibility: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; border: 2px solid #1565c0; border-radius: 12px; background: var(--bg-card); text-align: center;">
+            <div style="font-size: 0.625rem; text-transform: uppercase; color: #1565c0; margin-bottom: 0.75rem; letter-spacing: 0.05em;" id="card-type-label">Question</div>
+            <div style="font-size: 1.25rem; font-weight: 600; line-height: 1.5;" id="card-front-text"></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 1rem;">
+              <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">touch_app</span> Tap to reveal answer
+            </div>
+          </div>
+          <%# Back %>
+          <div id="card-back" style="position: absolute; width: 100%; min-height: 200px; backface-visibility: hidden; transform: rotateY(180deg); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; border: 2px solid var(--positive); border-radius: 12px; background: var(--bg-card); text-align: center;">
+            <div style="font-size: 0.625rem; text-transform: uppercase; color: var(--positive); margin-bottom: 0.75rem; letter-spacing: 0.05em;">Answer</div>
+            <div style="font-size: 1.1rem; line-height: 1.6;" id="card-back-text"></div>
+          </div>
+        </div>
+      </div>
+
+      <%# Fallback details-based card for no-JS %>
+      <noscript>
+        <% @flashcards.first(10).each_with_index do |card, i| %>
+          <details style="width: 100%; max-width: 600px; margin-bottom: 1rem; border: 1px solid var(--border); border-radius: 8px; padding: 1rem;">
+            <summary style="font-weight: 600; cursor: pointer;"><%= card[:front] %></summary>
+            <p style="margin-top: 0.75rem; color: var(--text-secondary);"><%= card[:back] %></p>
+          </details>
+        <% end %>
+      </noscript>
+
+      <%# Card tags %>
+      <div id="card-tags" style="margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.375rem; justify-content: center;"></div>
+    </div>
+
+    <%# Navigation %>
+    <div style="padding: 1rem 2rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+      <button class="btn" onclick="prevCard()" id="btn-prev" style="display: flex; align-items: center; gap: 0.25rem;">
+        <span class="material-icons-outlined" style="font-size: 1.1rem;">chevron_left</span> Previous
+      </button>
+      <div style="display: flex; gap: 0.5rem;">
+        <button class="btn btn-sm" onclick="shuffleCards()" title="Shuffle cards">
+          <span class="material-icons-outlined" style="font-size: 1rem;">shuffle</span>
+        </button>
+        <button class="btn btn-sm" onclick="resetCards()" title="Reset to beginning">
+          <span class="material-icons-outlined" style="font-size: 1rem;">restart_alt</span>
+        </button>
+      </div>
+      <button class="btn" onclick="nextCard()" id="btn-next" style="display: flex; align-items: center; gap: 0.25rem;">
+        Next <span class="material-icons-outlined" style="font-size: 1.1rem;">chevron_right</span>
+      </button>
+    </div>
+
+    <%# Progress bar %>
+    <div style="height: 4px; background: var(--border); border-radius: 0 0 8px 8px; overflow: hidden;">
+      <div id="progress-bar" style="height: 100%; background: #1565c0; transition: width 0.3s ease; width: 0%;"></div>
+    </div>
+  </div>
+
+  <%# Study Tips %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">tips_and_updates</span> Study Tips</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem;">
+        <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+          <span class="material-icons-outlined" style="color: #1565c0; font-size: 1.25rem; margin-top: 2px;">schedule</span>
+          <div>
+            <div style="font-weight: 600; font-size: 0.875rem;">Spaced Repetition</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">Review cards at increasing intervals: 1 day, 3 days, 7 days, 14 days.</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+          <span class="material-icons-outlined" style="color: #1565c0; font-size: 1.25rem; margin-top: 2px;">psychology</span>
+          <div>
+            <div style="font-weight: 600; font-size: 0.875rem;">Active Recall</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">Try to answer before flipping. Active retrieval strengthens memory more than re-reading.</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+          <span class="material-icons-outlined" style="color: #1565c0; font-size: 1.25rem; margin-top: 2px;">filter_list</span>
+          <div>
+            <div style="font-weight: 600; font-size: 0.875rem;">Focus by Deck or Tag</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">Use the deck selector or tag filter to study specific topics in focused sessions.</div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
+          <span class="material-icons-outlined" style="color: #1565c0; font-size: 1.25rem; margin-top: 2px;">short_text</span>
+          <div>
+            <div style="font-weight: 600; font-size: 0.875rem;">Keep It Short</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">Study in 15-20 minute sessions. Shorter bursts are more effective than marathon sessions.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<%# Bottom Nav %>
+<div class="card">
+  <div style="padding: 1rem; display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap;">
+    <%= link_to notes_path, class: "btn", style: "display: flex; align-items: center; gap: 0.375rem;" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">notes</span> Notes
+    <% end %>
+    <%= link_to knowledge_graph_notes_path, class: "btn", style: "display: flex; align-items: center; gap: 0.375rem;" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">hub</span> Knowledge Graph
+    <% end %>
+    <%= link_to writing_stats_path, class: "btn", style: "display: flex; align-items: center; gap: 0.375rem;" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">edit_note</span> Writing Stats
+    <% end %>
+  </div>
+</div>
+
+<%# Flashcard data and JS %>
+<script>
+  var ALL_FLASHCARDS = <%= raw @flashcards.to_json %>;
+  var currentCards = ALL_FLASHCARDS.slice();
+  var currentIndex = 0;
+  var isFlipped = false;
+  var currentDeck = 'all';
+  var currentTag = 'all';
+
+  function applyFilters() {
+    currentCards = ALL_FLASHCARDS.filter(function(card) {
+      var deckMatch = currentDeck === 'all' || card.deck === currentDeck;
+      var tagMatch = currentTag === 'all' || card.tags.indexOf(currentTag) !== -1;
+      return deckMatch && tagMatch;
+    });
+    currentIndex = 0;
+    isFlipped = false;
+    renderCard();
+  }
+
+  function filterDeck(deck) {
+    currentDeck = deck;
+    applyFilters();
+  }
+
+  function filterTag(tag) {
+    currentTag = tag;
+    // Update tag button styles
+    var btns = document.querySelectorAll('[id^="tag-btn-"]');
+    btns.forEach(function(btn) {
+      btn.style.background = '';
+      btn.style.color = '';
+      btn.style.borderColor = '';
+    });
+    if (tag === 'all') {
+      var allBtn = document.getElementById('tag-btn-all');
+      if (allBtn) { allBtn.style.background = '#1565c0'; allBtn.style.color = '#fff'; allBtn.style.borderColor = '#1565c0'; }
+    }
+    applyFilters();
+  }
+
+  function startStudy() {
+    var viewer = document.getElementById('flashcard-viewer');
+    if (viewer) viewer.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  function renderCard() {
+    var frontText = document.getElementById('card-front-text');
+    var backText = document.getElementById('card-back-text');
+    var counter = document.getElementById('card-counter');
+    var badge = document.getElementById('difficulty-badge');
+    var tagsEl = document.getElementById('card-tags');
+    var typeLabel = document.getElementById('card-type-label');
+    var inner = document.getElementById('flashcard-inner');
+    var progress = document.getElementById('progress-bar');
+
+    if (currentCards.length === 0) {
+      frontText.textContent = 'No flashcards match your filters.';
+      backText.textContent = 'Try selecting a different deck or tag.';
+      counter.textContent = '0 of 0';
+      badge.textContent = '';
+      tagsEl.innerHTML = '';
+      progress.style.width = '0%';
+      return;
+    }
+
+    var card = currentCards[currentIndex];
+    frontText.textContent = card.front;
+    backText.textContent = card.back;
+    counter.textContent = (currentIndex + 1) + ' of ' + currentCards.length;
+
+    // Difficulty badge
+    var diffColors = { easy: '#0d904f', medium: '#f9ab00', hard: '#d93025' };
+    var diffBg = { easy: 'rgba(13,144,79,0.1)', medium: 'rgba(249,171,0,0.1)', hard: 'rgba(217,48,37,0.1)' };
+    badge.textContent = card.difficulty_estimate;
+    badge.style.color = diffColors[card.difficulty_estimate] || '#666';
+    badge.style.background = diffBg[card.difficulty_estimate] || 'var(--bg)';
+
+    // Type label
+    var typeLabels = { title_content: 'Question', key_term: 'Key Term', summary: 'Summary' };
+    typeLabel.textContent = typeLabels[card.type] || 'Question';
+
+    // Tags
+    tagsEl.innerHTML = '';
+    card.tags.forEach(function(tag) {
+      var span = document.createElement('span');
+      span.textContent = tag;
+      span.style.cssText = 'font-size: 0.625rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: rgba(21,101,192,0.1); color: #1565c0;';
+      tagsEl.appendChild(span);
+    });
+
+    // Reset flip
+    isFlipped = false;
+    inner.style.transform = 'rotateY(0deg)';
+
+    // Progress
+    progress.style.width = ((currentIndex + 1) / currentCards.length * 100) + '%';
+
+    // Update flashcard height to fit content
+    updateCardHeight();
+  }
+
+  function updateCardHeight() {
+    var front = document.getElementById('card-front');
+    var back = document.getElementById('card-back');
+    var inner = document.getElementById('flashcard-inner');
+    // Make both absolute-positioned divs contribute to height
+    var frontH = front.scrollHeight;
+    var backH = back.scrollHeight;
+    var maxH = Math.max(frontH, backH, 200);
+    inner.style.minHeight = maxH + 'px';
+    front.style.minHeight = maxH + 'px';
+    back.style.minHeight = maxH + 'px';
+  }
+
+  function flipCard() {
+    var inner = document.getElementById('flashcard-inner');
+    isFlipped = !isFlipped;
+    inner.style.transform = isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
+  }
+
+  function nextCard() {
+    if (currentCards.length === 0) return;
+    currentIndex = (currentIndex + 1) % currentCards.length;
+    renderCard();
+  }
+
+  function prevCard() {
+    if (currentCards.length === 0) return;
+    currentIndex = (currentIndex - 1 + currentCards.length) % currentCards.length;
+    renderCard();
+  }
+
+  function shuffleCards() {
+    for (var i = currentCards.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var temp = currentCards[i];
+      currentCards[i] = currentCards[j];
+      currentCards[j] = temp;
+    }
+    currentIndex = 0;
+    renderCard();
+  }
+
+  function resetCards() {
+    currentCards = ALL_FLASHCARDS.filter(function(card) {
+      var deckMatch = currentDeck === 'all' || card.deck === currentDeck;
+      var tagMatch = currentTag === 'all' || card.tags.indexOf(currentTag) !== -1;
+      return deckMatch && tagMatch;
+    });
+    currentIndex = 0;
+    renderCard();
+  }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (e.key === 'ArrowRight' || e.key === 'n') nextCard();
+    if (e.key === 'ArrowLeft' || e.key === 'p') prevCard();
+    if (e.key === ' ' || e.key === 'f') { e.preventDefault(); flipCard(); }
+    if (e.key === 's') shuffleCards();
+  });
+
+  // Initialize
+  renderCard();
+</script>
+
+<% else %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary);">school</span>
+    <h2 style="margin-top: 1rem;">No Flashcards Yet</h2>
+    <p style="color: var(--text-secondary); margin-top: 0.5rem;">Start creating notes to generate flashcards automatically.</p>
+    <%= link_to "Create a Note", new_note_path, class: "btn", style: "margin-top: 1rem; background: #1565c0; color: #fff; border-color: #1565c0;" %>
+  </div>
+<% end %>

@@ -1,0 +1,40 @@
+<div class="page-header">
+  <h1>Pinboard</h1>
+  <div class="page-actions">
+    <%= link_to "All Notes", notes_path, class: "btn" %>
+    <%= link_to "New Note", new_note_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<% if @pinned_notes.any? %>
+  <h2 style="margin-bottom: 0.75rem;">
+    <span class="material-icons-outlined" style="font-size: 1.25rem; vertical-align: -3px;">push_pin</span>
+    Pinned
+  </h2>
+  <div class="pinboard-grid">
+    <% @pinned_notes.each do |note| %>
+      <%= render "pinboard_card", note: note %>
+    <% end %>
+  </div>
+<% end %>
+
+<% if @favorited_notes.any? %>
+  <h2 style="margin: 1.5rem 0 0.75rem;">
+    <span class="material-icons-outlined" style="font-size: 1.25rem; vertical-align: -3px; color: #f59e0b;">star</span>
+    Favorites
+  </h2>
+  <div class="pinboard-grid">
+    <% @favorited_notes.each do |note| %>
+      <%= render "pinboard_card", note: note %>
+    <% end %>
+  </div>
+<% end %>
+
+<% if @pinned_notes.empty? && @favorited_notes.empty? %>
+  <div class="card empty-state-large">
+    <span class="material-icons-outlined">push_pin</span>
+    <h3>No pinned or favorited notes</h3>
+    <p>Pin or favorite notes to see them here for quick access.</p>
+    <%= link_to "Browse Notes", notes_path, class: "btn btn-primary" %>
+  </div>
+<% end %>

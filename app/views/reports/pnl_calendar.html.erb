@@ -1,0 +1,288 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">calendar_month</span>
+    P&L Calendar
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Heatmap", reports_heatmap_path, class: "btn btn-sm" %>
+    <%= link_to "Monthly P&L", reports_monthly_performance_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<div class="week-nav">
+  <%= link_to reports_pnl_calendar_path(month: @month_offset + 1), class: "btn btn-sm" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">chevron_left</span> Previous
+  <% end %>
+  <h2 class="week-nav-title"><%= @target_date.strftime("%B %Y") %></h2>
+  <% if @month_offset > 0 %>
+    <%= link_to reports_pnl_calendar_path(month: @month_offset - 1), class: "btn btn-sm" do %>
+      Next <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">chevron_right</span>
+    <% end %>
+  <% else %>
+    <span class="btn btn-sm" style="opacity: 0.3; pointer-events: none;">Next</span>
+  <% end %>
+</div>
+
+<%# Summary strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Month P&L</div>
+      <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @month_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(@month_pnl) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_trades %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Days</div>
+      <div style="font-size: 1.5rem; font-weight: 700;">
+        <span class="positive"><%= @green_days %></span> / <span class="negative"><%= @red_days %></span>
+      </div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Day Win Rate</div>
+      <% day_wr = @trading_days > 0 ? (@green_days.to_f / @trading_days * 100).round(0) : 0 %>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= day_wr >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= day_wr %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg/Day</div>
+      <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @avg_daily >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(@avg_daily) %></div>
+    </div>
+  </div>
+</div>
+
+<%# Calendar grid %>
+<%
+  max_abs_pnl = @daily_pnl.values.map { |v| v.to_f.abs }.max.to_f
+  max_abs_pnl = 1 if max_abs_pnl == 0
+%>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="padding: 0.75rem 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px;">
+      <% %w[Sun Mon Tue Wed Thu Fri Sat].each do |day| %>
+        <div style="text-align: center; font-size: 0.6875rem; font-weight: 600; color: var(--text-secondary); padding: 0.5rem 0;"><%= day %></div>
+      <% end %>
+
+      <% @month_start.wday.times do %>
+        <div style="min-height: 5rem;"></div>
+      <% end %>
+
+      <% (@month_start..@month_end).each do |date| %>
+        <%
+          date_str = date.strftime("%Y-%m-%d")
+          pnl = @daily_pnl[date_str]&.to_f
+          trades = @trades_by_date[date_str] || []
+          is_today = date == Date.current
+          is_future = date > Date.current
+          has_trades = trades.any?
+          intensity = pnl ? (pnl.abs / max_abs_pnl).clamp(0, 1) : 0
+        %>
+        <div style="min-height: 5rem; border: 1px solid <%= is_today ? 'var(--primary)' : 'var(--border)' %>; border-radius: 4px; padding: 0.375rem; position: relative;
+                    background: <%=
+                      if pnl && pnl > 0
+                        "rgba(13, 144, 79, #{(intensity * 0.25).round(2)})"
+                      elsif pnl && pnl < 0
+                        "rgba(217, 48, 37, #{(intensity * 0.25).round(2)})"
+                      elsif is_future
+                        "var(--bg)"
+                      else
+                        "transparent"
+                      end
+                    %>; <%= is_today ? 'box-shadow: 0 0 0 1px var(--primary);' : '' %>">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.25rem;">
+            <span style="font-size: 0.6875rem; font-weight: <%= is_today ? '700' : '500' %>; color: <%= is_today ? 'var(--primary)' : 'var(--text-secondary)' %>;"><%= date.day %></span>
+            <% if pnl %>
+              <span style="font-size: 0.6875rem; font-weight: 700;" class="<%= pnl >= 0 ? 'positive' : 'negative' %>">
+                <%= pnl >= 0 ? "+" : "" %><%= number_to_currency(pnl, precision: 0) %>
+              </span>
+            <% end %>
+          </div>
+          <% if has_trades %>
+            <div style="font-size: 0.5625rem; color: var(--text-secondary); margin-bottom: 0.125rem;">
+              <%= trades.count %> trade<%= trades.count == 1 ? "" : "s" %>
+            </div>
+            <% trades.first(3).each do |trade| %>
+              <div style="display: flex; justify-content: space-between; font-size: 0.5625rem; line-height: 1.4;">
+                <%= link_to trade["symbol"], trade_path(trade["id"]), style: "font-weight: 600; color: var(--text); text-decoration: none;" %>
+                <span class="<%= trade["pnl"].to_f >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(trade["pnl"], precision: 0) %></span>
+              </div>
+            <% end %>
+            <% if trades.count > 3 %>
+              <div style="font-size: 0.5rem; color: var(--text-secondary); text-align: center;">+<%= trades.count - 3 %> more</div>
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Best and worst days %>
+<% if @best_day && @worst_day && @trading_days >= 2 %>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="border-left: 3px solid var(--positive);">
+      <div style="padding: 1rem 1.25rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Day</div>
+        <div style="font-size: 1.25rem; font-weight: 700;" class="positive"><%= number_to_currency(@best_day[1]) %></div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);"><%= Date.parse(@best_day[0]).strftime("%A, %b %d") rescue @best_day[0] %></div>
+        <% best_trades = @trades_by_date[@best_day[0]] || [] %>
+        <% if best_trades.any? %>
+          <div style="margin-top: 0.375rem; font-size: 0.75rem; color: var(--text-secondary);">
+            <%= best_trades.count %> trade<%= best_trades.count == 1 ? "" : "s" %>: <%= best_trades.map { |t| t["symbol"] }.uniq.join(", ") %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+    <div class="card" style="border-left: 3px solid var(--negative);">
+      <div style="padding: 1rem 1.25rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Day</div>
+        <div style="font-size: 1.25rem; font-weight: 700;" class="negative"><%= number_to_currency(@worst_day[1]) %></div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);"><%= Date.parse(@worst_day[0]).strftime("%A, %b %d") rescue @worst_day[0] %></div>
+        <% worst_trades = @trades_by_date[@worst_day[0]] || [] %>
+        <% if worst_trades.any? %>
+          <div style="margin-top: 0.375rem; font-size: 0.75rem; color: var(--text-secondary);">
+            <%= worst_trades.count %> trade<%= worst_trades.count == 1 ? "" : "s" %>: <%= worst_trades.map { |t| t["symbol"] }.uniq.join(", ") %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Running equity curve for the month %>
+<% if @daily_pnl.any? %>
+  <%
+    sorted_pnl = @daily_pnl.sort_by { |k, _| k }
+    cumulative = 0
+    equity_points = sorted_pnl.map { |date, pnl| cumulative += pnl.to_f; { date: date, equity: cumulative.round(2) } }
+    eq_max = equity_points.map { |p| p[:equity] }.max
+    eq_min = equity_points.map { |p| p[:equity] }.min
+    eq_range = eq_max - eq_min
+    eq_range = 1 if eq_range == 0
+
+    chart_w = 700
+    chart_h = 160
+    pad_l = 60
+    pad_r = 20
+    pad_t = 10
+    pad_b = 25
+    inner_w = chart_w - pad_l - pad_r
+    inner_h = chart_h - pad_t - pad_b
+
+    y_max = [eq_max, 0].max
+    y_min = [eq_min, 0].min
+    y_range = y_max - y_min
+    y_range = 1 if y_range == 0
+
+    zero_y = pad_t + (y_max / y_range * inner_h)
+
+    points = equity_points.each_with_index.map { |p, i|
+      x = pad_l + (i.to_f / [equity_points.count - 1, 1].max * inner_w)
+      y = pad_t + ((y_max - p[:equity]) / y_range * inner_h)
+      "#{x.round(1)},#{y.round(1)}"
+    }
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>Month Equity Curve</h2>
+      <span class="<%= cumulative >= 0 ? 'positive' : 'negative' %>" style="font-weight: 700;"><%= cumulative >= 0 ? "+" : "" %><%= number_to_currency(cumulative) %></span>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h %>" style="width: 100%; height: auto;">
+        <% 5.times do |i| %>
+          <%
+            val = y_max - (i.to_f / 4 * y_range)
+            gy = pad_t + (i.to_f / 4 * inner_h)
+          %>
+          <line x1="<%= pad_l %>" y1="<%= gy.round(1) %>" x2="<%= chart_w - pad_r %>" y2="<%= gy.round(1) %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4,4" />
+          <text x="<%= pad_l - 6 %>" y="<%= gy.round(1) + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="8">
+            $<%= val.round(0) %>
+          </text>
+        <% end %>
+
+        <line x1="<%= pad_l %>" y1="<%= zero_y.round(1) %>" x2="<%= chart_w - pad_r %>" y2="<%= zero_y.round(1) %>" stroke="var(--text-secondary)" stroke-width="1" opacity="0.3" />
+
+        <polygon points="<%= pad_l %>,<%= zero_y.round(1) %> <%= points.join(' ') %> <%= (pad_l + (equity_points.count - 1).to_f / [equity_points.count - 1, 1].max * inner_w).round(1) %>,<%= zero_y.round(1) %>"
+                 fill="<%= cumulative >= 0 ? 'var(--positive)' : 'var(--negative)' %>" opacity="0.1" />
+
+        <polyline points="<%= points.join(' ') %>" fill="none"
+                  stroke="<%= cumulative >= 0 ? 'var(--positive)' : 'var(--negative)' %>" stroke-width="2" />
+
+        <% equity_points.each_with_index do |p, i| %>
+          <%
+            x = pad_l + (i.to_f / [equity_points.count - 1, 1].max * inner_w)
+            y = pad_t + ((y_max - p[:equity]) / y_range * inner_h)
+          %>
+          <circle cx="<%= x.round(1) %>" cy="<%= y.round(1) %>" r="3"
+                  fill="<%= p[:equity] >= 0 ? 'var(--positive)' : 'var(--negative)' %>" stroke="var(--surface)" stroke-width="1.5">
+            <title><%= Date.parse(p[:date]).strftime("%b %d") rescue p[:date] %>: <%= number_to_currency(p[:equity]) %></title>
+          </circle>
+        <% end %>
+
+        <% equity_points.each_with_index do |p, i| %>
+          <% next unless i % [equity_points.count / 6, 1].max == 0 || i == equity_points.count - 1 %>
+          <%
+            x = pad_l + (i.to_f / [equity_points.count - 1, 1].max * inner_w)
+          %>
+          <text x="<%= x.round(1) %>" y="<%= chart_h - 4 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="7.5">
+            <%= Date.parse(p[:date]).strftime("%b %d") rescue p[:date] %>
+          </text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<%# Day-of-week performance %>
+<% if @trading_days >= 5 %>
+  <%
+    dow_data = {}
+    @daily_pnl.each do |date_str, pnl|
+      dow = Date.parse(date_str).strftime("%A") rescue nil
+      next unless dow
+      dow_data[dow] ||= { pnl: 0, count: 0, wins: 0 }
+      dow_data[dow][:pnl] += pnl.to_f
+      dow_data[dow][:count] += 1
+      dow_data[dow][:wins] += 1 if pnl.to_f > 0
+    end
+    dow_order = %w[Monday Tuesday Wednesday Thursday Friday]
+    dow_max = dow_data.values.map { |d| d[:pnl].abs }.max.to_f
+    dow_max = 1 if dow_max == 0
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Performance by Day of Week</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <% dow_order.each do |day| %>
+        <% d = dow_data[day] %>
+        <% next unless d %>
+        <%
+          avg_pnl = d[:count] > 0 ? (d[:pnl] / d[:count]).round(2) : 0
+          wr = d[:count] > 0 ? (d[:wins].to_f / d[:count] * 100).round(0) : 0
+          bar_pct = (d[:pnl].abs / dow_max * 100).round(1)
+        %>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <span style="width: 5rem; font-size: 0.8125rem; font-weight: 500;"><%= day[0..2] %></span>
+          <div style="flex: 1; position: relative; height: 1.125rem;">
+            <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border);"></div>
+            <% if d[:pnl] >= 0 %>
+              <div style="position: absolute; left: 50%; height: 100%; width: <%= bar_pct / 2 %>%; background: var(--positive); opacity: 0.6; border-radius: 0 4px 4px 0;"></div>
+            <% else %>
+              <div style="position: absolute; right: 50%; height: 100%; width: <%= bar_pct / 2 %>%; background: var(--negative); opacity: 0.6; border-radius: 4px 0 0 4px;"></div>
+            <% end %>
+          </div>
+          <span style="width: 5rem; text-align: right; font-size: 0.75rem; font-weight: 600;" class="<%= d[:pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(d[:pnl]) %></span>
+          <span style="width: 2.5rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary);"><%= wr %>%</span>
+          <span style="width: 1rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary);"><%= d[:count] %>d</span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<% if @daily_pnl.empty? %>
+  <div class="card empty-state" style="padding: 2rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 2.5rem; color: var(--text-secondary);">calendar_month</span>
+    <p style="margin: 0.5rem 0 0; color: var(--text-secondary);">No trades found for <%= @target_date.strftime("%B %Y") %>.</p>
+  </div>
+<% end %>

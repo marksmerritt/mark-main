@@ -1,0 +1,325 @@
+<div class="page-header">
+  <h1>Snowball vs Avalanche</h1>
+  <div class="page-actions">
+    <%= link_to "All Debts", budget_debt_accounts_path, class: "btn" %>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 1rem;">
+  <%= form_with url: compare_plans_budget_debt_accounts_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :extra, "Extra Monthly Payment" %>
+        <%= f.number_field :extra, value: @extra, step: "50", min: "0", class: "form-control", placeholder: "0.00" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Recalculate", class: "btn btn-primary" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% snowball_ok = @snowball.present? && !@snowball["error"] %>
+<% avalanche_ok = @avalanche.present? && !@avalanche["error"] %>
+
+<% if snowball_ok && avalanche_ok %>
+  <%
+    s_interest = @snowball["total_interest_cost"].to_f
+    a_interest = @avalanche["total_interest_cost"].to_f
+    interest_saved = (s_interest - a_interest).abs
+    s_months = @snowball["payoff_months"].to_i
+    a_months = @avalanche["payoff_months"].to_i
+    months_saved = (s_months - a_months).abs
+    avalanche_wins_interest = a_interest < s_interest
+    snowball_wins_speed = s_months < a_months
+  %>
+
+  <% if interest_saved > 0 || months_saved > 0 %>
+    <div class="card" style="margin-bottom: 1.5rem; border-left: 3px solid var(--primary);">
+      <div style="padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+        <span class="material-icons-outlined" style="font-size: 2rem; color: var(--primary);">insights</span>
+        <div>
+          <% if interest_saved > 1 %>
+            <p style="font-weight: 600; margin-bottom: 0.25rem;">
+              The <strong><%= avalanche_wins_interest ? "Avalanche" : "Snowball" %></strong> method saves you
+              <span class="positive"><%= number_to_currency(interest_saved) %></span> in interest.
+            </p>
+          <% end %>
+          <% if months_saved > 0 %>
+            <p style="font-size: 0.875rem; color: var(--text-secondary);">
+              <% if snowball_wins_speed && !avalanche_wins_interest %>
+                The Snowball method pays off <strong><%= months_saved %> month<%= months_saved == 1 ? '' : 's' %></strong> faster.
+              <% elsif !snowball_wins_speed && avalanche_wins_interest %>
+                The Avalanche method also pays off <strong><%= months_saved %> month<%= months_saved == 1 ? '' : 's' %></strong> faster.
+              <% elsif snowball_wins_speed %>
+                However, the Snowball method pays off <strong><%= months_saved %> month<%= months_saved == 1 ? '' : 's' %></strong> faster, building momentum with quick wins.
+              <% else %>
+                However, the Avalanche method takes <strong><%= months_saved %> month<%= months_saved == 1 ? '' : 's' %></strong> longer.
+              <% end %>
+            </p>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="content-grid" style="margin-bottom: 1.5rem;">
+    <%# Snowball card %>
+    <div class="card" style="border-top: 3px solid var(--primary);">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="vertical-align: -4px; margin-right: 0.25rem;">ac_unit</span>
+          Snowball
+        </h2>
+        <% if snowball_wins_speed && !avalanche_wins_interest %>
+          <span class="badge badge-success">Recommended</span>
+        <% end %>
+      </div>
+      <div style="padding: 0 1.25rem 0.5rem; font-size: 0.8125rem; color: var(--text-secondary);">
+        Pay smallest balances first for quick wins and momentum.
+      </div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Total Debt</span>
+          <span class="detail-value negative"><%= number_to_currency(@snowball["total_debt"]) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Total Interest</span>
+          <span class="detail-value negative"><%= number_to_currency(s_interest) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Payoff Time</span>
+          <span class="detail-value"><%= s_months %> months</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Debt Free By</span>
+          <span class="detail-value positive"><%= @snowball["payoff_date"] %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Total Cost</span>
+          <span class="detail-value"><%= number_to_currency(@snowball["total_debt"].to_f + s_interest) %></span>
+        </div>
+      </div>
+      <div style="padding: 0.75rem 1.25rem;">
+        <%= link_to "View Full Plan", snowball_budget_debt_accounts_path(extra: @extra), class: "btn btn-sm btn-primary" %>
+      </div>
+    </div>
+
+    <%# Avalanche card %>
+    <div class="card" style="border-top: 3px solid var(--negative);">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="vertical-align: -4px; margin-right: 0.25rem;">landslide</span>
+          Avalanche
+        </h2>
+        <% if avalanche_wins_interest %>
+          <span class="badge badge-success">Saves Most</span>
+        <% end %>
+      </div>
+      <div style="padding: 0 1.25rem 0.5rem; font-size: 0.8125rem; color: var(--text-secondary);">
+        Pay highest interest rates first to minimize total interest paid.
+      </div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Total Debt</span>
+          <span class="detail-value negative"><%= number_to_currency(@avalanche["total_debt"]) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Total Interest</span>
+          <span class="detail-value negative"><%= number_to_currency(a_interest) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Payoff Time</span>
+          <span class="detail-value"><%= a_months %> months</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Debt Free By</span>
+          <span class="detail-value positive"><%= @avalanche["payoff_date"] %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Total Cost</span>
+          <span class="detail-value"><%= number_to_currency(@avalanche["total_debt"].to_f + a_interest) %></span>
+        </div>
+      </div>
+      <div style="padding: 0.75rem 1.25rem;">
+        <%= link_to "View Full Plan", avalanche_budget_debt_accounts_path(extra: @extra), class: "btn btn-sm btn-primary" %>
+      </div>
+    </div>
+  </div>
+
+  <%# Head-to-Head visual comparison %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Head-to-Head</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <%
+        compare_rows = [
+          { label: "Interest Cost", snowball: s_interest, avalanche: a_interest, lower_wins: true, format: :currency },
+          { label: "Payoff Months", snowball: s_months, avalanche: a_months, lower_wins: true, format: :number },
+          { label: "Total Cost", snowball: @snowball["total_debt"].to_f + s_interest, avalanche: @avalanche["total_debt"].to_f + a_interest, lower_wins: true, format: :currency }
+        ]
+      %>
+      <% compare_rows.each do |row| %>
+        <%
+          max_val = [row[:snowball].abs, row[:avalanche].abs].max
+          max_val = 1 if max_val == 0
+          s_pct = (row[:snowball].abs / max_val * 40).round(1)
+          a_pct = (row[:avalanche].abs / max_val * 40).round(1)
+          s_wins = row[:lower_wins] ? row[:snowball] < row[:avalanche] : row[:snowball] > row[:avalanche]
+          formatted_s = row[:format] == :currency ? number_to_currency(row[:snowball]) : "#{row[:snowball]} mo"
+          formatted_a = row[:format] == :currency ? number_to_currency(row[:avalanche]) : "#{row[:avalanche]} mo"
+        %>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.625rem;">
+          <div style="width: 80px; text-align: right; font-size: 0.75rem; font-weight: <%= s_wins ? '700' : '400' %>; color: <%= s_wins ? 'var(--primary)' : 'var(--text-secondary)' %>;">
+            <%= formatted_s %>
+          </div>
+          <div style="flex: 1; position: relative; height: 16px;">
+            <div style="position: absolute; right: 50%; top: 1px; bottom: 1px; width: <%= s_pct %>%;
+                        background: var(--primary); opacity: 0.5; border-radius: 3px 0 0 3px;"></div>
+            <div style="position: absolute; left: 50%; top: 1px; bottom: 1px; width: <%= a_pct %>%;
+                        background: var(--negative); opacity: 0.5; border-radius: 0 3px 3px 0;"></div>
+            <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border);"></div>
+          </div>
+          <div style="width: 80px; font-size: 0.75rem; font-weight: <%= !s_wins ? '700' : '400' %>; color: <%= !s_wins ? 'var(--negative)' : 'var(--text-secondary)' %>;">
+            <%= formatted_a %>
+          </div>
+        </div>
+      <% end %>
+      <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.6875rem; color: var(--text-secondary);">
+        <span style="color: var(--primary);">Snowball</span>
+        <span style="color: var(--negative);">Avalanche</span>
+      </div>
+    </div>
+  </div>
+
+  <%# Side-by-side timeline comparison %>
+  <%
+    s_timeline = @snowball["timeline"] || []
+    a_timeline = @avalanche["timeline"] || []
+    max_months = [s_timeline.size, a_timeline.size].max
+  %>
+  <% if max_months > 1 %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Payoff Timeline Comparison</h2></div>
+      <%
+        max_total = [
+          s_timeline.map { |t| t["total"].to_f }.max || 0,
+          a_timeline.map { |t| t["total"].to_f }.max || 0
+        ].max
+        max_total = 1 if max_total == 0
+        chart_height = 200
+      %>
+      <div style="padding: 1rem 1.25rem;">
+        <svg viewBox="0 0 600 <%= chart_height + 40 %>" style="width: 100%; height: auto;">
+          <%# Grid lines %>
+          <% 5.times do |i| %>
+            <% y = (i.to_f / 4 * chart_height).round(1) %>
+            <line x1="0" y1="<%= y %>" x2="600" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" />
+            <text x="2" y="<%= y - 3 %>" font-size="9" fill="var(--text-secondary)">
+              <%= number_to_currency((max_total * (1 - i.to_f / 4)).round(0), precision: 0) %>
+            </text>
+          <% end %>
+
+          <%# Snowball line %>
+          <% if s_timeline.any? %>
+            <polyline fill="none" stroke="var(--primary)" stroke-width="2.5"
+              points="<%= s_timeline.each_with_index.map { |t, i|
+                x = (i.to_f / [s_timeline.size - 1, 1].max * 580 + 10).round(1)
+                y = ((1 - t["total"].to_f / max_total) * chart_height).round(1)
+                "#{x},#{y}"
+              }.join(' ') %>" />
+          <% end %>
+
+          <%# Avalanche line %>
+          <% if a_timeline.any? %>
+            <polyline fill="none" stroke="var(--negative)" stroke-width="2.5" stroke-dasharray="6,3"
+              points="<%= a_timeline.each_with_index.map { |t, i|
+                x = (i.to_f / [a_timeline.size - 1, 1].max * 580 + 10).round(1)
+                y = ((1 - t["total"].to_f / max_total) * chart_height).round(1)
+                "#{x},#{y}"
+              }.join(' ') %>" />
+          <% end %>
+
+          <%# X-axis labels %>
+          <% label_interval = [max_months / 6, 1].max %>
+          <% max_months.times do |i| %>
+            <% if i % label_interval == 0 || i == max_months - 1 %>
+              <% x = (i.to_f / [max_months - 1, 1].max * 580 + 10).round(1) %>
+              <text x="<%= x %>" y="<%= chart_height + 20 %>" font-size="9" fill="var(--text-secondary)" text-anchor="middle">
+                Mo <%= i + 1 %>
+              </text>
+            <% end %>
+          <% end %>
+
+          <%# Zero line %>
+          <line x1="0" y1="<%= chart_height %>" x2="600" y2="<%= chart_height %>" stroke="var(--text-secondary)" stroke-width="1" />
+        </svg>
+
+        <div style="display: flex; gap: 1.5rem; justify-content: center; margin-top: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+            <div style="width: 1.25rem; height: 3px; background: var(--primary);"></div>
+            Snowball
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+            <div style="width: 1.25rem; height: 3px; background: var(--negative); border-top: 1px dashed var(--negative);"></div>
+            Avalanche
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Payoff order comparison %>
+  <% if @accounts.is_a?(Array) && @accounts.any? %>
+    <% active = @accounts.select { |a| a["status"] == "active" } %>
+    <% if active.any? %>
+      <div class="content-grid">
+        <div class="card">
+          <div class="card-header"><h2>Snowball Order</h2></div>
+          <div style="padding: 0.75rem 1.25rem;">
+            <% active.sort_by { |a| a["balance"].to_f }.each_with_index do |a, i| %>
+              <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+                <span class="badge badge-primary" style="min-width: 1.5rem; text-align: center;"><%= i + 1 %></span>
+                <div style="flex: 1;">
+                  <div style="font-weight: 600; font-size: 0.875rem;"><%= a["name"] %></div>
+                  <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                    <%= number_to_currency(a["balance"]) %> at <%= a["interest_rate"] %>%
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h2>Avalanche Order</h2></div>
+          <div style="padding: 0.75rem 1.25rem;">
+            <% active.sort_by { |a| -(a["interest_rate"].to_f) }.each_with_index do |a, i| %>
+              <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+                <span class="badge badge-danger" style="min-width: 1.5rem; text-align: center;"><%= i + 1 %></span>
+                <div style="flex: 1;">
+                  <div style="font-weight: 600; font-size: 0.875rem;"><%= a["name"] %></div>
+                  <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                    <%= a["interest_rate"] %>% — <%= number_to_currency(a["balance"]) %>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <%# Extra payment impact %>
+  <% if @extra == 0 %>
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header"><h2>What If You Paid Extra?</h2></div>
+      <div style="padding: 1rem 1.25rem; font-size: 0.875rem; color: var(--text-secondary); line-height: 1.6;">
+        <p>Try adding an extra monthly payment above to see how much faster you could be debt-free. Even <strong>$50/month</strong> extra can shave months off your timeline and save hundreds in interest.</p>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p>Add debt accounts to compare payoff strategies.</p>
+  </div>
+<% end %>

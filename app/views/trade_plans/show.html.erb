@@ -1,0 +1,438 @@
+<%
+  tp_entry = @trade_plan["target_entry"].to_f
+  tp_stop = @trade_plan["stop_loss"].to_f
+  tp_target = @trade_plan["take_profit"].to_f
+  tp_has_levels = tp_entry > 0 && tp_stop > 0 && tp_target > 0
+  tp_is_long = @trade_plan["side"] == "long"
+  tp_qty = @trade_plan["position_size"].to_i
+
+  if tp_has_levels
+    tp_risk = (tp_entry - tp_stop).abs
+    tp_reward = (tp_target - tp_entry).abs
+    tp_rr = tp_risk > 0 ? (tp_reward / tp_risk).round(2) : 0
+    tp_rr_color = tp_rr >= 2 ? "var(--positive)" : tp_rr >= 1 ? "var(--primary)" : "var(--negative)"
+    tp_total_risk = tp_qty > 0 ? tp_risk * tp_qty : tp_risk
+    tp_total_reward = tp_qty > 0 ? tp_reward * tp_qty : tp_reward
+  end
+
+  # Plan completeness
+  plan_items = []
+  plan_items << { done: @trade_plan["target_entry"].present?, label: "Target entry" }
+  plan_items << { done: @trade_plan["stop_loss"].present?, label: "Stop loss" }
+  plan_items << { done: @trade_plan["take_profit"].present?, label: "Take profit" }
+  plan_items << { done: @trade_plan["entry_trigger"].present?, label: "Entry trigger" }
+  plan_items << { done: @trade_plan["exit_strategy"].present?, label: "Exit strategy" }
+  plan_items << { done: @trade_plan["position_size"].present?, label: "Position size" }
+  plan_done = plan_items.count { |i| i[:done] }
+  plan_total = plan_items.size
+  plan_pct = (plan_done.to_f / plan_total * 100).round(0)
+
+  status_colors = { "planned" => "var(--primary)", "executed" => "var(--positive)", "cancelled" => "var(--text-secondary)", "expired" => "var(--negative)" }
+  status_icons = { "planned" => "pending_actions", "executed" => "check_circle", "cancelled" => "cancel", "expired" => "schedule" }
+  tp_status = @trade_plan["status"] || "planned"
+  tp_status_color = status_colors[tp_status] || "var(--text-secondary)"
+  tp_status_icon = status_icons[tp_status] || "help"
+%>
+
+<div data-controller="toggle">
+<div class="page-header">
+  <h1><%= @trade_plan["symbol"] %> — <%= @trade_plan["side"]&.capitalize %> Plan</h1>
+  <div class="page-actions">
+    <% if tp_status == "planned" %>
+      <button class="btn btn-primary" data-action="click->toggle#show" data-toggle-target="trigger">
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">play_arrow</span> Execute Trade
+      </button>
+    <% end %>
+    <%= link_to edit_trade_plan_path(@trade_plan["id"]), class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">edit</span> Edit
+    <% end %>
+    <%= link_to "Delete", trade_plan_path(@trade_plan["id"]), data: { turbo_method: :delete, turbo_confirm: "Are you sure you want to delete this trade plan?" }, class: "btn btn-danger" %>
+    <%= link_to "Back to Plans", trade_plans_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Hero card %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: stretch; flex-wrap: wrap;">
+    <%# Symbol & status %>
+    <div style="flex: 0 0 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; border-right: 1px solid var(--border);">
+      <div style="font-size: 2rem; font-weight: 700; letter-spacing: 0.5px;"><%= @trade_plan["symbol"] %></div>
+      <% if @trade_plan["asset_class"].present? %>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.375rem;"><%= @trade_plan["asset_class"]&.capitalize %></div>
+      <% end %>
+      <div style="display: flex; gap: 0.375rem; align-items: center; margin-bottom: 0.5rem;">
+        <span class="material-icons-outlined" style="font-size: 1rem; color: <%= tp_status_color %>;"><%= tp_status_icon %></span>
+        <span class="badge badge-<%= tp_status %>"><%= tp_status.capitalize %></span>
+      </div>
+      <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">
+        <%= tp_is_long ? "LONG" : "SHORT" %><%= tp_qty > 0 ? " &middot; #{tp_qty} shares".html_safe : "" %>
+      </div>
+    </div>
+
+    <%# R:R gauge & key metrics %>
+    <div style="flex: 1; min-width: 300px; display: flex; align-items: center; gap: 1.5rem; padding: 1.25rem; flex-wrap: wrap;">
+      <% if tp_has_levels %>
+        <%# Semicircular R:R gauge %>
+        <%
+          rr_r = 50; rr_cx = 60; rr_cy = 55
+          rr_circum = Math::PI * rr_r
+          rr_gauge_val = [tp_rr, 5.0].min  # cap gauge at 5:1
+          rr_filled = rr_circum * rr_gauge_val / 5.0
+        %>
+        <div style="text-align: center; flex-shrink: 0;">
+          <svg width="120" height="70" viewBox="0 0 120 70">
+            <path d="M <%= rr_cx - rr_r %> <%= rr_cy %> A <%= rr_r %> <%= rr_r %> 0 1 1 <%= rr_cx + rr_r %> <%= rr_cy %>"
+                  fill="none" stroke="var(--border)" stroke-width="8" stroke-linecap="round" />
+            <path d="M <%= rr_cx - rr_r %> <%= rr_cy %> A <%= rr_r %> <%= rr_r %> 0 1 1 <%= rr_cx + rr_r %> <%= rr_cy %>"
+                  fill="none" stroke="<%= tp_rr_color %>" stroke-width="8" stroke-linecap="round"
+                  stroke-dasharray="<%= rr_filled.round(1) %> <%= rr_circum.round(1) %>" />
+            <text x="<%= rr_cx %>" y="<%= rr_cy - 8 %>" text-anchor="middle" font-size="18" font-weight="700" fill="<%= tp_rr_color %>">1:<%= tp_rr %></text>
+            <text x="<%= rr_cx %>" y="<%= rr_cy + 5 %>" text-anchor="middle" font-size="8" fill="var(--text-secondary)">Risk/Reward</text>
+          </svg>
+        </div>
+      <% end %>
+
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; flex: 1;">
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Entry</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= tp_entry > 0 ? number_to_currency(tp_entry) : "—" %></div>
+        </div>
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Stop Loss</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: var(--negative);"><%= tp_stop > 0 ? number_to_currency(tp_stop) : "—" %></div>
+        </div>
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Take Profit</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: var(--positive);"><%= tp_target > 0 ? number_to_currency(tp_target) : "—" %></div>
+        </div>
+        <% if tp_has_levels %>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">$ at Risk</div>
+            <div style="font-size: 1.125rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(tp_total_risk) %></div>
+          </div>
+        <% else %>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Position</div>
+            <div style="font-size: 1.125rem; font-weight: 700;"><%= tp_qty > 0 ? "#{tp_qty} shares" : "—" %></div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Price zone visualization %>
+  <% if tp_has_levels %>
+    <%
+      all_levels = [tp_stop, tp_entry, tp_target].sort
+      zone_min = all_levels.first * 0.995
+      zone_max = all_levels.last * 1.005
+      zone_range = zone_max - zone_min
+      zone_range = 1 if zone_range == 0
+      stop_pos = ((tp_stop - zone_min) / zone_range * 100).clamp(0, 100).round(1)
+      entry_pos = ((tp_entry - zone_min) / zone_range * 100).clamp(0, 100).round(1)
+      target_pos = ((tp_target - zone_min) / zone_range * 100).clamp(0, 100).round(1)
+    %>
+    <div style="padding: 0.75rem 1.25rem 1rem; border-top: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.375rem;">Price Levels</div>
+      <div style="position: relative; height: 2rem; background: var(--bg); border-radius: var(--radius); overflow: visible;">
+        <%# Risk zone %>
+        <% risk_left = tp_is_long ? stop_pos : entry_pos %>
+        <% risk_width = tp_is_long ? (entry_pos - stop_pos).abs : (stop_pos - entry_pos).abs %>
+        <div style="position: absolute; left: <%= risk_left %>%; width: <%= risk_width %>%; height: 100%;
+                    background: rgba(217,48,37,0.12); border-radius: var(--radius);"></div>
+        <%# Reward zone %>
+        <% reward_left = tp_is_long ? entry_pos : target_pos %>
+        <% reward_width = tp_is_long ? (target_pos - entry_pos).abs : (entry_pos - target_pos).abs %>
+        <div style="position: absolute; left: <%= reward_left %>%; width: <%= reward_width %>%; height: 100%;
+                    background: rgba(13,144,79,0.12); border-radius: var(--radius);"></div>
+        <%# Markers %>
+        <div style="position: absolute; left: <%= stop_pos %>%; top: 0; bottom: 0; width: 2px; background: var(--negative);"
+             title="Stop: <%= number_to_currency(tp_stop) %>"></div>
+        <div style="position: absolute; left: <%= entry_pos %>%; top: 0; bottom: 0; width: 2px; background: var(--primary);"
+             title="Entry: <%= number_to_currency(tp_entry) %>"></div>
+        <div style="position: absolute; left: <%= target_pos %>%; top: 0; bottom: 0; width: 2px; background: var(--positive);"
+             title="Target: <%= number_to_currency(tp_target) %>"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 0.25rem; font-size: 0.625rem;">
+        <span style="color: var(--negative);">Stop: <%= number_to_currency(tp_stop) %></span>
+        <span style="color: var(--primary); font-weight: 600;">Entry: <%= number_to_currency(tp_entry) %></span>
+        <span style="color: var(--positive);">Target: <%= number_to_currency(tp_target) %></span>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Plan completeness checklist %>
+<% if plan_pct < 100 %>
+  <div class="card" style="margin-bottom: 1rem; border-left: 3px solid var(--primary);">
+    <div style="padding: 0.75rem 1.25rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+        <div style="font-size: 0.8125rem; font-weight: 600;">Plan Completeness</div>
+        <span style="font-size: 0.8125rem; font-weight: 600; color: var(--primary);"><%= plan_done %>/<%= plan_total %></span>
+      </div>
+      <div style="height: 0.375rem; background: var(--bg); border-radius: 4px; overflow: hidden; margin-bottom: 0.5rem;">
+        <div style="height: 100%; width: <%= plan_pct %>%; background: var(--primary); border-radius: 4px;"></div>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+        <% plan_items.each do |item| %>
+          <% unless item[:done] %>
+            <span style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.75rem; color: var(--text-secondary); padding: 0.125rem 0.5rem; background: var(--bg); border-radius: 4px;">
+              <span class="material-icons-outlined" style="font-size: 0.75rem;">radio_button_unchecked</span>
+              <%= item[:label] %>
+            </span>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<% if tp_status == "planned" %>
+  <div class="card execute-form hidden" data-toggle-target="content" style="margin-bottom: 1rem;">
+    <div class="card-header">
+      <h2>Execute Trade</h2>
+    </div>
+    <%= form_with url: execute_trade_plan_path(@trade_plan["id"]), method: :post, class: "filter-form" do |f| %>
+      <div class="filter-row">
+        <div class="form-group">
+          <%= f.label :entry_price, "Entry Price" %>
+          <%= f.number_field :entry_price, value: @trade_plan["target_entry"], step: 0.01, class: "form-control", required: true %>
+        </div>
+        <div class="form-group">
+          <label>Symbol</label>
+          <input class="form-control" disabled value="<%= @trade_plan["symbol"] %>">
+        </div>
+        <div class="form-group">
+          <label>Side</label>
+          <input class="form-control" disabled value="<%= @trade_plan["side"]&.capitalize %>">
+        </div>
+        <div class="form-group">
+          <label>Quantity</label>
+          <input class="form-control" disabled value="<%= @trade_plan["position_size"] || 1 %>">
+        </div>
+        <div class="form-group form-actions-inline">
+          <%= f.submit "Confirm Execution", class: "btn btn-primary" %>
+          <button type="button" class="btn" data-action="click->toggle#hide">Cancel</button>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<div class="trade-detail-grid">
+  <div class="trade-detail-main">
+    <div class="card">
+      <div class="card-header"><h2>Strategy</h2></div>
+      <% if @trade_plan["entry_trigger"].present? %>
+        <div class="detail-section">
+          <h3>Entry Trigger</h3>
+          <div class="text-content"><%= simple_format(@trade_plan["entry_trigger"]) %></div>
+        </div>
+      <% end %>
+      <% if @trade_plan["exit_strategy"].present? %>
+        <div class="detail-section">
+          <h3>Exit Strategy</h3>
+          <div class="text-content"><%= simple_format(@trade_plan["exit_strategy"]) %></div>
+        </div>
+      <% end %>
+      <% if @trade_plan["entry_trigger"].blank? && @trade_plan["exit_strategy"].blank? %>
+        <div style="padding: 1rem 1.25rem;">
+          <p class="text-muted" style="font-size: 0.875rem;">No strategy defined yet. <%= link_to "Edit this plan", edit_trade_plan_path(@trade_plan["id"]) %> to add entry triggers and exit strategy.</p>
+        </div>
+      <% end %>
+    </div>
+
+    <% if tp_has_levels %>
+      <%# Risk/Reward breakdown %>
+      <div class="card">
+        <div class="card-header">
+          <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">straighten</span> Risk/Reward Breakdown</h2>
+          <span style="font-size: 0.875rem; font-weight: 600; color: <%= tp_rr_color %>;">1:<%= tp_rr %></span>
+        </div>
+        <div style="padding: 1rem 1.25rem;">
+          <%# SVG R:R visual %>
+          <%
+            rr_prices = [tp_stop, tp_entry, tp_target]
+            rr_min = rr_prices.min * 0.998
+            rr_max = rr_prices.max * 1.002
+            rr_range = rr_max - rr_min
+            rr_range = 1 if rr_range == 0
+            rr_to_y = ->(price) { ((rr_max - price) / rr_range * 100).round(2) }
+          %>
+          <svg viewBox="0 0 300 120" style="width: 100%; height: 120px;">
+            <%# Risk zone %>
+            <% ry_entry = rr_to_y.call(tp_entry) * 1.1 %>
+            <% ry_stop = rr_to_y.call(tp_stop) * 1.1 %>
+            <% ry_target = rr_to_y.call(tp_target) * 1.1 %>
+            <% risk_top_y = [ry_entry, ry_stop].min %>
+            <% risk_h = (ry_entry - ry_stop).abs %>
+            <rect x="40" y="<%= risk_top_y %>" width="220" height="<%= risk_h %>" fill="rgba(217,48,37,0.08)" rx="2"/>
+            <%# Reward zone %>
+            <% rew_top_y = [ry_entry, ry_target].min %>
+            <% rew_h = (ry_entry - ry_target).abs %>
+            <rect x="40" y="<%= rew_top_y %>" width="220" height="<%= rew_h %>" fill="rgba(13,144,79,0.08)" rx="2"/>
+            <%# Lines %>
+            <line x1="40" y1="<%= ry_stop %>" x2="260" y2="<%= ry_stop %>" stroke="var(--negative)" stroke-width="2"/>
+            <text x="265" y="<%= ry_stop + 4 %>" fill="var(--negative)" font-size="9" font-weight="600"><%= number_to_currency(tp_stop) %></text>
+            <text x="4" y="<%= ry_stop + 4 %>" fill="var(--negative)" font-size="8">Stop</text>
+            <line x1="40" y1="<%= ry_entry %>" x2="260" y2="<%= ry_entry %>" stroke="var(--primary)" stroke-width="2" stroke-dasharray="6,3"/>
+            <text x="265" y="<%= ry_entry + 4 %>" fill="var(--primary)" font-size="9" font-weight="600"><%= number_to_currency(tp_entry) %></text>
+            <text x="4" y="<%= ry_entry + 4 %>" fill="var(--primary)" font-size="8">Entry</text>
+            <line x1="40" y1="<%= ry_target %>" x2="260" y2="<%= ry_target %>" stroke="var(--positive)" stroke-width="2"/>
+            <text x="265" y="<%= ry_target + 4 %>" fill="var(--positive)" font-size="9" font-weight="600"><%= number_to_currency(tp_target) %></text>
+            <text x="4" y="<%= ry_target + 4 %>" fill="var(--positive)" font-size="8">Target</text>
+          </svg>
+
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Risk/Share</div>
+              <div style="font-size: 1rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(tp_risk) %></div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Reward/Share</div>
+              <div style="font-size: 1rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(tp_reward) %></div>
+            </div>
+            <div style="text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Risk</div>
+              <div style="font-size: 1rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(tp_total_risk) %></div>
+            </div>
+          </div>
+
+          <% if tp_qty > 0 %>
+            <%# Scenario table: what happens at different R multiples %>
+            <div style="margin-top: 0.75rem;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.375rem;">Outcome Scenarios</div>
+              <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 0; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;">
+                <%
+                  scenarios = [
+                    { label: "Full Stop", r: -1.0 },
+                    { label: "Half Stop", r: -0.5 },
+                    { label: "Breakeven", r: 0 },
+                    { label: "Half Target", r: tp_rr * 0.5 },
+                    { label: "Full Target", r: tp_rr }
+                  ]
+                %>
+                <% scenarios.each_with_index do |sc, i| %>
+                  <%
+                    sc_pnl = sc[:r] * tp_risk * tp_qty
+                    sc_color = sc_pnl > 0 ? "var(--positive)" : sc_pnl < 0 ? "var(--negative)" : "var(--text-secondary)"
+                  %>
+                  <div style="padding: 0.5rem; text-align: center; <%= i < scenarios.length - 1 ? 'border-right: 1px solid var(--border);' : '' %> background: <%= sc_pnl > 0 ? 'rgba(13,144,79,0.04)' : sc_pnl < 0 ? 'rgba(217,48,37,0.04)' : 'transparent' %>;">
+                    <div style="font-size: 0.5625rem; color: var(--text-secondary); text-transform: uppercase;"><%= sc[:label] %></div>
+                    <div style="font-size: 0.875rem; font-weight: 700; color: <%= sc_color %>;"><%= number_to_currency(sc_pnl) %></div>
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @trade_plan["notes"].present? %>
+      <div class="card">
+        <div class="card-header"><h2>Notes</h2></div>
+        <div class="text-content"><%= simple_format(@trade_plan["notes"]) %></div>
+      </div>
+    <% end %>
+  </div>
+
+  <div class="trade-detail-sidebar">
+    <%# Trade setup details %>
+    <div class="card">
+      <div class="card-header"><h2>Trade Setup</h2></div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Symbol</span>
+          <span class="detail-value"><%= @trade_plan["symbol"] %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Side</span>
+          <span class="detail-value"><%= @trade_plan["side"]&.capitalize %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Asset Class</span>
+          <span class="detail-value"><%= @trade_plan["asset_class"]&.capitalize || "—" %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Target Entry</span>
+          <span class="detail-value"><%= tp_entry > 0 ? number_to_currency(tp_entry) : "—" %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Position Size</span>
+          <span class="detail-value"><%= tp_qty > 0 ? tp_qty : "—" %></span>
+        </div>
+        <% if tp_has_levels && tp_qty > 0 %>
+          <div class="detail-item">
+            <span class="detail-label">Position Value</span>
+            <span class="detail-value"><%= number_to_currency(tp_entry * tp_qty) %></span>
+          </div>
+        <% end %>
+        <div class="detail-item">
+          <span class="detail-label">Status</span>
+          <span class="detail-value"><span class="badge badge-<%= tp_status %>"><%= tp_status.capitalize %></span></span>
+        </div>
+        <% if @trade_plan["created_at"].present? %>
+          <div class="detail-item">
+            <span class="detail-label">Created</span>
+            <span class="detail-value text-muted"><%= Date.parse(@trade_plan["created_at"]).strftime("%b %d, %Y") rescue "—" %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Matched Trades</h2>
+        <span class="badge"><%= @matched_trades.count %></span>
+      </div>
+
+      <% if @matched_trades.any? %>
+        <ul class="matched-trades-list">
+          <% @matched_trades.each do |trade| %>
+            <li>
+              <div class="matched-trade-info">
+                <%= link_to trade_path(trade["id"]) do %>
+                  <strong><%= trade["symbol"] %></strong>
+                <% end %>
+                <span class="matched-trade-time"><%= trade["entry_time"]&.to_s&.slice(0, 16)&.gsub("T", " ") %></span>
+              </div>
+              <span class="matched-trade-pnl <%= trade["pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+                <%= number_to_currency(trade["pnl"]) %>
+              </span>
+            </li>
+          <% end %>
+        </ul>
+
+        <%
+          matched_pnl = @matched_trades.sum { |t| t["pnl"].to_f }
+          matched_wins = @matched_trades.count { |t| t["pnl"].to_f > 0 }
+          matched_win_rate = @matched_trades.any? ? (matched_wins.to_f / @matched_trades.count * 100).round(1) : 0
+          execution_rate = @total_trades_after_plan > 0 ? (@matched_trades.count.to_f / @total_trades_after_plan * 100).round(1) : 0
+        %>
+
+        <div class="detail-grid" style="border-top: 1px solid var(--border); padding-top: 0.5rem;">
+          <div class="detail-item">
+            <span class="detail-label">Matched P&L</span>
+            <span class="detail-value <%= matched_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(matched_pnl) %></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Win Rate</span>
+            <span class="detail-value"><%= matched_win_rate %>%</span>
+          </div>
+        </div>
+
+        <div class="execution-rate-bar">
+          <span>Execution Rate</span>
+          <div class="execution-rate-fill">
+            <div class="execution-rate-fill-inner" style="width: <%= execution_rate %>%;"></div>
+          </div>
+          <span><strong><%= execution_rate %>%</strong></span>
+        </div>
+      <% else %>
+        <p class="empty-state" style="padding: 1rem; font-size: 0.875rem;">No matching trades found for this plan.</p>
+      <% end %>
+    </div>
+  </div>
+</div>
+</div>

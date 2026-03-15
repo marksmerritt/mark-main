@@ -1,15 +1,14 @@
 <% @trades.each do |trade| %>
   <tr>
+    <td class="td-narrow"><input type="checkbox" value="<%= trade["id"] %>" data-bulk-actions-target="checkbox" data-action="bulk-actions#toggle"></td>
     <td><%= link_to Date.parse(trade["entry_time"]).strftime("%b %d, %Y"), trade_path(trade["id"]) if trade["entry_time"] %></td>
     <td><strong><%= trade["symbol"] %></strong></td>
     <td><%= trade["side"]&.capitalize %></td>
     <td><%= trade["asset_class"]&.capitalize %></td>
     <td><%= number_to_currency(trade["entry_price"]) %></td>
-    <td><%= trade["exit_price"] ? number_to_currency(trade["exit_price"]) : "—" %></td>
+    <td><%= trade["exit_price"] ? number_to_currency(trade["exit_price"]) : "\u2014" %></td>
     <td><%= trade["quantity"] %></td>
-    <td class="<%= trade["pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
-      <%= trade["pnl"] ? number_to_currency(trade["pnl"]) : "—" %>
-    </td>
-    <td><span class="badge badge-<%= trade["status"] %>"><%= trade["status"]&.capitalize %></span></td>
+    <td><%= outcome_badge(trade["pnl"]) %> <%= pnl_display(trade["pnl"]) %></td>
+    <td><%= badge_for(trade["status"]) %></td>
   </tr>
 <% end %>

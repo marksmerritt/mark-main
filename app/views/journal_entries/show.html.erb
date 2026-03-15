@@ -1,82 +1,302 @@
+<%
+  je = @journal_entry
+  je_date = Date.parse(je["date"]) rescue Date.current
+  je_mood = je["mood"]
+  je_pnl = je["daily_pnl"].to_f
+  je_trades = je["trades"].is_a?(Array) ? je["trades"] : []
+  je_has_trades = je_trades.any?
+
+  # Mood styling
+  je_mood_colors = { "great" => "#0d904f", "good" => "#34a853", "confident" => "#1a73e8", "neutral" => "#9aa0a6",
+                     "disciplined" => "#6366f1", "excited" => "#f59e0b", "anxious" => "#ea8600",
+                     "frustrated" => "#e8710a", "fearful" => "#d93025", "bad" => "#ea8600", "terrible" => "#d93025" }
+  je_mood_icons = { "great" => "sentiment_very_satisfied", "good" => "sentiment_satisfied", "confident" => "military_tech",
+                    "neutral" => "sentiment_neutral", "disciplined" => "self_improvement", "excited" => "celebration",
+                    "anxious" => "psychology", "frustrated" => "sentiment_dissatisfied", "fearful" => "warning",
+                    "bad" => "sentiment_dissatisfied", "terrible" => "sentiment_very_dissatisfied" }
+  je_mood_color = je_mood_colors[je_mood.to_s.downcase] || "var(--text-secondary)"
+  je_mood_icon = je_mood_icons[je_mood.to_s.downcase] || "sentiment_neutral"
+
+  if je_has_trades
+    je_winners = je_trades.count { |t| t["pnl"].to_f > 0 }
+    je_losers = je_trades.count { |t| t["pnl"].to_f < 0 }
+    je_total = je_trades.count
+    je_win_rate = je_total > 0 ? (je_winners.to_f / je_total * 100).round(0) : 0
+    je_best = je_trades.max_by { |t| t["pnl"].to_f }
+    je_worst = je_trades.min_by { |t| t["pnl"].to_f }
+    je_avg_pnl = je_total > 0 ? (je_pnl / je_total).round(2) : 0
+  end
+
+  # Content completeness
+  je_sections = []
+  je_sections << { done: je["content"].present?, label: "Content", icon: "edit_note" }
+  je_sections << { done: je_mood.present?, label: "Mood", icon: "psychology" }
+  je_sections << { done: je["market_conditions"].present?, label: "Market conditions", icon: "show_chart" }
+  je_sections << { done: je["plan"].present?, label: "Plan", icon: "assignment" }
+  je_sections << { done: je["review"].present?, label: "Review", icon: "rate_review" }
+  je_done = je_sections.count { |s| s[:done] }
+  je_completeness = (je_done.to_f / je_sections.size * 100).round(0)
+%>
+
 <div class="page-header">
-  <h1>Journal Entry — <%= Date.parse(@journal_entry["date"]).strftime("%A, %B %-d, %Y") %></h1>
+  <h1>Journal — <%= je_date.strftime("%A, %B %-d, %Y") %></h1>
   <div class="page-actions">
-    <%= link_to "Edit", edit_journal_entry_path(@journal_entry["id"]), class: "btn btn-primary" %>
-    <%= link_to "Delete", journal_entry_path(@journal_entry["id"]), data: { turbo_method: :delete, turbo_confirm: "Are you sure you want to delete this journal entry?" }, class: "btn btn-danger" %>
+    <%= link_to edit_journal_entry_path(je["id"]), class: "btn btn-primary" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">edit</span> Edit
+    <% end %>
+    <%= link_to "Delete", journal_entry_path(je["id"]), data: { turbo_method: :delete, turbo_confirm: "Are you sure you want to delete this journal entry?" }, class: "btn btn-danger" %>
+    <%= link_to calendar_journal_entries_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">calendar_month</span> Calendar
+    <% end %>
     <%= link_to "Back", journal_entries_path, class: "btn" %>
   </div>
 </div>
 
-<div class="card">
-  <div class="card-header">
-    <h2>Overview</h2>
-    <% if @journal_entry["mood"].present? %>
-      <span class="badge badge-mood"><%= @journal_entry["mood"] %></span>
+<%# Day summary hero %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: stretch; flex-wrap: wrap;">
+    <%# Date & Mood %>
+    <div style="flex: 0 0 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; border-right: 1px solid var(--border);">
+      <div style="font-size: 2rem; font-weight: 700;"><%= je_date.day %></div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary);"><%= je_date.strftime("%B %Y") %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;"><%= je_date.strftime("%A") %></div>
+      <% if je_mood.present? %>
+        <div style="display: flex; align-items: center; gap: 0.375rem;">
+          <span class="material-icons-outlined" style="font-size: 1.5rem; color: <%= je_mood_color %>;"><%= je_mood_icon %></span>
+          <span style="font-size: 0.875rem; font-weight: 600; color: <%= je_mood_color %>;"><%= je_mood.capitalize %></span>
+        </div>
+      <% end %>
+    </div>
+
+    <%# Key metrics %>
+    <div style="flex: 1; min-width: 280px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0;">
+      <div style="padding: 1.25rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Daily P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= je_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(je_pnl) %></div>
+      </div>
+      <div style="padding: 1.25rem; border-bottom: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= je_total || 0 %></div>
+        <% if je_has_trades %>
+          <div style="font-size: 0.625rem; color: var(--text-secondary);"><span class="positive"><%= je_winners %>W</span> / <span class="negative"><%= je_losers %>L</span></div>
+        <% end %>
+      </div>
+      <div style="padding: 1.25rem; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <% if je_has_trades %>
+          <div style="font-size: 1.25rem; font-weight: 700; color: <%= je_win_rate >= 55 ? 'var(--positive)' : je_win_rate >= 45 ? 'var(--text)' : 'var(--negative)' %>;"><%= je_win_rate %>%</div>
+        <% else %>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--text-secondary);">—</div>
+        <% end %>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Completeness</div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;">
+          <% je_sections.size.times do |i| %>
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: <%= i < je_done ? 'var(--primary)' : 'var(--border)' %>;"></div>
+          <% end %>
+          <span style="font-size: 0.8125rem; font-weight: 600; margin-left: 0.125rem;"><%= je_done %>/<%= je_sections.size %></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Trade P&L bar chart for the day %>
+  <% if je_has_trades && je_trades.size >= 2 %>
+    <%
+      pnl_vals = je_trades.map { |t| t["pnl"].to_f }
+      pnl_max = [pnl_vals.max.abs, pnl_vals.min.abs, 1].max
+    %>
+    <div style="padding: 0.75rem 1.25rem 1rem; border-top: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.375rem;">Trade Results</div>
+      <div style="display: flex; align-items: flex-end; gap: 4px; height: 50px;">
+        <% je_trades.each do |t| %>
+          <%
+            tp = t["pnl"].to_f
+            bar_h = (tp.abs / pnl_max * 100).clamp(5, 100).round(0)
+            bar_color = tp >= 0 ? "var(--positive)" : "var(--negative)"
+          %>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;"
+               title="<%= t["symbol"] %>: <%= number_to_currency(tp) %>">
+            <div style="width: 100%; max-width: 40px; height: <%= bar_h / 2 %>px; background: <%= bar_color %>; opacity: 0.6; border-radius: 2px 2px 0 0;"></div>
+            <div style="font-size: 0.5rem; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50px;"><%= t["symbol"] %></div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Missing sections prompt %>
+<% missing = je_sections.reject { |s| s[:done] } %>
+<% if missing.any? && missing.size <= 3 %>
+  <div class="card" style="margin-bottom: 1rem; border-left: 3px solid var(--primary);">
+    <div style="padding: 0.75rem 1.25rem;">
+      <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.375rem;">Complete your journal entry:</div>
+      <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+        <% missing.each do |item| %>
+          <%= link_to edit_journal_entry_path(je["id"]), style: "display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.8125rem; color: var(--primary); text-decoration: none;" do %>
+            <span class="material-icons-outlined" style="font-size: 0.875rem;"><%= item[:icon] %></span>
+            Add <%= item[:label].downcase %>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div class="trade-detail-grid">
+  <div class="trade-detail-main">
+    <% if je["content"].present? %>
+      <div class="card">
+        <div class="card-header"><h2>Content</h2></div>
+        <div class="text-content"><%= simple_format(je["content"]) %></div>
+      </div>
+    <% end %>
+
+    <% if je["market_conditions"].present? %>
+      <div class="card">
+        <div class="card-header">
+          <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Market Conditions</h2>
+        </div>
+        <div class="text-content"><%= simple_format(je["market_conditions"]) %></div>
+      </div>
+    <% end %>
+
+    <% if je["plan"].present? %>
+      <div class="card">
+        <div class="card-header">
+          <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">assignment</span> Plan</h2>
+        </div>
+        <div class="text-content"><%= simple_format(je["plan"]) %></div>
+      </div>
+    <% end %>
+
+    <% if je["review"].present? %>
+      <div class="card">
+        <div class="card-header">
+          <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">rate_review</span> Review</h2>
+        </div>
+        <div class="text-content"><%= simple_format(je["review"]) %></div>
+      </div>
+    <% end %>
+
+    <%# Trades table %>
+    <% if je_has_trades %>
+      <div class="card">
+        <div class="card-header">
+          <h2>Trades (<%= je_total %>)</h2>
+          <span style="font-size: 0.8125rem; font-weight: 600;" class="<%= je_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(je_pnl) %></span>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th style="text-align: right;">P&L</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% je_trades.sort_by { |t| -t["pnl"].to_f }.each do |trade| %>
+              <tr>
+                <td><strong><%= trade["symbol"] %></strong></td>
+                <td><%= trade["side"]&.capitalize %></td>
+                <td style="text-align: right;" class="<%= trade["pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+                  <strong><%= number_to_currency(trade["pnl"] || 0) %></strong>
+                </td>
+                <td style="text-align: right;"><%= link_to "View", trade_path(trade["id"]), class: "btn btn-sm" %></td>
+              </tr>
+            <% end %>
+          </tbody>
+          <% if je_has_trades %>
+            <tfoot>
+              <tr style="font-weight: 600;">
+                <td colspan="2">Total</td>
+                <td style="text-align: right;" class="<%= je_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(je_pnl) %></td>
+                <td></td>
+              </tr>
+            </tfoot>
+          <% end %>
+        </table>
+      </div>
     <% end %>
   </div>
 
-  <div class="detail-section">
-    <h3>Content</h3>
-    <div class="text-content"><%= simple_format(@journal_entry["content"]) %></div>
-  </div>
+  <div class="trade-detail-sidebar">
+    <% if je_has_trades %>
+      <div class="card">
+        <div class="card-header"><h2>Day Stats</h2></div>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Win Rate</span>
+            <span class="detail-value"><%= je_win_rate %>%</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Avg P&L</span>
+            <span class="detail-value" class="<%= je_avg_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(je_avg_pnl) %></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Best Trade</span>
+            <span class="detail-value positive"><%= number_to_currency(je_best["pnl"]) %></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Worst Trade</span>
+            <span class="detail-value negative"><%= number_to_currency(je_worst["pnl"]) %></span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Symbols</span>
+            <span class="detail-value"><%= je_trades.map { |t| t["symbol"] }.uniq.join(", ") %></span>
+          </div>
+        </div>
 
-  <% if @journal_entry["market_conditions"].present? %>
-    <div class="detail-section">
-      <h3>Market Conditions</h3>
-      <div class="text-content"><%= simple_format(@journal_entry["market_conditions"]) %></div>
-    </div>
-  <% end %>
+        <%# Win rate bar %>
+        <div style="padding: 0.5rem 1.25rem 0.75rem;">
+          <div style="height: 0.375rem; background: var(--bg); border-radius: 4px; overflow: hidden; display: flex;">
+            <% if je_total > 0 %>
+              <div style="width: <%= je_win_rate %>%; height: 100%; background: var(--positive); opacity: 0.6;"></div>
+              <div style="width: <%= 100 - je_win_rate %>%; height: 100%; background: var(--negative); opacity: 0.6;"></div>
+            <% end %>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.5625rem; color: var(--text-secondary); margin-top: 0.125rem;">
+            <span class="positive"><%= je_winners %> wins</span>
+            <span class="negative"><%= je_losers %> losses</span>
+          </div>
+        </div>
+      </div>
+    <% end %>
 
-  <% if @journal_entry["plan"].present? %>
-    <div class="detail-section">
-      <h3>Plan</h3>
-      <div class="text-content"><%= simple_format(@journal_entry["plan"]) %></div>
-    </div>
-  <% end %>
+    <%# Mood info %>
+    <% if je_mood.present? %>
+      <div class="card">
+        <div class="card-header"><h2>Mood</h2></div>
+        <div style="padding: 1rem 1.25rem; text-align: center;">
+          <span class="material-icons-outlined" style="font-size: 2.5rem; color: <%= je_mood_color %>;"><%= je_mood_icon %></span>
+          <div style="font-size: 1rem; font-weight: 600; color: <%= je_mood_color %>; margin-top: 0.25rem;"><%= je_mood.capitalize %></div>
+          <% if je_has_trades %>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.375rem;">
+              Traded <%= je_total %> time<%= je_total == 1 ? "" : "s" %> while feeling <%= je_mood.downcase %>,
+              netting <span class="<%= je_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(je_pnl) %></span>.
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
 
-  <% if @journal_entry["review"].present? %>
-    <div class="detail-section">
-      <h3>Review</h3>
-      <div class="text-content"><%= simple_format(@journal_entry["review"]) %></div>
-    </div>
-  <% end %>
-</div>
-
-<div class="card">
-  <div class="card-header">
-    <h2>Daily P&L</h2>
-    <span class="<%= @journal_entry["daily_pnl"].to_f >= 0 ? 'positive' : 'negative' %>" style="font-size: 1.25rem; font-weight: 600;">
-      <%= number_to_currency(@journal_entry["daily_pnl"] || 0) %>
-    </span>
-  </div>
-</div>
-
-<% if @journal_entry["trades"].present? && @journal_entry["trades"].any? %>
-  <div class="card">
-    <div class="card-header">
-      <h2>Trades</h2>
-    </div>
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Symbol</th>
-          <th>Side</th>
-          <th>P&L</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        <% @journal_entry["trades"].each do |trade| %>
-          <tr>
-            <td><%= trade["symbol"] %></td>
-            <td><%= trade["side"]&.capitalize %></td>
-            <td class="<%= trade["pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
-              <%= number_to_currency(trade["pnl"] || 0) %>
-            </td>
-            <td><%= link_to "View", trade_path(trade["id"]), class: "btn btn-sm" %></td>
-          </tr>
+    <%# Quick actions %>
+    <div class="card">
+      <div class="card-header"><h2>Quick Actions</h2></div>
+      <div style="padding: 0.5rem 1.25rem; display: flex; flex-direction: column; gap: 0.375rem;">
+        <%= link_to edit_journal_entry_path(je["id"]), class: "btn btn-sm", style: "justify-content: flex-start;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem;">edit</span> Edit Entry
         <% end %>
-      </tbody>
-    </table>
+        <%= link_to new_journal_entry_path("journal_entry[date]" => (je_date + 1).to_s), class: "btn btn-sm", style: "justify-content: flex-start;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem;">add</span> Next Day Entry
+        <% end %>
+        <%= link_to new_trade_path("trade[entry_time]" => je_date.to_s), class: "btn btn-sm", style: "justify-content: flex-start;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem;">trending_up</span> Log Trade for This Day
+        <% end %>
+      </div>
+    </div>
   </div>
-<% end %>
+</div>

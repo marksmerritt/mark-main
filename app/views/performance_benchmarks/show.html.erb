@@ -1,0 +1,249 @@
+<% content_for(:title) { "Performance Benchmarks" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #1565c0;">leaderboard</span>
+    Performance Benchmarks
+  </h1>
+</div>
+
+<% if @trades.blank? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem;">leaderboard</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Need closed trades to benchmark</div>
+  </div>
+<% else %>
+
+<%# Tier Card %>
+<div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid <%= @tier_info[:color] %>;">
+  <div style="display: flex; align-items: center; gap: 1.5rem; padding: 1.5rem;">
+    <div style="width: 80px; height: 80px; position: relative;">
+      <svg viewBox="0 0 80 80" style="width: 100%; height: 100%;">
+        <circle cx="40" cy="40" r="35" fill="none" stroke="var(--border)" stroke-width="6"/>
+        <circle cx="40" cy="40" r="35" fill="none" stroke="<%= @tier_info[:color] %>" stroke-width="6"
+                stroke-dasharray="<%= (220 * @overall_percentile / 100.0).round(1) %> 220"
+                stroke-linecap="round" transform="rotate(-90 40 40)"/>
+        <text x="40" y="38" text-anchor="middle" fill="var(--text)" font-size="16" font-weight="700"><%= @overall_percentile %></text>
+        <text x="40" y="50" text-anchor="middle" fill="var(--text-secondary)" font-size="8">percentile</text>
+      </svg>
+    </div>
+    <div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Your Trading Tier</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @tier_info[:color] %>;"><%= @tier_info[:label] %></div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+        Top <%= 100 - @overall_percentile %>% of retail traders
+        <% if @improving %>
+          &middot; <span style="color: var(--positive);">Improving</span>
+        <% elsif @improving == false %>
+          &middot; <span style="color: var(--negative);">Declining</span>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Key Metrics vs Benchmarks %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">analytics</span> Your Metrics vs Industry</h2>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @your_metrics[:win_rate] %>%</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">Top <%= 100 - @percentiles[:win_rate] %>%</div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profit Factor</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @your_metrics[:profit_factor] %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">Top <%= 100 - @percentiles[:profit_factor] %>%</div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Expectancy</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @your_metrics[:expectancy] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@your_metrics[:expectancy]) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">Top <%= 100 - @percentiles[:expectancy] %>%</div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total P&L</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @your_metrics[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@your_metrics[:total_pnl]) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @your_metrics[:trade_count] %> trades</div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Consistency</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @consistency_pct %>%</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">profitable months</div>
+    </div>
+  </div>
+</div>
+
+<%# Tier Ladder %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">stairs</span> Trader Tier Ladder</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% @benchmarks.to_a.reverse.each do |key, bm| %>
+      <% is_current = key == @tier %>
+      <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; margin-bottom: 0.375rem; border-radius: 8px; background: <%= is_current ? 'var(--surface)' : 'transparent' %>; border: <%= is_current ? '2px solid ' + bm[:color] : '1px solid transparent' %>;">
+        <div style="width: 12px; height: 12px; border-radius: 50%; background: <%= bm[:color] %>;"></div>
+        <span style="width: 6rem; font-weight: <%= is_current ? '700' : '500' %>; font-size: 0.875rem;"><%= bm[:label] %></span>
+        <span style="font-size: 0.75rem; color: var(--text-secondary); width: 5rem;">WR &ge; <%= bm[:win_rate] %>%</span>
+        <span style="font-size: 0.75rem; color: var(--text-secondary); width: 5rem;">PF &ge; <%= bm[:profit_factor] %></span>
+        <span style="font-size: 0.75rem; color: var(--text-secondary); flex: 1;">E[x] &ge; $<%= bm[:expectancy] %></span>
+        <% if is_current %>
+          <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: <%= bm[:color] %>; color: white; font-weight: 600;">YOU</span>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Risk-Adjusted Metrics %>
+<% if @risk_benchmarks.present? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">shield</span> Risk-Adjusted Performance</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @risk_benchmarks.each do |rb| %>
+        <%
+          if rb[:inverse]
+            level = rb[:yours] <= rb[:elite] ? "elite" : (rb[:yours] <= rb[:great] ? "great" : (rb[:yours] <= rb[:good] ? "good" : "poor"))
+          else
+            level = rb[:yours] >= rb[:elite] ? "elite" : (rb[:yours] >= rb[:great] ? "great" : (rb[:yours] >= rb[:good] ? "good" : "poor"))
+          end
+          level_color = { "elite" => "#8e24aa", "great" => "#43a047", "good" => "#fdd835", "poor" => "#e53935" }[level]
+        %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+          <span style="width: 7rem; font-size: 0.8125rem; text-align: right;"><%= rb[:label] %></span>
+          <div style="flex: 1; position: relative; height: 1.5rem; background: var(--bg); border-radius: 6px; overflow: hidden;">
+            <% bar_pct = if rb[:inverse]
+              rb[:yours] > 0 ? [100 - (rb[:yours].to_f / (rb[:good] * 2) * 100), 100].min : 100
+            else
+              max_val = rb[:suffix] == "%" ? 100 : rb[:elite] * 1.5
+              [(rb[:yours].to_f / max_val * 100).abs, 100].min
+            end %>
+            <div style="height: 100%; width: <%= bar_pct.round(1) %>%; background: <%= level_color %>; opacity: 0.6; border-radius: 6px;"></div>
+            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center;">
+              <span style="font-size: 0.75rem; font-weight: 600;"><%= rb[:prefix] %><%= rb[:yours] %><%= rb[:suffix] %></span>
+            </div>
+          </div>
+          <span style="min-width: 3rem; font-size: 0.6875rem; color: <%= level_color %>; font-weight: 600; text-transform: uppercase;"><%= level %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Monthly Comparison Chart %>
+<% if @monthly_data.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Monthly Performance</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        months = @monthly_data.to_a
+        pnl_max = months.map { |_, v| v[:pnl].abs }.max.to_f
+        pnl_max = 1 if pnl_max == 0
+      %>
+      <svg viewBox="0 0 <%= months.size * 58 + 60 %> 180" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <line x1="30" y1="90" x2="<%= months.size * 58 + 50 %>" y2="90" stroke="var(--border)" stroke-width="0.5"/>
+        <% months.each_with_index do |(month, data), i| %>
+          <% bar_h = (data[:pnl].abs / pnl_max * 75).round(1) %>
+          <% x = 35 + i * 58 %>
+          <% if data[:pnl] >= 0 %>
+            <rect x="<%= x %>" y="<%= 90 - bar_h %>" width="42" height="<%= bar_h %>" fill="var(--positive)" opacity="0.5" rx="3"/>
+            <text x="<%= x + 21 %>" y="<%= 90 - bar_h - 4 %>" text-anchor="middle" fill="var(--positive)" font-size="7" font-weight="600">+$<%= (data[:pnl] / 1000.0).round(1) %>k</text>
+          <% else %>
+            <rect x="<%= x %>" y="90" width="42" height="<%= bar_h %>" fill="var(--negative)" opacity="0.5" rx="3"/>
+            <text x="<%= x + 21 %>" y="<%= 90 + bar_h + 10 %>" text-anchor="middle" fill="var(--negative)" font-size="7" font-weight="600">-$<%= (data[:pnl].abs / 1000.0).round(1) %>k</text>
+          <% end %>
+          <text x="<%= x + 21 %>" y="170" text-anchor="middle" fill="var(--text-secondary)" font-size="6"><%= month[-5..] %></text>
+          <%
+            wr = data[:trades] > 0 ? (data[:wins].to_f / data[:trades] * 100).round(0) : 0
+          %>
+          <text x="<%= x + 21 %>" y="160" text-anchor="middle" fill="var(--text-secondary)" font-size="5"><%= wr %>% WR</text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<%# Strengths & Weaknesses %>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+  <div class="card" style="padding: 1.25rem;">
+    <div style="font-weight: 600; margin-bottom: 0.75rem; color: var(--positive);">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">thumb_up</span> Strengths
+    </div>
+    <% strengths = [] %>
+    <% strengths << "Strong win rate (#{@your_metrics[:win_rate]}%)" if @your_metrics[:win_rate] >= 50 %>
+    <% strengths << "Positive expectancy ($#{@your_metrics[:expectancy]})" if @your_metrics[:expectancy] > 0 %>
+    <% strengths << "Good profit factor (#{@your_metrics[:profit_factor]})" if @your_metrics[:profit_factor] >= 1.5 %>
+    <% strengths << "High consistency (#{@consistency_pct}% profitable months)" if @consistency_pct >= 60 %>
+    <% strengths << "Strong Sharpe ratio (#{@sharpe_ratio})" if @sharpe_ratio.to_f >= 0.5 %>
+    <% strengths << "Performance improving over time" if @improving %>
+    <% strengths << "No significant strengths yet — keep trading!" if strengths.empty? %>
+    <% strengths.each do |s| %>
+      <div style="font-size: 0.8125rem; margin-bottom: 0.375rem; display: flex; gap: 0.5rem; align-items: start;">
+        <span style="color: var(--positive);">+</span> <%= s %>
+      </div>
+    <% end %>
+  </div>
+  <div class="card" style="padding: 1.25rem;">
+    <div style="font-weight: 600; margin-bottom: 0.75rem; color: var(--negative);">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">flag</span> Areas to Improve
+    </div>
+    <% weaknesses = [] %>
+    <% weaknesses << "Win rate below 50% (#{@your_metrics[:win_rate]}%)" if @your_metrics[:win_rate] < 50 %>
+    <% weaknesses << "Negative expectancy — losing on average" if @your_metrics[:expectancy] < 0 %>
+    <% weaknesses << "Profit factor below 1.0 — losing money" if @your_metrics[:profit_factor] < 1.0 %>
+    <% weaknesses << "Low consistency (#{@consistency_pct}% profitable months)" if @consistency_pct < 50 %>
+    <% weaknesses << "Large drawdown ($#{number_with_delimiter(@max_drawdown.to_f.round(0))})" if @max_drawdown.to_f > 5000 %>
+    <% weaknesses << "Performance declining recently" if @improving == false %>
+    <% weaknesses << "Looking good! Keep up the discipline." if weaknesses.empty? %>
+    <% weaknesses.each do |w| %>
+      <div style="font-size: 0.8125rem; margin-bottom: 0.375rem; display: flex; gap: 0.5rem; align-items: start;">
+        <span style="color: var(--negative);">!</span> <%= w %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Next Level Requirements %>
+<% next_tier_key = @benchmarks.keys[@benchmarks.keys.index(@tier) + 1] if @benchmarks.keys.index(@tier) %>
+<% if next_tier_key %>
+  <% next_bm = @benchmarks[next_tier_key] %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid <%= next_bm[:color] %>; padding: 1.25rem;">
+    <div style="font-weight: 600; margin-bottom: 0.5rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">arrow_upward</span>
+      To reach <span style="color: <%= next_bm[:color] %>;"><%= next_bm[:label] %></span> tier:
+    </div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary);">
+      <% if @your_metrics[:win_rate] < next_bm[:win_rate] %>
+        <div style="margin-bottom: 0.25rem;">Increase win rate from <strong><%= @your_metrics[:win_rate] %>%</strong> to <strong><%= next_bm[:win_rate] %>%</strong> (+<%= (next_bm[:win_rate] - @your_metrics[:win_rate]).round(1) %>pp)</div>
+      <% end %>
+      <% if @your_metrics[:profit_factor] < next_bm[:profit_factor] %>
+        <div style="margin-bottom: 0.25rem;">Improve profit factor from <strong><%= @your_metrics[:profit_factor] %></strong> to <strong><%= next_bm[:profit_factor] %></strong></div>
+      <% end %>
+      <% if @your_metrics[:expectancy] < next_bm[:expectancy] %>
+        <div>Raise expectancy from <strong><%= number_to_currency(@your_metrics[:expectancy]) %></strong> to <strong><%= number_to_currency(next_bm[:expectancy]) %></strong></div>
+      <% end %>
+    </div>
+  </div>
+<% else %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid #8e24aa; padding: 1.25rem;">
+    <div style="font-weight: 600; color: #8e24aa;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">emoji_events</span>
+      You've reached the Elite tier! Keep maintaining your edge.
+    </div>
+  </div>
+<% end %>
+
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Report Card", trading_grades_path, class: "btn" %>
+  <%= link_to "Edge Finder", edge_finder_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+</div>

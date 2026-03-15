@@ -1,0 +1,245 @@
+<% content_for(:title) { "Writing Digest" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #3f51b5;">auto_stories</span>
+    Writing Digest
+  </h1>
+  <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= Date.current.strftime("%A, %B %-d, %Y") %></span>
+</div>
+
+<%# Today's Progress Card %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: linear-gradient(135deg, rgba(63,81,181,0.06), rgba(63,81,181,0.02));">
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+    <div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Today's Words</div>
+      <div style="font-size: 2.5rem; font-weight: 700; color: #3f51b5; line-height: 1.2;"><%= number_with_delimiter(@today_words) %></div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary);">of <%= number_with_delimiter(@daily_goal) %> word goal</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="position: relative; width: 80px; height: 80px;">
+        <svg viewBox="0 0 36 36" style="width: 80px; height: 80px; transform: rotate(-90deg);">
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" stroke-width="3"/>
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#3f51b5" stroke-width="3"
+                  stroke-dasharray="<%= @goal_progress %>, 100" stroke-linecap="round"/>
+        </svg>
+        <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.875rem; font-weight: 700;"><%= @goal_progress.round(0) %>%</div>
+      </div>
+    </div>
+  </div>
+  <div style="width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+    <div style="height: 100%; width: <%= @goal_progress %>%; background: #3f51b5; border-radius: 4px; transition: width 0.3s;"></div>
+  </div>
+  <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.375rem;">
+    <span><%= @today_notes.count %> note<%= @today_notes.count == 1 ? '' : 's' %> today</span>
+    <span><%= [@daily_goal - @today_words, 0].max %> words to go</span>
+  </div>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Today's Words</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #3f51b5;"><%= number_with_delimiter(@today_words) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">This Week</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_with_delimiter(@week_words) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Streak</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @writing_streak >= 3 ? 'var(--positive)' : 'var(--text)' %>;"><%= @writing_streak %> <span style="font-size: 0.75rem;">days</span></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Productivity</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @productivity_score >= 70 ? 'var(--positive)' : @productivity_score >= 40 ? '#ff9800' : 'var(--negative)' %>;"><%= @productivity_score %><span style="font-size: 0.75rem;">/100</span></div>
+    </div>
+  </div>
+</div>
+
+<%# Weekly Comparison %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">compare_arrows</span> Weekly Comparison</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Words</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= number_with_delimiter(@week_words) %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">vs <%= number_with_delimiter(@last_week_words) %></div>
+        <% if @word_delta != 0 %>
+          <span style="font-size: 0.75rem; font-weight: 600; color: <%= @word_delta > 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;"><%= @word_delta > 0 ? 'arrow_upward' : 'arrow_downward' %></span>
+            <%= @word_delta > 0 ? '+' : '' %><%= number_with_delimiter(@word_delta) %>
+          </span>
+        <% end %>
+      </div>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notes</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @week_notes.count %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">vs <%= @last_week_count %></div>
+        <% if @note_delta != 0 %>
+          <span style="font-size: 0.75rem; font-weight: 600; color: <%= @note_delta > 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;"><%= @note_delta > 0 ? 'arrow_upward' : 'arrow_downward' %></span>
+            <%= @note_delta > 0 ? '+' : '' %><%= @note_delta %>
+          </span>
+        <% end %>
+      </div>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Length</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @this_week_avg %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">vs <%= @last_week_avg %></div>
+        <% avg_delta = @this_week_avg - @last_week_avg %>
+        <% if avg_delta != 0 %>
+          <span style="font-size: 0.75rem; font-weight: 600; color: <%= avg_delta > 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;"><%= avg_delta > 0 ? 'arrow_upward' : 'arrow_downward' %></span>
+            <%= avg_delta > 0 ? '+' : '' %><%= avg_delta %> w
+          </span>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Daily Breakdown Bar Chart %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Daily Breakdown</h2>
+  </div>
+  <div style="padding: 1.25rem; overflow-x: auto;">
+    <%
+      day_max = @daily_breakdown.values.max.to_f
+      day_max = 1 if day_max == 0
+      bar_count = @daily_breakdown.count
+      bar_width = 48
+      chart_w = bar_count * (bar_width + 12) + 40
+    %>
+    <svg viewBox="0 0 <%= chart_w %> 170" style="width: 100%; height: auto; min-width: <%= chart_w %>px; font-family: Inter, sans-serif;">
+      <%# Goal line %>
+      <% goal_y = 140 - (@daily_goal.to_f / day_max * 120) %>
+      <% if @daily_goal <= day_max %>
+        <line x1="10" y1="<%= goal_y %>" x2="<%= chart_w - 10 %>" y2="<%= goal_y %>" stroke="#3f51b5" stroke-width="1" stroke-dasharray="4,3" opacity="0.4"/>
+        <text x="<%= chart_w - 8 %>" y="<%= goal_y - 3 %>" text-anchor="end" fill="#3f51b5" font-size="6" opacity="0.6">goal</text>
+      <% end %>
+      <% @daily_breakdown.each_with_index do |(date, words), i| %>
+        <%
+          bar_h = words > 0 ? (words / day_max * 120) : 0
+          x = 20 + i * (bar_width + 12)
+          is_today = date == Date.current
+          fill_color = is_today ? '#3f51b5' : '#7986cb'
+          fill_opacity = is_today ? '0.85' : '0.5'
+        %>
+        <rect x="<%= x %>" y="<%= 140 - bar_h %>" width="<%= bar_width %>" height="<%= [bar_h, 2].max %>"
+              fill="<%= fill_color %>" opacity="<%= fill_opacity %>" rx="3"/>
+        <% if words > 0 %>
+          <text x="<%= x + bar_width / 2 %>" y="<%= 140 - bar_h - 4 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="7" font-weight="600"><%= number_with_delimiter(words) %></text>
+        <% end %>
+        <text x="<%= x + bar_width / 2 %>" y="155" text-anchor="middle" fill="<%= is_today ? '#3f51b5' : 'var(--text-secondary)' %>" font-size="8" font-weight="<%= is_today ? '700' : '400' %>"><%= date.strftime("%a") %></text>
+        <text x="<%= x + bar_width / 2 %>" y="165" text-anchor="middle" fill="var(--text-secondary)" font-size="6"><%= date.strftime("%-m/%-d") %></text>
+      <% end %>
+    </svg>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Recent Activity Feed %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">history</span> Recent Activity</h2>
+    </div>
+    <div style="padding: 0;">
+      <% if @recent_notes.any? %>
+        <% @recent_notes.each_with_index do |note, i| %>
+          <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: flex-start; gap: 0.75rem; <%= i == @recent_notes.length - 1 ? 'border-bottom: none;' : '' %>">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: #3f51b5; margin-top: 2px;">description</span>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 600; font-size: 0.8125rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= note["title"].presence || "Untitled" %></div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; flex-wrap: wrap;">
+                <span style="font-size: 0.6875rem; color: var(--text-secondary);">
+                  <% ts = note["created_at"] %>
+                  <% begin %>
+                    <%= Time.parse(ts).strftime("%-m/%-d %l:%M%P") %>
+                  <% rescue %>
+                    <%= ts.to_s.slice(0, 10) %>
+                  <% end %>
+                </span>
+                <span style="font-size: 0.6875rem; color: var(--text-secondary);">&middot; <%= note["_word_count"] %> words</span>
+                <% nb_name = note.dig("notebook", "name") %>
+                <% if nb_name.present? %>
+                  <span style="font-size: 0.625rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: rgba(63,81,181,0.1); color: #3f51b5;"><%= nb_name %></span>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      <% else %>
+        <div style="padding: 2rem; text-align: center; color: var(--text-secondary); font-size: 0.8125rem;">No recent notes</div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Word Count Distribution + Most Active Notebook %>
+  <div>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">stacked_bar_chart</span> Word Count Distribution</h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <%
+          dist_max = @distribution.values.max.to_f
+          dist_max = 1 if dist_max == 0
+          dist_labels = { short: "Short (<100)", medium: "Medium (100-500)", long: "Long (500-1K)", epic: "Epic (1K+)" }
+          dist_colors = { short: "#90caf9", medium: "#42a5f5", long: "#1e88e5", epic: "#3f51b5" }
+        %>
+        <% @distribution.each do |key, count| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.625rem;">
+            <span style="width: 7rem; font-size: 0.75rem; text-align: right; color: var(--text-secondary); white-space: nowrap;"><%= dist_labels[key] %></span>
+            <div style="flex: 1; height: 1.25rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+              <div style="height: 100%; width: <%= (count / dist_max * 100).round(1) %>%; background: <%= dist_colors[key] %>; border-radius: 4px; min-width: <%= count > 0 ? '4px' : '0' %>;"></div>
+            </div>
+            <span style="min-width: 2rem; text-align: right; font-size: 0.8125rem; font-weight: 600;"><%= count %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Most Active Notebook %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">menu_book</span> Most Active Notebook</h2>
+      </div>
+      <div style="padding: 1.25rem; text-align: center;">
+        <% if @most_active_notebook != "None" %>
+          <span class="material-icons-outlined" style="font-size: 2.5rem; color: #3f51b5; display: block; margin-bottom: 0.5rem;">book</span>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= @most_active_notebook %></div>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+            <%= @most_active_notebook_data[:count] %> note<%= @most_active_notebook_data[:count] == 1 ? '' : 's' %> &middot; <%= number_with_delimiter(@most_active_notebook_data[:words]) %> words this week
+          </div>
+        <% else %>
+          <div style="color: var(--text-secondary); font-size: 0.8125rem;">No notebook activity this week</div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Writing Velocity %>
+    <div class="card">
+      <div style="padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem;">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: #3f51b5;">speed</span>
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Writing Velocity</div>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= @velocity %> <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">words/hr</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Bottom Nav %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Notes", notes_path, class: "btn" %>
+  <%= link_to "Writing Stats", writing_stats_path, class: "btn" %>
+  <%= link_to "Productivity", productivity_notes_path, class: "btn" %>
+</div>

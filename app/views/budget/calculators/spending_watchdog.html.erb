@@ -1,0 +1,283 @@
+<% content_for(:title) { "Spending Watchdog" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #c62828;">notifications_active</span>
+    Spending Watchdog
+  </h1>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Active Alerts</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @total_alerts > 0 ? '#c62828' : 'var(--positive)' %>;"><%= @total_alerts %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Danger Alerts</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @danger_count > 0 ? 'var(--negative)' : 'var(--positive)' %>;"><%= @danger_count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Warning Alerts</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @warning_count > 0 ? '#fbbc04' : 'var(--positive)' %>;"><%= @warning_count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Good News</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @good_news_count %></div>
+    </div>
+  </div>
+</div>
+
+<% if @total_alerts == 0 && @positive_alerts.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; margin-bottom: 1.5rem;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--positive); margin-bottom: 1rem;">verified</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">All Clear</div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">No spending alerts right now. Your finances look healthy!</div>
+  </div>
+<% end %>
+
+<%# ========== DANGER ALERTS ========== %>
+<% danger_alerts = @alerts.select { |a| a[:severity] == :danger } %>
+<% if danger_alerts.any? %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--negative);">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">error</span> Danger Alerts</h2>
+    </div>
+    <div style="padding: 0;">
+      <% danger_alerts.each do |a| %>
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 2.5rem; height: 2.5rem; border-radius: 50%; background: rgba(234,67,53,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--negative);">
+              <%= case a[:type]
+                  when :budget_pace then "speed"
+                  when :unusual_spending then "warning"
+                  when :large_transaction then "paid"
+                  when :frequency then "schedule"
+                  else "error"
+                  end %>
+            </span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 0.875rem;"><%= a[:title] %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= a[:message] %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= a[:category] %> &middot; <%= a[:date] %></div>
+          </div>
+          <% if a[:amount] && a[:amount] != 0 %>
+            <div style="text-align: right; flex-shrink: 0;">
+              <div style="font-weight: 700; color: var(--negative);"><%= number_to_currency(a[:amount].abs) %></div>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# ========== WARNING ALERTS ========== %>
+<% warning_alerts = @alerts.select { |a| a[:severity] == :warning } %>
+<% if warning_alerts.any? %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid #fbbc04;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #fbbc04;">warning</span> Warnings</h2>
+    </div>
+    <div style="padding: 0;">
+      <% warning_alerts.each do |a| %>
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 2.5rem; height: 2.5rem; border-radius: 50%; background: rgba(251,188,4,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: #fbbc04;">
+              <%= case a[:type]
+                  when :budget_pace then "speed"
+                  when :unusual_spending then "trending_up"
+                  when :large_transaction then "paid"
+                  when :frequency then "schedule"
+                  when :recurring_change then "sync_problem"
+                  else "warning"
+                  end %>
+            </span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 0.875rem;"><%= a[:title] %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= a[:message] %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= a[:category] %> &middot; <%= a[:date] %></div>
+          </div>
+          <% if a[:amount] && a[:amount] != 0 %>
+            <div style="text-align: right; flex-shrink: 0;">
+              <div style="font-weight: 700; color: #fbbc04;"><%= number_to_currency(a[:amount].abs) %></div>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# ========== INFO ALERTS ========== %>
+<% info_alerts = @alerts.select { |a| a[:severity] == :info } %>
+<% if info_alerts.any? %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid #2196f3;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2196f3;">info</span> Info</h2>
+    </div>
+    <div style="padding: 0;">
+      <% info_alerts.each do |a| %>
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 2.5rem; height: 2.5rem; border-radius: 50%; background: rgba(33,150,243,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: #2196f3;">
+              <%= case a[:type]
+                  when :new_merchant then "store"
+                  when :no_activity then "do_not_disturb"
+                  when :recurring_change then "sync"
+                  else "info"
+                  end %>
+            </span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 0.875rem;"><%= a[:title] %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= a[:message] %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= a[:category] %> &middot; <%= a[:date] %></div>
+          </div>
+          <% if a[:amount] && a[:amount] != 0 %>
+            <div style="text-align: right; flex-shrink: 0;">
+              <div style="font-weight: 600; color: #2196f3;"><%= number_to_currency(a[:amount].abs) %></div>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# ========== BUDGET PACE SECTION ========== %>
+<% if @pace_data.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #c62828;">speed</span> Budget Pace</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @pace_data.each do |p| %>
+        <div style="margin-bottom: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.375rem;">
+            <span style="font-weight: 600; font-size: 0.875rem;"><%= p[:category] %></span>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= number_to_currency(p[:spent]) %> / <%= number_to_currency(p[:budgeted]) %></span>
+              <span style="font-size: 0.75rem; font-weight: 700; padding: 0.125rem 0.5rem; border-radius: 9999px; background: <%= p[:pace_pct] > 120 ? 'rgba(234,67,53,0.15)' : p[:pace_pct] > 100 ? 'rgba(251,188,4,0.15)' : 'rgba(76,175,80,0.15)' %>; color: <%= p[:pace_pct] > 120 ? 'var(--negative)' : p[:pace_pct] > 100 ? '#fbbc04' : 'var(--positive)' %>;"><%= p[:pace_pct] %>%</span>
+            </div>
+          </div>
+          <div style="background: var(--bg-secondary); border-radius: 6px; height: 0.5rem; overflow: hidden; position: relative;">
+            <div style="height: 100%; width: <%= [p[:pace_pct], 100].min %>%; border-radius: 6px; background: <%= p[:pace_pct] > 120 ? 'var(--negative)' : p[:pace_pct] > 100 ? '#fbbc04' : 'var(--positive)' %>;"></div>
+            <%# Expected pace marker %>
+            <% expected_pct = ((Date.current - Date.current.beginning_of_month).to_f / (Date.current.end_of_month - Date.current.beginning_of_month + 1).to_f * 100).round(0) %>
+            <div style="position: absolute; top: -2px; bottom: -2px; left: <%= expected_pct %>%; width: 2px; background: var(--text-secondary); opacity: 0.5;" title="Expected pace"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 0.25rem;">
+            <span style="font-size: 0.6875rem; color: var(--text-secondary);">Projected: <%= number_to_currency(p[:projected]) %></span>
+            <% if p[:exhausted_date] %>
+              <span style="font-size: 0.6875rem; color: <%= p[:exhausted_date] <= Date.current.end_of_month ? 'var(--negative)' : 'var(--text-secondary)' %>;">
+                Exhausted by: <%= p[:exhausted_date].strftime("%b %d") %>
+              </span>
+            <% elsif p[:spent] >= p[:budgeted] %>
+              <span style="font-size: 0.6875rem; color: var(--negative); font-weight: 600;">Already exhausted</span>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# ========== CATEGORY BURN RATE TABLE ========== %>
+<% if @burn_rates.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff6f00;">local_fire_department</span> Category Burn Rate</h2>
+    </div>
+    <div style="overflow-x: auto;">
+      <table class="table" style="width: 100%; font-size: 0.8125rem;">
+        <thead>
+          <tr>
+            <th style="text-align: left; padding: 0.625rem 1rem;">Category</th>
+            <th style="text-align: right; padding: 0.625rem 1rem;">Budget</th>
+            <th style="text-align: right; padding: 0.625rem 1rem;">Spent</th>
+            <th style="text-align: right; padding: 0.625rem 1rem;">Remaining</th>
+            <th style="text-align: right; padding: 0.625rem 1rem;">Daily Rate</th>
+            <th style="text-align: right; padding: 0.625rem 1rem;">Days Left</th>
+            <th style="text-align: center; padding: 0.625rem 1rem;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @burn_rates.each do |b| %>
+            <tr>
+              <td style="padding: 0.5rem 1rem; font-weight: 500;"><%= b[:category] %></td>
+              <td style="padding: 0.5rem 1rem; text-align: right;"><%= number_to_currency(b[:budgeted]) %></td>
+              <td style="padding: 0.5rem 1rem; text-align: right;"><%= number_to_currency(b[:spent]) %></td>
+              <td style="padding: 0.5rem 1rem; text-align: right; color: <%= b[:remaining] < 0 ? 'var(--negative)' : 'var(--positive)' %>;">
+                <%= number_to_currency(b[:remaining]) %>
+              </td>
+              <td style="padding: 0.5rem 1rem; text-align: right;"><%= number_to_currency(b[:daily_rate]) %>/day</td>
+              <td style="padding: 0.5rem 1rem; text-align: right; font-weight: 600; color: <%= if b[:days_left].nil? || b[:days_left] <= 0 then 'var(--negative)' elsif b[:days_left] < 10 then '#fbbc04' else 'var(--positive)' end %>;">
+                <% if b[:days_left].nil? || b[:remaining] <= 0 %>
+                  Exhausted
+                <% else %>
+                  <%= b[:days_left].round(0) %> days
+                <% end %>
+              </td>
+              <td style="padding: 0.5rem 1rem; text-align: center;">
+                <% if b[:remaining] <= 0 %>
+                  <span style="font-size: 0.6875rem; font-weight: 600; padding: 0.125rem 0.5rem; border-radius: 9999px; background: rgba(234,67,53,0.15); color: var(--negative);">OVER</span>
+                <% elsif b[:pct_used] > 85 %>
+                  <span style="font-size: 0.6875rem; font-weight: 600; padding: 0.125rem 0.5rem; border-radius: 9999px; background: rgba(251,188,4,0.15); color: #fbbc04;">CAUTION</span>
+                <% else %>
+                  <span style="font-size: 0.6875rem; font-weight: 600; padding: 0.125rem 0.5rem; border-radius: 9999px; background: rgba(76,175,80,0.15); color: var(--positive);">OK</span>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# ========== POSITIVE ALERTS (GOOD NEWS) ========== %>
+<% if @positive_alerts.any? %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--positive);">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">thumb_up</span> Good News</h2>
+    </div>
+    <div style="padding: 0;">
+      <% @positive_alerts.each do |a| %>
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 2.5rem; height: 2.5rem; border-radius: 50%; background: rgba(76,175,80,0.15); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--positive);">savings</span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 0.875rem;"><%= a[:title] %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= a[:message] %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= a[:category] %> &middot; Pace: <%= a[:pace_pct] %>%</div>
+          </div>
+          <div style="text-align: right; flex-shrink: 0;">
+            <div style="font-weight: 700; color: var(--positive);">+<%= number_to_currency(a[:amount]) %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">projected savings</div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Navigation %>
+<div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem;">
+  <%= link_to budget_dashboard_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary); display: block; margin-bottom: 0.25rem;">dashboard</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Dashboard</span>
+  <% end %>
+  <%= link_to budget_alerts_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #c62828; display: block; margin-bottom: 0.25rem;">notifications</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Alerts</span>
+  <% end %>
+  <%= link_to budget_reports_spending_path, class: "card", style: "flex: 1; min-width: 140px; padding: 1rem; text-align: center; text-decoration: none; color: var(--text);" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #2196f3; display: block; margin-bottom: 0.25rem;">receipt_long</span>
+    <span style="font-size: 0.8125rem; font-weight: 500;">Spending Report</span>
+  <% end %>
+</div>

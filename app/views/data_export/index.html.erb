@@ -1,0 +1,167 @@
+<div class="page-header">
+  <h1><span class="material-icons-outlined" style="vertical-align: -4px;">download</span> Export Data</h1>
+  <p class="text-muted">Your data belongs to you. Export everything in portable formats.</p>
+</div>
+
+<%# Data overview strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0;">
+    <%
+      sources = [
+        { label: "Trades", count: @trades_count, icon: "trending_up", color: "var(--primary)" },
+        { label: "Journal", count: @journal_count, icon: "auto_stories", color: "#ea8600" },
+        { label: "Notes", count: @notes_count, icon: "description", color: "var(--positive)" },
+        { label: "Playbooks", count: @playbooks_count, icon: "menu_book", color: "#6366f1" }
+      ]
+    %>
+    <% sources.each_with_index do |s, i| %>
+      <div style="padding: 1rem; text-align: center; <%= i < sources.length - 1 ? 'border-right: 1px solid var(--border);' : '' %>">
+        <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= s[:color] %>; display: block; margin-bottom: 0.25rem;"><%= s[:icon] %></span>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= s[:count] %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;"><%= s[:label] %></div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Account Statement Banner %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border-left: 3px solid var(--primary);">
+  <div>
+    <div style="font-weight: 600;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px; color: var(--primary);">summarize</span>
+      Account Statement
+    </div>
+    <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">Generate a printable trading account statement with P&L, equity curve, and trade log for any date range.</div>
+  </div>
+  <%= link_to data_export_account_statement_path, class: "btn btn-primary btn-sm" do %>
+    <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">summarize</span> Generate
+  <% end %>
+</div>
+
+<h2 style="font-size: 1rem; margin-bottom: 0.75rem; color: var(--text-secondary);">Trading</h2>
+<div class="export-grid" style="margin-bottom: 1.5rem;">
+  <div class="card export-card">
+    <div class="export-icon" style="background: rgba(26,115,232,0.1); color: var(--primary);">
+      <span class="material-icons-outlined">trending_up</span>
+    </div>
+    <h3>Trades</h3>
+    <p>All trades with symbol, side, prices, P&L, setup, tags, and review data.</p>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
+      <div class="export-meta">
+        <span class="material-icons-outlined" style="font-size: 0.875rem;">table_chart</span> CSV
+        <% if @trades_count.to_i > 0 %>
+          <span style="color: var(--text-secondary); margin-left: 0.25rem;">&middot; <%= @trades_count %> records</span>
+        <% end %>
+      </div>
+      <%= link_to data_export_trades_csv_path, class: "btn btn-primary btn-sm" do %>
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">download</span> Export
+      <% end %>
+    </div>
+  </div>
+
+  <div class="card export-card">
+    <div class="export-icon" style="background: rgba(234,136,0,0.1); color: #ea8600;">
+      <span class="material-icons-outlined">auto_stories</span>
+    </div>
+    <h3>Journal Entries</h3>
+    <p>Journal entries with date, mood, content, market conditions, and daily P&L.</p>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
+      <div class="export-meta">
+        <span class="material-icons-outlined" style="font-size: 0.875rem;">table_chart</span> CSV
+        <% if @journal_count.to_i > 0 %>
+          <span style="color: var(--text-secondary); margin-left: 0.25rem;">&middot; <%= @journal_count %> entries</span>
+        <% end %>
+      </div>
+      <%= link_to data_export_journal_csv_path, class: "btn btn-primary btn-sm" do %>
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">download</span> Export
+      <% end %>
+    </div>
+  </div>
+
+  <div class="card export-card">
+    <div class="export-icon" style="background: rgba(99,102,241,0.1); color: #6366f1;">
+      <span class="material-icons-outlined">menu_book</span>
+    </div>
+    <h3>Playbooks</h3>
+    <p>Formatted playbooks with setup rules, entry/exit criteria, and risk management.</p>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
+      <div class="export-meta">
+        <span class="material-icons-outlined" style="font-size: 0.875rem;">text_snippet</span> Markdown
+        <% if @playbooks_count.to_i > 0 %>
+          <span style="color: var(--text-secondary); margin-left: 0.25rem;">&middot; <%= @playbooks_count %> playbooks</span>
+        <% end %>
+      </div>
+      <%= link_to data_export_playbooks_md_path, class: "btn btn-primary btn-sm" do %>
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">download</span> Export
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<h2 style="font-size: 1rem; margin-bottom: 0.75rem; color: var(--text-secondary);">Notes</h2>
+<div class="export-grid" style="margin-bottom: 1.5rem;">
+  <div class="card export-card">
+    <div class="export-icon" style="background: rgba(13,144,79,0.1); color: var(--positive);">
+      <span class="material-icons-outlined">description</span>
+    </div>
+    <h3>Notes</h3>
+    <p>All notes with content, tags, notebook info, and metadata.</p>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
+      <div class="export-meta">
+        <span class="material-icons-outlined" style="font-size: 0.875rem;">data_object</span> JSON
+        <% if @notes_count.to_i > 0 %>
+          <span style="color: var(--text-secondary); margin-left: 0.25rem;">&middot; <%= @notes_count %> notes</span>
+        <% end %>
+      </div>
+      <%= link_to data_export_notes_json_path, class: "btn btn-primary btn-sm" do %>
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">download</span> Export
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<h2 style="font-size: 1rem; margin-bottom: 0.75rem; color: var(--text-secondary);">Budget</h2>
+<div class="export-grid">
+  <div class="card export-card">
+    <div class="export-icon" style="background: rgba(217,48,37,0.1); color: var(--negative);">
+      <span class="material-icons-outlined">receipt_long</span>
+    </div>
+    <h3>Transactions</h3>
+    <p>Budget transactions with date, amount, merchant, category, and type.</p>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
+      <div class="export-meta">
+        <span class="material-icons-outlined" style="font-size: 0.875rem;">table_chart</span> CSV
+      </div>
+      <%= link_to data_export_budget_transactions_csv_path, class: "btn btn-primary btn-sm" do %>
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">download</span> Export
+      <% end %>
+    </div>
+  </div>
+
+  <div class="card export-card">
+    <div class="export-icon" style="background: rgba(245,158,11,0.1); color: #f59e0b;">
+      <span class="material-icons-outlined">account_balance</span>
+    </div>
+    <h3>Budget Summary</h3>
+    <p>Complete budget overview with net worth, debts, funds, and goals.</p>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-top: auto;">
+      <div class="export-meta">
+        <span class="material-icons-outlined" style="font-size: 0.875rem;">data_object</span> JSON
+      </div>
+      <%= link_to data_export_budget_summary_json_path, class: "btn btn-primary btn-sm" do %>
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">download</span> Export
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Data ownership notice %>
+<div class="card" style="margin-top: 1.5rem;">
+  <div style="padding: 1rem 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
+    <span class="material-icons-outlined" style="font-size: 1.25rem; color: var(--primary);">verified_user</span>
+    <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+      All exports are generated on-demand from your data. Files are downloaded directly to your device — nothing is stored on third-party servers.
+      Export regularly to maintain backups of your financial and trading data.
+    </div>
+  </div>
+</div>

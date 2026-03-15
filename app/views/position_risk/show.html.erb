@@ -1,0 +1,505 @@
+<% content_for(:title) { "Position Risk" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #ff9800;">shield</span>
+    Position Risk Analyzer
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Exposure", exposure_path, class: "btn" %>
+    <%= link_to "Risk Dashboard", risk_dashboard_path, class: "btn" %>
+  </div>
+</div>
+
+<% if @open_trades.empty? && @closed_trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); display: block; margin-bottom: 1rem;">shield</span>
+    <h3>No Trades Found</h3>
+    <p class="text-muted" style="margin: 0.5rem 0 1rem;">Add some trades to see your position risk analysis.</p>
+    <%= link_to "New Trade", new_trade_path, class: "btn btn-primary" %>
+  </div>
+<% else %>
+
+  <%# ===== Stats Strip ===== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Open Positions</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @open_trades.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Exposure</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@gross_exposure) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Portfolio Heat</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= @portfolio_heat > 10 ? 'var(--negative)' : @portfolio_heat > 5 ? '#f9ab00' : 'var(--positive)' %>;"><%= @portfolio_heat %>%</div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Max Drawdown</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= @max_drawdown > 10 ? 'var(--negative)' : @max_drawdown > 5 ? '#f9ab00' : 'var(--text)' %>;"><%= @max_drawdown %>%</div>
+      </div>
+    </div>
+  </div>
+
+  <%# ===== Risk Alerts ===== %>
+  <% if @risk_alerts.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #ff9800;">warning</span>
+          Risk Alerts
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @risk_alerts.count %> alert<%= @risk_alerts.count == 1 ? '' : 's' %></span>
+      </div>
+      <div style="padding: 1rem 1.25rem; display: grid; gap: 0.75rem;">
+        <% @risk_alerts.each do |alert| %>
+          <%
+            bg_color = alert[:severity] == "danger" ? "rgba(234,67,53,0.05)" : "rgba(249,171,0,0.05)"
+            border_color = alert[:severity] == "danger" ? "var(--negative)" : "#f9ab00"
+            icon_color = alert[:severity] == "danger" ? "var(--negative)" : "#f9ab00"
+          %>
+          <div style="display: flex; gap: 0.75rem; padding: 0.75rem; background: <%= bg_color %>; border-radius: var(--radius); border-left: 3px solid <%= border_color %>;">
+            <span class="material-icons-outlined" style="color: <%= icon_color %>; margin-top: 2px; flex-shrink: 0;"><%= alert[:icon] %></span>
+            <div>
+              <div style="font-size: 0.875rem; font-weight: 600;"><%= alert[:title] %></div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary);"><%= alert[:message] %></div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+    <%# ===== Concentration Chart ===== %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">donut_large</span>
+          Portfolio Concentration
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% if @by_symbol.any? %>
+          <%
+            bar_colors = ["#1a73e8", "#0d904f", "#e91e63", "#f9ab00", "#9c27b0", "#00bcd4", "#ff5722", "#607d8b"]
+          %>
+          <% @by_symbol.each_with_index do |(sym, data), i| %>
+            <div style="margin-bottom: 0.75rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                <span style="font-size: 0.875rem; font-weight: 600;"><%= sym %></span>
+                <span style="font-size: 0.8125rem; font-weight: 600; color: <%= data[:pct] > 20 ? 'var(--negative)' : 'var(--text)' %>;"><%= data[:pct] %>%</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <div style="flex: 1; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; position: relative;">
+                  <div style="height: 100%; width: <%= [data[:pct], 100].min %>%; background: <%= data[:pct] > 20 ? 'var(--negative)' : bar_colors[i % bar_colors.length] %>; border-radius: 4px;"></div>
+                  <% if data[:pct] <= 100 %>
+                    <div style="position: absolute; top: 0; left: 20%; width: 1px; height: 100%; background: var(--text-secondary); opacity: 0.3;"></div>
+                  <% end %>
+                </div>
+                <span style="font-size: 0.6875rem; color: var(--text-secondary); min-width: 60px; text-align: right;"><%= number_to_currency(data[:exposure]) %></span>
+              </div>
+            </div>
+          <% end %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.5rem; text-align: right;">
+            <span style="display: inline-block; width: 1px; height: 8px; background: var(--text-secondary); opacity: 0.5; vertical-align: -1px; margin-right: 4px;"></span>
+            20% threshold
+          </div>
+        <% else %>
+          <div style="text-align: center; color: var(--text-secondary); padding: 1rem;">No open positions</div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# ===== Long/Short Exposure ===== %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">swap_vert</span>
+          Directional Exposure
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <%# Visual bar %>
+        <div style="display: flex; height: 32px; border-radius: 4px; overflow: hidden; margin-bottom: 1rem;">
+          <% if @long_pct > 0 %>
+            <div style="width: <%= @long_pct %>%; background: var(--positive); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.6875rem; font-weight: 600;">
+              <% if @long_pct > 15 %><%= @long_pct %>% Long<% end %>
+            </div>
+          <% end %>
+          <% if @short_pct > 0 %>
+            <div style="width: <%= @short_pct %>%; background: var(--negative); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 0.6875rem; font-weight: 600;">
+              <% if @short_pct > 15 %><%= @short_pct %>% Short<% end %>
+            </div>
+          <% end %>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+          <div style="padding: 0.75rem; background: rgba(13,144,79,0.05); border-radius: var(--radius); border-left: 3px solid var(--positive);">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Long</div>
+            <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(@long_exposure) %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @long_trades.count %> position<%= @long_trades.count == 1 ? '' : 's' %></div>
+          </div>
+          <div style="padding: 0.75rem; background: rgba(234,67,53,0.05); border-radius: var(--radius); border-left: 3px solid var(--negative);">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Short</div>
+            <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(@short_exposure) %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @short_trades.count %> position<%= @short_trades.count == 1 ? '' : 's' %></div>
+          </div>
+        </div>
+
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net Exposure</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: <%= @net_exposure >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@net_exposure) %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @net_exposure >= 0 ? 'Net Long' : 'Net Short' %></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ===== Position Sizing Table ===== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">table_chart</span>
+        Position Sizing & Risk
+      </h2>
+      <div style="display: flex; gap: 1rem; font-size: 0.75rem; color: var(--text-secondary);">
+        <span>Largest: <strong style="color: var(--text);"><%= number_to_currency(@largest_position) %></strong></span>
+        <span>Smallest: <strong style="color: var(--text);"><%= number_to_currency(@smallest_position) %></strong></span>
+        <span>CV: <strong style="color: var(--text);"><%= @position_cv %>%</strong></span>
+      </div>
+    </div>
+    <% if @position_risks.any? %>
+      <div style="overflow-x: auto;">
+        <table class="data-table" style="width: 100%; font-size: 0.875rem;">
+          <thead>
+            <tr>
+              <th style="text-align: left; padding: 0.625rem 1rem;">Symbol</th>
+              <th style="text-align: center; padding: 0.625rem 0.5rem;">Side</th>
+              <th style="text-align: right; padding: 0.625rem 0.5rem;">Qty</th>
+              <th style="text-align: right; padding: 0.625rem 0.5rem;">Entry</th>
+              <th style="text-align: right; padding: 0.625rem 0.5rem;">Exposure</th>
+              <th style="text-align: right; padding: 0.625rem 0.5rem;">% Portfolio</th>
+              <th style="text-align: right; padding: 0.625rem 0.5rem;">Stop</th>
+              <th style="text-align: right; padding: 0.625rem 0.5rem;">Risk Amount</th>
+              <th style="text-align: right; padding: 0.625rem 0.5rem;">P&L</th>
+              <th style="text-align: right; padding: 0.625rem 1rem;">Entered</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @position_risks.each do |pos| %>
+              <tr>
+                <td style="padding: 0.625rem 1rem;">
+                  <%= link_to pos[:symbol], trade_path(pos[:id]), style: "font-weight: 600; color: var(--primary); text-decoration: none;" %>
+                  <% unless pos[:has_stop] %>
+                    <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--negative); vertical-align: -2px; margin-left: 4px;" title="No stop loss">warning</span>
+                  <% end %>
+                </td>
+                <td style="padding: 0.625rem 0.5rem; text-align: center;">
+                  <span style="font-size: 0.6875rem; padding: 0.125rem 0.375rem; border-radius: 3px; font-weight: 600; text-transform: uppercase; background: <%= pos[:side] == 'long' ? 'rgba(13,144,79,0.1)' : 'rgba(234,67,53,0.1)' %>; color: <%= pos[:side] == 'long' ? 'var(--positive)' : 'var(--negative)' %>;"><%= pos[:side] %></span>
+                </td>
+                <td style="padding: 0.625rem 0.5rem; text-align: right;"><%= pos[:quantity] %></td>
+                <td style="padding: 0.625rem 0.5rem; text-align: right;"><%= number_to_currency(pos[:entry]) %></td>
+                <td style="padding: 0.625rem 0.5rem; text-align: right; font-weight: 600;"><%= number_to_currency(pos[:exposure]) %></td>
+                <td style="padding: 0.625rem 0.5rem; text-align: right;">
+                  <div style="display: flex; align-items: center; gap: 0.375rem; justify-content: flex-end;">
+                    <div style="width: 40px; height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden;">
+                      <div style="height: 100%; width: <%= [pos[:pct_of_portfolio], 100].min %>%; background: <%= pos[:pct_of_portfolio] > 20 ? 'var(--negative)' : pos[:pct_of_portfolio] > 15 ? '#f9ab00' : 'var(--primary)' %>; border-radius: 2px;"></div>
+                    </div>
+                    <span style="font-size: 0.75rem;"><%= pos[:pct_of_portfolio] %>%</span>
+                  </div>
+                </td>
+                <td style="padding: 0.625rem 0.5rem; text-align: right; color: var(--text-secondary);"><%= pos[:stop].to_f > 0 ? number_to_currency(pos[:stop]) : '&mdash;'.html_safe %></td>
+                <td style="padding: 0.625rem 0.5rem; text-align: right; color: var(--negative);"><%= pos[:risk_amount] ? number_to_currency(pos[:risk_amount]) : '&mdash;'.html_safe %></td>
+                <td style="padding: 0.625rem 0.5rem; text-align: right; font-weight: 600; color: <%= pos[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(pos[:pnl]) %></td>
+                <td style="padding: 0.625rem 1rem; text-align: right; font-size: 0.75rem; color: var(--text-secondary);"><%= pos[:entry_time] %></td>
+              </tr>
+            <% end %>
+          </tbody>
+          <tfoot>
+            <tr style="border-top: 2px solid var(--border); font-weight: 700;">
+              <td style="padding: 0.625rem 1rem;">Total</td>
+              <td colspan="3"></td>
+              <td style="padding: 0.625rem 0.5rem; text-align: right;"><%= number_to_currency(@gross_exposure) %></td>
+              <td style="padding: 0.625rem 0.5rem; text-align: right;">100%</td>
+              <td></td>
+              <td style="padding: 0.625rem 0.5rem; text-align: right; color: var(--negative);"><%= number_to_currency(@total_risk_at_stop) %></td>
+              <td style="padding: 0.625rem 0.5rem; text-align: right; color: <%= @open_trades.sum { |t| t['pnl'].to_f } >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@open_trades.sum { |t| t['pnl'].to_f }) %></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    <% else %>
+      <div style="padding: 2rem; text-align: center; color: var(--text-secondary);">No open positions to analyze</div>
+    <% end %>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+    <%# ===== VaR Card ===== %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">functions</span>
+          Value at Risk (VaR)
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% if @var_count >= 5 %>
+          <div style="text-align: center; margin-bottom: 1rem;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">95% VaR (per trade)</div>
+            <div style="font-size: 1.75rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@var_95) %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Based on <%= @var_count %> closed trades</div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss</div>
+              <div style="font-size: 1rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@var_avg_loss) %></div>
+            </div>
+            <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Trade</div>
+              <div style="font-size: 1rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@var_worst) %></div>
+            </div>
+          </div>
+
+          <div style="font-size: 0.75rem; color: var(--text-secondary); background: var(--bg); border-radius: var(--radius); padding: 0.75rem;">
+            <strong>What this means:</strong> There is a 5% chance that any single trade will lose more than
+            <strong style="color: var(--negative);"><%= number_to_currency(@var_95.abs) %></strong>.
+            This is based on the historical distribution of your trade P&L.
+          </div>
+        <% else %>
+          <div style="text-align: center; color: var(--text-secondary); padding: 1rem;">
+            <span class="material-icons-outlined" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">functions</span>
+            Need at least 5 closed trades to compute VaR.<br>
+            Currently have <strong><%= @var_count %></strong> closed trade<%= @var_count == 1 ? '' : 's' %>.
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# ===== Correlation Risk ===== %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">hub</span>
+          Correlation Risk
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% if @correlated_pairs.any? %>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            Symbols entered within 2 days of each other may have correlated moves:
+          </div>
+          <div style="display: grid; gap: 0.5rem;">
+            <% @correlated_pairs.first(8).each do |pair| %>
+              <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: var(--bg); border-radius: var(--radius);">
+                <span class="material-icons-outlined" style="font-size: 1rem; color: #f9ab00;">link</span>
+                <span style="font-size: 0.875rem; font-weight: 600;"><%= pair[0] %></span>
+                <span style="font-size: 0.75rem; color: var(--text-secondary);">&harr;</span>
+                <span style="font-size: 0.875rem; font-weight: 600;"><%= pair[1] %></span>
+              </div>
+            <% end %>
+          </div>
+          <% if @correlated_pairs.count > 8 %>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem; text-align: right;">
+              + <%= @correlated_pairs.count - 8 %> more pair<%= @correlated_pairs.count - 8 == 1 ? '' : 's' %>
+            </div>
+          <% end %>
+        <% else %>
+          <div style="text-align: center; color: var(--text-secondary); padding: 1rem;">
+            <span class="material-icons-outlined" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">hub</span>
+            No correlated entries detected among open positions.
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# ===== Drawdown Mini Equity Curve ===== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">show_chart</span>
+        Drawdown & Equity Curve
+      </h2>
+      <div style="display: flex; gap: 1rem; font-size: 0.75rem; color: var(--text-secondary);">
+        <span>Current DD: <strong style="color: <%= @current_drawdown > 5 ? 'var(--negative)' : 'var(--text)' %>;"><%= @current_drawdown %>%</strong></span>
+        <span>Max DD: <strong style="color: var(--negative);"><%= @max_drawdown %>%</strong></span>
+        <span>Peak: <strong style="color: var(--text);"><%= number_to_currency(@equity_peak) %></strong></span>
+      </div>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% if @equity_curve.count >= 2 %>
+        <%
+          # SVG chart dimensions
+          svg_w = 800
+          svg_h = 200
+          pad_l = 10
+          pad_r = 10
+          pad_t = 10
+          pad_b = 10
+          chart_w = svg_w - pad_l - pad_r
+          chart_h = svg_h - pad_t - pad_b
+
+          equities = @equity_curve.map { |d| d[:equity] }
+          e_min = [equities.min, 0].min
+          e_max = [equities.max, 0].max
+          e_range = e_max - e_min
+          e_range = 1 if e_range == 0
+
+          points_equity = @equity_curve.each_with_index.map { |d, i|
+            x = pad_l + (i.to_f / (@equity_curve.count - 1) * chart_w)
+            y = pad_t + chart_h - ((d[:equity] - e_min) / e_range * chart_h)
+            "#{x.round(1)},#{y.round(1)}"
+          }
+
+          # Peak line
+          points_peak = @equity_curve.each_with_index.map { |d, i|
+            x = pad_l + (i.to_f / (@equity_curve.count - 1) * chart_w)
+            y = pad_t + chart_h - ((d[:peak] - e_min) / e_range * chart_h)
+            "#{x.round(1)},#{y.round(1)}"
+          }
+
+          # Area fill for drawdown
+          zero_y = pad_t + chart_h - ((0 - e_min) / e_range * chart_h)
+          fill_points = points_equity.dup
+          last_x = pad_l + chart_w
+          first_x = pad_l
+          fill_points << "#{last_x.round(1)},#{zero_y.round(1)}"
+          fill_points << "#{first_x.round(1)},#{zero_y.round(1)}"
+        %>
+        <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; height: 200px;" preserveAspectRatio="none">
+          <%# Zero line %>
+          <line x1="<%= pad_l %>" y1="<%= zero_y.round(1) %>" x2="<%= svg_w - pad_r %>" y2="<%= zero_y.round(1) %>"
+                stroke="var(--border)" stroke-width="1" stroke-dasharray="4,4" />
+          <%# Equity fill %>
+          <polygon points="<%= fill_points.join(' ') %>" fill="rgba(26,115,232,0.08)" />
+          <%# Peak line %>
+          <polyline points="<%= points_peak.join(' ') %>" fill="none" stroke="var(--text-secondary)" stroke-width="1" stroke-dasharray="3,3" opacity="0.5" />
+          <%# Equity line %>
+          <polyline points="<%= points_equity.join(' ') %>" fill="none" stroke="#1a73e8" stroke-width="2" />
+          <%# End dot %>
+          <% last_pt = points_equity.last.split(',') %>
+          <circle cx="<%= last_pt[0] %>" cy="<%= last_pt[1] %>" r="3" fill="#1a73e8" />
+        </svg>
+        <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          <span><%= @equity_curve.first[:date] %></span>
+          <span style="display: flex; align-items: center; gap: 1rem;">
+            <span><span style="display: inline-block; width: 12px; height: 2px; background: #1a73e8; vertical-align: 1px; margin-right: 2px;"></span> Equity</span>
+            <span><span style="display: inline-block; width: 12px; height: 2px; background: var(--text-secondary); opacity: 0.5; vertical-align: 1px; margin-right: 2px; border-top: 1px dashed var(--text-secondary);"></span> Peak</span>
+          </span>
+          <span><%= @equity_curve.last[:date] %></span>
+        </div>
+      <% else %>
+        <div style="text-align: center; color: var(--text-secondary); padding: 1rem;">
+          <span class="material-icons-outlined" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">show_chart</span>
+          Need at least 2 closed trades to show equity curve.
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ===== Position Sizing Analysis Card ===== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">straighten</span>
+        Position Sizing Analysis
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem;">
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Largest</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(@largest_position) %></div>
+        </div>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Smallest</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(@smallest_position) %></div>
+        </div>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Average</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(@avg_position) %></div>
+        </div>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Coeff. of Variation</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: <%= @position_cv > 50 ? '#f9ab00' : 'var(--text)' %>;"><%= @position_cv %>%</div>
+        </div>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Spread</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= @avg_position > 0 ? "#{((@largest_position / @avg_position)).round(1)}x" : "N/A" %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">max / avg</div>
+        </div>
+      </div>
+      <% if @position_cv > 50 %>
+        <div style="margin-top: 1rem; padding: 0.625rem; background: rgba(249,171,0,0.05); border-radius: var(--radius); border-left: 3px solid #f9ab00; font-size: 0.8125rem; color: var(--text-secondary);">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #f9ab00;">info</span>
+          High variation in position sizes (CV > 50%). Consider standardizing position sizing for more consistent risk management.
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ===== Portfolio Heat Detail ===== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #ff9800;">local_fire_department</span>
+        Portfolio Heat
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="text-align: center; margin-bottom: 1rem;">
+        <%
+          heat_color = @portfolio_heat > 10 ? 'var(--negative)' : @portfolio_heat > 5 ? '#f9ab00' : 'var(--positive)'
+          heat_pct_bar = [@portfolio_heat, 100].min
+        %>
+        <div style="font-size: 2rem; font-weight: 700; color: <%= heat_color %>;"><%= @portfolio_heat %>%</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">Total risk at stop / Gross exposure</div>
+      </div>
+      <div style="height: 12px; background: var(--bg); border-radius: 6px; overflow: hidden; margin-bottom: 0.75rem; position: relative;">
+        <div style="height: 100%; width: <%= heat_pct_bar %>%; background: <%= heat_color %>; border-radius: 6px; transition: width 0.3s;"></div>
+        <%# Threshold markers %>
+        <div style="position: absolute; top: 0; left: 5%; width: 1px; height: 100%; background: var(--positive); opacity: 0.5;"></div>
+        <div style="position: absolute; top: 0; left: 10%; width: 1px; height: 100%; background: var(--negative); opacity: 0.5;"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary);">
+        <span>0%</span>
+        <span style="color: var(--positive);">5% safe</span>
+        <span style="color: var(--negative);">10% danger</span>
+        <span>20%+</span>
+      </div>
+      <div style="margin-top: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Risk at Stop</div>
+          <div style="font-size: 1rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_risk_at_stop) %></div>
+        </div>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Gross Exposure</div>
+          <div style="font-size: 1rem; font-weight: 700;"><%= number_to_currency(@gross_exposure) %></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ===== Bottom Navigation ===== %>
+  <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <%= link_to exposure_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">pie_chart</span>
+      Exposure
+    <% end %>
+    <%= link_to risk_dashboard_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">speed</span>
+      Risk Dashboard
+    <% end %>
+    <%= link_to reports_index_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">assessment</span>
+      Reports
+    <% end %>
+  </div>
+
+<% end %>

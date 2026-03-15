@@ -1,0 +1,244 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">pattern</span>
+    Spending Patterns
+  </h1>
+  <div class="page-actions">
+    <% [1, 3, 6, 12].each do |m| %>
+      <% if m == @months_back %>
+        <span class="btn btn-sm btn-primary"><%= m %>m</span>
+      <% else %>
+        <%= link_to "#{m}m", budget_reports_spending_patterns_path(months: m), class: "btn btn-sm" %>
+      <% end %>
+    <% end %>
+  </div>
+</div>
+
+<%# Summary %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Spent</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@total_spent) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Transactions</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @transaction_count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Daily</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@avg_daily) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Zero-Spend Days</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @zero_spend_days %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Biggest Day</div>
+      <div style="font-size: 1.125rem; font-weight: 700; color: var(--negative);"><%= @max_day ? number_to_currency(@max_day[1]) : "—" %></div>
+      <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= @max_day ? @max_day[0] : "" %></div>
+    </div>
+  </div>
+</div>
+
+<%# Pattern Insights %>
+<% if @patterns.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">lightbulb</span> Pattern Insights</h2>
+    </div>
+    <% @patterns.each do |p| %>
+      <%
+        bg = case p[:type]
+             when "positive" then "rgba(52,168,83,0.06)"
+             when "warning" then "rgba(249,171,0,0.06)"
+             else "rgba(26,115,232,0.06)"
+             end
+        color = case p[:type]
+                when "positive" then "var(--positive)"
+                when "warning" then "#f9ab00"
+                else "var(--primary)"
+                end
+      %>
+      <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--border); background: <%= bg %>;">
+        <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= color %>;"><%= p[:icon] %></span>
+        <span style="font-size: 0.8125rem;"><%= p[:text] %></span>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Day of Week %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">calendar_month</span> Spending by Day</h2>
+    </div>
+    <%
+      max_day_total = @by_day.values.map { |d| d[:total] }.max.to_f
+      max_day_total = 1 if max_day_total == 0
+    %>
+    <div style="padding: 1.25rem;">
+      <% @by_day.each do |day, data| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.625rem;">
+          <span style="width: 30px; font-size: 0.8125rem; font-weight: 500;"><%= day[0..2] %></span>
+          <div style="flex: 1; height: 22px; background: var(--bg); border-radius: 4px; overflow: hidden; position: relative;">
+            <div style="height: 100%; width: <%= (data[:total] / max_day_total * 100).round %>%; background: <%= day == @biggest_spend_day ? 'var(--negative)' : 'var(--primary)' %>; opacity: 0.6; border-radius: 4px;"></div>
+          </div>
+          <span style="font-size: 0.75rem; font-weight: 600; min-width: 55px; text-align: right;"><%= number_to_currency(data[:total]) %></span>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary); min-width: 25px; text-align: right;"><%= data[:count] %></span>
+        </div>
+      <% end %>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1rem 1.25rem; border-top: 1px solid var(--border);">
+      <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Weekday Avg</div>
+        <div style="font-size: 1.125rem; font-weight: 600;"><%= number_to_currency(@weekday_avg) %></div>
+      </div>
+      <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Weekend Avg</div>
+        <div style="font-size: 1.125rem; font-weight: 600; color: <%= @weekend_avg > @weekday_avg ? 'var(--negative)' : 'var(--positive)' %>;"><%= number_to_currency(@weekend_avg) %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Week of Month %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">date_range</span> Spending by Week of Month</h2>
+    </div>
+    <%
+      max_week = @by_week_of_month.values.max.to_f
+      max_week = 1 if max_week == 0
+    %>
+    <div style="padding: 1.25rem;">
+      <% @by_week_of_month.each do |week, total| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+          <span style="width: 60px; font-size: 0.8125rem; font-weight: 500;"><%= week %></span>
+          <div style="flex: 1; height: 28px; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= (total / max_week * 100).round %>%; background: var(--primary); opacity: 0.6; border-radius: 4px; display: flex; align-items: center; padding-left: 0.5rem;">
+              <% if total / max_week > 0.3 %>
+                <span style="font-size: 0.6875rem; color: white; font-weight: 500;"><%= number_to_currency(total) %></span>
+              <% end %>
+            </div>
+          </div>
+          <% if total / max_week <= 0.3 %>
+            <span style="font-size: 0.75rem; font-weight: 600;"><%= number_to_currency(total) %></span>
+          <% end %>
+        </div>
+      <% end %>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+        <% heaviest = @by_week_of_month.max_by { |_, v| v }.first %>
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">info</span>
+        <%= heaviest %> is your heaviest spending week — likely due to recurring bills or payday spending.
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Transaction Size Distribution %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Transaction Size Distribution</h2>
+    </div>
+    <table class="table" style="font-size: 0.8125rem;">
+      <thead>
+        <tr>
+          <th>Size Range</th>
+          <th style="text-align: right;">Count</th>
+          <th style="text-align: right;">% of Txns</th>
+          <th style="text-align: right;">Total Spent</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @size_buckets.each do |label, data| %>
+          <tr>
+            <td><strong><%= label %></strong></td>
+            <td style="text-align: right;"><%= data[:count] %></td>
+            <td style="text-align: right;">
+              <div style="display: flex; align-items: center; gap: 0.375rem; justify-content: flex-end;">
+                <div style="width: 50px; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                  <div style="height: 100%; width: <%= data[:pct] %>%; background: var(--primary); opacity: 0.6; border-radius: 3px;"></div>
+                </div>
+                <span><%= data[:pct] %>%</span>
+              </div>
+            </td>
+            <td style="text-align: right; font-weight: 600;"><%= number_to_currency(data[:total]) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <%# Repeat Merchants %>
+  <% if @repeat_merchants.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">repeat</span> Most Visited Merchants</h2>
+      </div>
+      <% @repeat_merchants.each_with_index do |m, i| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <span style="font-size: 0.75rem; color: var(--text-secondary); width: 18px;"><%= i + 1 %>.</span>
+          <div style="flex: 1;">
+            <strong style="font-size: 0.8125rem;"><%= m[:name] %></strong>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= m[:count] %> visits · avg <%= number_to_currency(m[:avg]) %></div>
+          </div>
+          <span style="font-weight: 600;"><%= number_to_currency(m[:total]) %></span>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+
+<%# Daily Spending Timeline %>
+<% if @daily_spending.count >= 7 %>
+  <%
+    max_daily = @daily_spending.values.max.to_f
+    max_daily = 1 if max_daily == 0
+    chart_w = 700
+    chart_h = 150
+    pad_l = 60
+    pad_r = 10
+    usable = chart_w - pad_l - pad_r
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">timeline</span> Daily Spending Timeline</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h + 25 %>" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <% 4.times do |i| %>
+          <% y = 10 + i * (chart_h / 3.0) %>
+          <line x1="<%= pad_l %>" y1="<%= y %>" x2="<%= chart_w - pad_r %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3"/>
+        <% end %>
+
+        <%# Average line %>
+        <% avg_y = 10 + chart_h - (@avg_daily / max_daily * chart_h) %>
+        <line x1="<%= pad_l %>" y1="<%= avg_y %>" x2="<%= chart_w - pad_r %>" y2="<%= avg_y %>"
+              stroke="#f9ab00" stroke-width="1" stroke-dasharray="4,3"/>
+
+        <%# Bars %>
+        <% bw = [(usable / @daily_spending.count * 0.7).round, 8].min %>
+        <% @daily_spending.each_with_index do |(date, amount), i| %>
+          <%
+            x = pad_l + (i + 0.5) * (usable.to_f / @daily_spending.count)
+            h = (amount / max_daily * chart_h).round
+            y = 10 + chart_h - h
+          %>
+          <rect x="<%= x - bw / 2 %>" y="<%= y %>" width="<%= bw %>" height="<%= [h, 1].max %>"
+                fill="<%= amount > @avg_daily * 2 ? 'var(--negative)' : 'var(--primary)' %>" opacity="0.6" rx="1"/>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Spending Report", budget_reports_spending_path, class: "btn" %>
+  <%= link_to "Category Deep Dive", budget_reports_category_drill_path, class: "btn" %>
+  <%= link_to "Merchants", budget_reports_merchants_path, class: "btn" %>
+</div>

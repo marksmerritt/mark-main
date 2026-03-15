@@ -1,0 +1,313 @@
+<div class="page-header">
+  <h1>Financial Calendar</h1>
+  <div class="page-actions">
+    <%= link_to "Dashboard", budget_dashboard_path, class: "btn" %>
+  </div>
+</div>
+
+<% start_date = Date.new(@year, @month, 1) %>
+<% end_date = start_date.end_of_month %>
+<% prev_month = start_date - 1.month %>
+<% next_month = start_date + 1.month %>
+
+<%
+  # Build unified events for each day
+  events_by_date = Hash.new { |h, k| h[k] = [] }
+
+  # Recurring bills
+  (start_date..end_date).each do |date|
+    calendar_bills_for_date(@recurring, date).each do |bill|
+      events_by_date[date] << {
+        type: "bill",
+        name: bill["name"],
+        amount: bill["amount"].to_f,
+        icon: "receipt_long",
+        color: "var(--danger, #ef4444)"
+      }
+    end
+  end
+
+  # Goal deadlines
+  @goals.each do |goal|
+    next unless goal["target_date"].present?
+    target = Date.parse(goal["target_date"]) rescue nil
+    next unless target && target.month == @month && target.year == @year
+    events_by_date[target] << {
+      type: "goal",
+      name: goal["name"],
+      amount: goal["remaining_amount"].to_f,
+      icon: "flag",
+      color: "var(--primary, #6366f1)"
+    }
+  end
+
+  # Challenge end dates
+  @challenges.each do |ch|
+    next unless ch["end_date"].present?
+    end_d = Date.parse(ch["end_date"]) rescue nil
+    next unless end_d && end_d.month == @month && end_d.year == @year
+    events_by_date[end_d] << {
+      type: "challenge",
+      name: ch["name"],
+      amount: ch["target_amount"].to_f,
+      icon: "emoji_events",
+      color: "var(--warning, #f59e0b)"
+    }
+  end
+
+  # Transactions (actual spending/income)
+  @transactions.each do |txn|
+    date = Date.parse(txn["transaction_date"]) rescue nil
+    next unless date
+    events_by_date[date] << {
+      type: "transaction",
+      name: txn["merchant"].presence || txn["description"],
+      amount: txn["amount"].to_f,
+      icon: txn["transaction_type"] == "income" ? "arrow_downward" : "arrow_upward",
+      color: txn["transaction_type"] == "income" ? "var(--positive, #22c55e)" : "var(--text-muted)",
+      transaction_type: txn["transaction_type"]
+    }
+  end
+%>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <%= link_to budget_calendar_path(month: prev_month.month, year: prev_month.year), class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 1.25rem;">chevron_left</span>
+    <% end %>
+    <h2 style="margin: 0;"><%= start_date.strftime("%B %Y") %></h2>
+    <%= link_to budget_calendar_path(month: next_month.month, year: next_month.year), class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 1.25rem;">chevron_right</span>
+    <% end %>
+  </div>
+
+  <div style="padding: 0.5rem 1.25rem; display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.8rem;">
+    <span><span class="material-icons-outlined" style="font-size: 0.9rem; vertical-align: middle; color: var(--danger, #ef4444);">receipt_long</span> Bills</span>
+    <span><span class="material-icons-outlined" style="font-size: 0.9rem; vertical-align: middle; color: var(--primary, #6366f1);">flag</span> Goals</span>
+    <span><span class="material-icons-outlined" style="font-size: 0.9rem; vertical-align: middle; color: var(--warning, #f59e0b);">emoji_events</span> Challenges</span>
+    <span><span class="material-icons-outlined" style="font-size: 0.9rem; vertical-align: middle;">arrow_upward</span> Expenses</span>
+    <span><span class="material-icons-outlined" style="font-size: 0.9rem; vertical-align: middle; color: var(--positive, #22c55e);">arrow_downward</span> Income</span>
+  </div>
+
+  <div class="bill-calendar">
+    <div class="bill-calendar-header">
+      <% %w[Sun Mon Tue Wed Thu Fri Sat].each do |day| %>
+        <div class="bill-calendar-day-name"><%= day %></div>
+      <% end %>
+    </div>
+
+    <div class="bill-calendar-grid">
+      <% start_date.wday.times do %>
+        <div class="bill-calendar-cell bill-calendar-cell-empty"></div>
+      <% end %>
+
+      <% (start_date..end_date).each do |date| %>
+        <% day_events = events_by_date[date] || [] %>
+        <div class="bill-calendar-cell <%= 'bill-calendar-cell-today' if date == Date.current %> <%= 'bill-calendar-cell-past' if date < Date.current %>">
+          <div class="bill-calendar-date"><%= date.day %></div>
+          <% day_events.first(4).each do |evt| %>
+            <div class="bill-calendar-item" style="border-left: 3px solid <%= evt[:color] %>; padding-left: 4px;"
+                 title="<%= evt[:name] %> — <%= number_to_currency(evt[:amount]) %>">
+              <span class="bill-calendar-item-name"><%= evt[:name].truncate(14) %></span>
+            </div>
+          <% end %>
+          <% if day_events.size > 4 %>
+            <div class="text-muted" style="font-size: 0.65rem; padding-left: 4px;">+<%= day_events.size - 4 %> more</div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <% remaining = (7 - (end_date.wday + 1) % 7) % 7 %>
+      <% remaining.times do %>
+        <div class="bill-calendar-cell bill-calendar-cell-empty"></div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Cash flow summary %>
+<%
+  all_events = events_by_date.values.flatten
+  bills_this_month = all_events.select { |e| e[:type] == "bill" }
+  goals_this_month = all_events.select { |e| e[:type] == "goal" }
+  challenges_this_month = all_events.select { |e| e[:type] == "challenge" }
+  expenses = all_events.select { |e| e[:type] == "transaction" && e[:transaction_type] != "income" }
+  income = all_events.select { |e| e[:type] == "transaction" && e[:transaction_type] == "income" }
+
+  total_income = income.sum { |e| e[:amount] }
+  total_expenses = expenses.sum { |e| e[:amount] }
+  total_bills = bills_this_month.sum { |b| b[:amount] }
+  total_outflow = total_expenses + total_bills
+  net_flow = total_income - total_outflow
+
+  # Bills paid vs upcoming
+  today = Date.current
+  bills_past = events_by_date.select { |d, _| d < today }.values.flatten.count { |e| e[:type] == "bill" }
+  bills_upcoming = bills_this_month.size - bills_past
+
+  # Daily spending trend (for days that have passed)
+  days_passed = (start_date..[today, end_date].min).to_a
+  daily_spending = days_passed.map do |d|
+    day_events = events_by_date[d] || []
+    day_events.select { |e| e[:type] == "transaction" && e[:transaction_type] != "income" }.sum { |e| e[:amount] }
+  end
+  max_daily = daily_spending.max || 1
+  max_daily = 1 if max_daily == 0
+  avg_daily = days_passed.any? ? (daily_spending.sum / days_passed.size).round(2) : 0
+%>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Income</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(total_income) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Expenses</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(total_expenses) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Bills</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(total_bills) %></div>
+      <div style="font-size: 0.625rem; color: var(--text-secondary);">
+        <%= bills_past %> paid &middot; <%= bills_upcoming %> upcoming
+      </div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net Cash Flow</div>
+      <div style="font-size: 1.25rem; font-weight: 700;" class="<%= net_flow >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(net_flow) %></div>
+    </div>
+  </div>
+</div>
+
+<%# Daily spending sparkline %>
+<% if daily_spending.any? && daily_spending.any? { |s| s > 0 } %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>Daily Spending</h2>
+      <span style="font-size: 0.8125rem; color: var(--text-secondary);">
+        Avg: <%= number_to_currency(avg_daily) %>/day
+      </span>
+    </div>
+    <div style="padding: 0.75rem 1.25rem;">
+      <%
+        spark_w = 600
+        spark_h = 60
+        bar_count = daily_spending.size
+        bar_gap = 2
+        bar_w = bar_count > 0 ? ((spark_w - (bar_count - 1) * bar_gap) / bar_count.to_f).round(1) : 10
+      %>
+      <svg viewBox="0 0 <%= spark_w %> <%= spark_h + 15 %>" style="width: 100%; height: 75px;">
+        <%# Average line %>
+        <% avg_y = avg_daily > 0 ? (spark_h - (avg_daily / max_daily * spark_h)).round(1) : spark_h %>
+        <line x1="0" y1="<%= avg_y %>" x2="<%= spark_w %>" y2="<%= avg_y %>"
+              stroke="var(--primary)" stroke-width="1" stroke-dasharray="4,3" opacity="0.5"/>
+        <%# Bars %>
+        <% daily_spending.each_with_index do |amount, i| %>
+          <%
+            bx = i * (bar_w + bar_gap)
+            bh = max_daily > 0 ? (amount / max_daily * spark_h).round(1) : 0
+            by = spark_h - bh
+            bar_color = amount > avg_daily * 1.5 ? "var(--negative)" : "var(--primary)"
+            bar_date = days_passed[i]
+            is_today = bar_date == today
+          %>
+          <rect x="<%= bx %>" y="<%= by %>" width="<%= bar_w %>" height="<%= bh %>"
+                fill="<%= bar_color %>" opacity="<%= is_today ? '0.9' : '0.5' %>" rx="1">
+            <title><%= bar_date.strftime('%b %d') %>: <%= number_to_currency(amount) %></title>
+          </rect>
+          <% if is_today %>
+            <rect x="<%= bx %>" y="<%= spark_h + 2 %>" width="<%= bar_w %>" height="2"
+                  fill="var(--primary)" rx="1"/>
+          <% end %>
+        <% end %>
+        <%# Date labels %>
+        <text x="0" y="<%= spark_h + 12 %>" font-size="7" fill="var(--text-secondary)"><%= days_passed.first.strftime("%b %d") %></text>
+        <text x="<%= spark_w %>" y="<%= spark_h + 12 %>" font-size="7" fill="var(--text-secondary)" text-anchor="end"><%= days_passed.last.strftime("%b %d") %></text>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<%# Upcoming events list %>
+<%
+  upcoming = (Date.current..end_date).flat_map { |d| (events_by_date[d] || []).map { |e| e.merge(date: d) } }
+  upcoming_sorted = upcoming.sort_by { |e| e[:date] }
+  # Group by date for a cleaner display
+  upcoming_by_date = upcoming_sorted.group_by { |e| e[:date] }
+%>
+<% if upcoming_by_date.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>Upcoming This Month</h2>
+      <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= upcoming.size %> events</span>
+    </div>
+    <% upcoming_by_date.each do |date, day_events| %>
+      <div style="border-bottom: 1px solid var(--border);">
+        <div style="padding: 0.5rem 1.25rem; background: var(--bg); font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">
+          <%= date.strftime("%A, %b %d") %>
+          <% if date == today %>
+            <span class="badge badge-primary" style="font-size: 0.5625rem; margin-left: 0.375rem;">TODAY</span>
+          <% end %>
+          <% day_total = day_events.sum { |e| e[:type] == "transaction" && e[:transaction_type] == "income" ? e[:amount] : -e[:amount] } %>
+          <span style="float: right; font-weight: 600;" class="<%= day_total >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(day_total.abs) %></span>
+        </div>
+        <% day_events.each do |evt| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1.25rem;">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= evt[:color] %>; flex-shrink: 0;"><%= evt[:icon] %></span>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 0.8125rem; font-weight: 500;"><%= evt[:name] %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= evt[:type].capitalize %></div>
+            </div>
+            <% if evt[:amount] > 0 %>
+              <span style="font-size: 0.875rem; font-weight: 600;" class="<%= evt[:transaction_type] == 'income' ? 'positive' : '' %>">
+                <%= number_to_currency(evt[:amount]) %>
+              </span>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# Monthly cash flow bar if both income and expenses exist %>
+<% if total_income > 0 || total_outflow > 0 %>
+  <%
+    flow_max = [total_income, total_outflow].max
+    flow_max = 1 if flow_max == 0
+    income_pct = (total_income / flow_max * 100).round(1)
+    outflow_pct = (total_outflow / flow_max * 100).round(1)
+    savings_rate = total_income > 0 ? ((total_income - total_outflow) / total_income * 100).round(0) : 0
+  %>
+  <div class="card">
+    <div class="card-header">
+      <h2>Cash Flow Summary</h2>
+      <% if total_income > 0 %>
+        <span style="font-size: 0.8125rem; font-weight: 600; color: <%= savings_rate >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= savings_rate %>% savings rate
+        </span>
+      <% end %>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="margin-bottom: 0.75rem;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">
+          <span style="color: var(--text-secondary);">Income</span>
+          <span style="font-weight: 600; color: var(--positive);"><%= number_to_currency(total_income) %></span>
+        </div>
+        <div style="height: 0.5rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: <%= income_pct %>%; background: var(--positive); opacity: 0.6; border-radius: 4px;"></div>
+        </div>
+      </div>
+      <div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">
+          <span style="color: var(--text-secondary);">Outflow (expenses + bills)</span>
+          <span style="font-weight: 600; color: var(--negative);"><%= number_to_currency(total_outflow) %></span>
+        </div>
+        <div style="height: 0.5rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: <%= outflow_pct %>%; background: var(--negative); opacity: 0.6; border-radius: 4px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>

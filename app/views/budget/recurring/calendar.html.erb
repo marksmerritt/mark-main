@@ -1,0 +1,132 @@
+<div class="page-header">
+  <h1>Bill Calendar</h1>
+  <div class="page-actions">
+    <%= link_to "List View", budget_recurring_index_path, class: "btn" %>
+    <%= link_to "Add Recurring", new_budget_recurring_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<% start_date = Date.new(@year, @month, 1) %>
+<% end_date = start_date.end_of_month %>
+<% prev_month = start_date - 1.month %>
+<% next_month = start_date + 1.month %>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <%= link_to calendar_budget_recurring_index_path(month: prev_month.month, year: prev_month.year), class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 1.25rem;">chevron_left</span>
+    <% end %>
+    <h2 style="margin: 0;"><%= start_date.strftime("%B %Y") %></h2>
+    <%= link_to calendar_budget_recurring_index_path(month: next_month.month, year: next_month.year), class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 1.25rem;">chevron_right</span>
+    <% end %>
+  </div>
+
+  <div class="bill-calendar">
+    <div class="bill-calendar-header">
+      <% %w[Sun Mon Tue Wed Thu Fri Sat].each do |day| %>
+        <div class="bill-calendar-day-name"><%= day %></div>
+      <% end %>
+    </div>
+
+    <div class="bill-calendar-grid">
+      <% # pad the first week with empty cells %>
+      <% start_date.wday.times do %>
+        <div class="bill-calendar-cell bill-calendar-cell-empty"></div>
+      <% end %>
+
+      <% (start_date..end_date).each do |date| %>
+        <% bills = calendar_bills_for_date(@items, date) %>
+        <div class="bill-calendar-cell <%= 'bill-calendar-cell-today' if date == Date.current %> <%= 'bill-calendar-cell-past' if date < Date.current %>">
+          <div class="bill-calendar-date"><%= date.day %></div>
+          <% bills.each do |bill| %>
+            <div class="bill-calendar-item <%= date < Date.current ? 'bill-overdue' : '' %>"
+                 title="<%= bill["name"] %> — <%= number_to_currency(bill["amount"]) %>">
+              <span class="bill-calendar-item-name"><%= bill["name"] %></span>
+              <span class="bill-calendar-item-amount"><%= number_to_currency(bill["amount"]) %></span>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <% # pad the last week %>
+      <% remaining = (7 - (end_date.wday + 1) % 7) % 7 %>
+      <% remaining.times do %>
+        <div class="bill-calendar-cell bill-calendar-cell-empty"></div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<% # Monthly summary below the calendar %>
+<% month_bills = (start_date..end_date).flat_map { |d| calendar_bills_for_date(@items, d) } %>
+<% month_total = month_bills.sum { |b| b["amount"].to_f } %>
+
+<% upcoming = (Date.current..end_date).flat_map { |d| calendar_bills_for_date(@items, d) } %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Bills This Month</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= month_bills.size %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Due</div>
+      <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(month_total) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Remaining This Month</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= upcoming.size %> bills</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Remaining Amount</div>
+      <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(upcoming.sum { |b| b["amount"].to_f }) %></div>
+    </div>
+  </div>
+</div>
+
+<% if month_bills.any? %>
+  <div class="card">
+    <div class="card-header"><h2>Bills Due in <%= start_date.strftime("%B") %></h2></div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Name</th>
+          <th>Merchant</th>
+          <th style="text-align: right;">Amount</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% (start_date..end_date).each do |date| %>
+          <% calendar_bills_for_date(@items, date).each do |bill| %>
+            <tr class="<%= 'table-row-warning' if date < Date.current %>">
+              <td><%= date.strftime("%b %d") %></td>
+              <td><strong><%= bill["name"] %></strong></td>
+              <td><%= bill["merchant"] %></td>
+              <td style="text-align: right;"><%= number_to_currency(bill["amount"]) %></td>
+              <td>
+                <% if date < Date.current %>
+                  <span class="badge badge-danger">Overdue</span>
+                <% elsif date == Date.current %>
+                  <span class="badge badge-warning">Due Today</span>
+                <% elsif date <= 3.days.from_now.to_date %>
+                  <span class="badge badge-warning">Due Soon</span>
+                <% else %>
+                  <span class="badge badge-success">Upcoming</span>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        <% end %>
+      </tbody>
+      <tfoot>
+        <tr style="font-weight: 600;">
+          <td colspan="3">Total</td>
+          <td style="text-align: right;"><%= number_to_currency(month_total) %></td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+  </div>
+<% end %>

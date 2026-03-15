@@ -1,0 +1,252 @@
+<% content_for(:title, "Playbook Comparison") %>
+
+<div style="max-width: 72rem; margin: 0 auto; padding: 1.5rem 1rem;">
+  <!-- Header -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+    <div>
+      <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">
+        <span class="material-icons-outlined" style="vertical-align: -4px; color: var(--primary);">compare_arrows</span>
+        Playbook Comparison
+      </h1>
+      <p style="color: var(--text-secondary); margin: 0.25rem 0 0; font-size: 0.875rem;">
+        Compare your trading playbooks side-by-side
+      </p>
+    </div>
+  </div>
+
+  <% if @playbook_stats.blank? || @playbook_stats.all? { |s| s[:trade_count] == 0 } %>
+    <!-- Empty State -->
+    <div class="card" style="padding: 3rem; text-align: center;">
+      <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary);">menu_book</span>
+      <h2 style="margin: 1rem 0 0.5rem; font-size: 1.25rem; font-weight: 600;">No Playbook Data</h2>
+      <p style="color: var(--text-secondary); font-size: 0.875rem; max-width: 28rem; margin: 0 auto;">
+        Create playbooks and assign them to your trades to see a side-by-side comparison of performance across strategies.
+      </p>
+    </div>
+  <% else %>
+    <!-- Summary Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+      <% @playbook_stats.each do |pb| %>
+        <% next if pb[:trade_count] == 0 && pb[:name] == "No Playbook" %>
+        <div class="card" style="padding: 1rem; border-top: 3px solid <%= pb[:color] %>;">
+          <div style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: <%= pb[:color] %>; margin-right: 0.375rem; vertical-align: 1px;"></span>
+            <%= pb[:name] %>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+            <div>
+              <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">P&L</div>
+              <div style="font-size: 1.125rem; font-weight: 700; color: <%= pb[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                <%= pb[:total_pnl] >= 0 ? '+' : '' %>$<%= number_with_delimiter(pb[:total_pnl].abs, delimiter: ',') %>
+              </div>
+            </div>
+            <div>
+              <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Trades</div>
+              <div style="font-size: 1.125rem; font-weight: 700;"><%= pb[:trade_count] %></div>
+            </div>
+            <div>
+              <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Win Rate</div>
+              <div style="font-size: 1.125rem; font-weight: 700; color: <%= pb[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;">
+                <%= pb[:win_rate] %>%
+              </div>
+            </div>
+            <div>
+              <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Profit Factor</div>
+              <div style="font-size: 1.125rem; font-weight: 700;">
+                <%= pb[:profit_factor] == Float::INFINITY ? '---' : pb[:profit_factor] %>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Equity Curve Overlay Chart -->
+    <% curves_with_data = @playbook_stats.select { |pb| pb[:equity_curve].length > 1 } %>
+    <% if curves_with_data.any? %>
+      <div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+        <div class="card-header" style="margin-bottom: 0.75rem;">
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px; color: var(--primary);">show_chart</span>
+          Equity Curves
+        </div>
+        <!-- Legend -->
+        <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 0.75rem; font-size: 0.8125rem;">
+          <% curves_with_data.each do |pb| %>
+            <div style="display: flex; align-items: center; gap: 0.375rem;">
+              <span style="display: inline-block; width: 16px; height: 3px; background: <%= pb[:color] %>; border-radius: 2px;"></span>
+              <span><%= pb[:name] %></span>
+            </div>
+          <% end %>
+        </div>
+        <%
+          # Compute SVG dimensions and scale
+          all_values = curves_with_data.flat_map { |pb| pb[:equity_curve].map { |pt| pt[:value] } }
+          all_values << 0 # always include zero line
+          max_val = all_values.max
+          min_val = all_values.min
+          range = max_val - min_val
+          range = 1.0 if range == 0
+
+          chart_w = 800
+          chart_h = 280
+          pad_l = 60
+          pad_r = 20
+          pad_t = 20
+          pad_b = 40
+          plot_w = chart_w - pad_l - pad_r
+          plot_h = chart_h - pad_t - pad_b
+
+          # Zero line y position
+          zero_y = pad_t + ((max_val - 0) / range * plot_h).round
+        %>
+        <svg viewBox="0 0 <%= chart_w %> <%= chart_h %>" style="width: 100%; height: auto;" preserveAspectRatio="xMidYMid meet">
+          <!-- Grid lines -->
+          <% 5.times do |i|
+               y = pad_t + (plot_h * i / 4.0).round
+               val = max_val - (range * i / 4.0)
+          %>
+            <line x1="<%= pad_l %>" y1="<%= y %>" x2="<%= chart_w - pad_r %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4,4"/>
+            <text x="<%= pad_l - 6 %>" y="<%= y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="9">$<%= number_with_delimiter(val.round(0), delimiter: ',') %></text>
+          <% end %>
+
+          <!-- Zero line -->
+          <line x1="<%= pad_l %>" y1="<%= zero_y %>" x2="<%= chart_w - pad_r %>" y2="<%= zero_y %>" stroke="var(--text-secondary)" stroke-width="1" opacity="0.4"/>
+
+          <!-- Curves -->
+          <% curves_with_data.each do |pb|
+               curve = pb[:equity_curve]
+               points = curve.each_with_index.map do |pt, i|
+                 x = pad_l + (i.to_f / [curve.length - 1, 1].max * plot_w).round
+                 y = pad_t + ((max_val - pt[:value]) / range * plot_h).round
+                 "#{x},#{y}"
+               end
+               polyline = points.join(" ")
+          %>
+            <polyline points="<%= polyline %>" fill="none" stroke="<%= pb[:color] %>" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+          <% end %>
+
+          <!-- X-axis labels (first, middle, last dates) -->
+          <%
+            longest_curve = curves_with_data.max_by { |pb| pb[:equity_curve].length }[:equity_curve]
+            if longest_curve.length > 0
+              label_indices = [0, longest_curve.length / 2, longest_curve.length - 1].uniq
+              label_indices.each do |idx|
+                x = pad_l + (idx.to_f / [longest_curve.length - 1, 1].max * plot_w).round
+                date_label = longest_curve[idx][:date].to_s.slice(5, 5) rescue ""
+          %>
+                <text x="<%= x %>" y="<%= chart_h - 8 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="9"><%= date_label %></text>
+          <%
+              end
+            end
+          %>
+        </svg>
+      </div>
+    <% end %>
+
+    <!-- Comparison Table -->
+    <div class="card" style="padding: 1rem; margin-bottom: 1.5rem; overflow-x: auto;">
+      <div class="card-header" style="margin-bottom: 0.75rem;">
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px; color: var(--primary);">table_chart</span>
+        Detailed Comparison
+      </div>
+      <% active_playbooks = @playbook_stats.select { |pb| pb[:trade_count] > 0 } %>
+      <table style="width: 100%; font-size: 0.8125rem; border-collapse: collapse; min-width: <%= 10 + active_playbooks.length * 8 %>rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.5rem; font-weight: 600; white-space: nowrap;">Metric</th>
+            <% active_playbooks.each do |pb| %>
+              <th style="text-align: right; padding: 0.5rem; font-weight: 600; white-space: nowrap;">
+                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: <%= pb[:color] %>; margin-right: 0.25rem; vertical-align: 1px;"></span>
+                <%= pb[:name] %>
+              </th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody>
+          <% @metric_rows.each do |row| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem; font-weight: 500; white-space: nowrap;"><%= row[:label] %></td>
+              <% active_playbooks.each do |pb| %>
+                <td style="text-align: right; padding: 0.5rem; white-space: nowrap;">
+                  <% case row[:format]
+                     when :currency
+                       val = pb[row[:key]].to_f
+                  %>
+                    <span style="color: <%= val >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;">
+                      <%= val >= 0 ? '+' : '' %>$<%= number_with_delimiter(val.abs.round(2), delimiter: ',') %>
+                    </span>
+                  <% when :percent %>
+                    <span style="color: <%= pb[row[:key]].to_f >= 50 ? 'var(--positive)' : 'var(--negative)' %>;">
+                      <%= pb[row[:key]] %>%
+                    </span>
+                  <% when :number %>
+                    <%= pb[row[:key]] %>
+                  <% when :ratio %>
+                    <%= pb[row[:key]] == Float::INFINITY ? '---' : pb[row[:key]] %>
+                  <% when :text %>
+                    <%= pb[row[:key]] || '---' %>
+                  <% when :best_trade %>
+                    <% bt = pb[:best_trade] %>
+                    <% if bt %>
+                      <span style="color: var(--positive); font-weight: 600;">+$<%= bt["pnl"].to_f.abs.round(2) %></span>
+                      <span style="color: var(--text-secondary); font-size: 0.75rem;"><%= bt["symbol"] %></span>
+                    <% else %>
+                      ---
+                    <% end %>
+                  <% when :worst_trade %>
+                    <% wt = pb[:worst_trade] %>
+                    <% if wt %>
+                      <span style="color: var(--negative); font-weight: 600;">$<%= wt["pnl"].to_f.round(2) %></span>
+                      <span style="color: var(--text-secondary); font-size: 0.75rem;"><%= wt["symbol"] %></span>
+                    <% else %>
+                      ---
+                    <% end %>
+                  <% end %>
+                </td>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Top Symbols per Playbook -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+      <% @playbook_stats.each do |pb| %>
+        <% next if pb[:trade_count] == 0 %>
+        <% next if pb[:top_symbols].blank? %>
+        <div class="card" style="padding: 1rem;">
+          <div class="card-header" style="margin-bottom: 0.75rem; font-size: 0.8125rem;">
+            <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: <%= pb[:color] %>; margin-right: 0.375rem; vertical-align: 1px;"></span>
+            <%= pb[:name] %> &mdash; Top Symbols
+          </div>
+          <table style="width: 100%; font-size: 0.8125rem; border-collapse: collapse;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <th style="text-align: left; padding: 0.25rem 0.375rem; font-size: 0.75rem;">Symbol</th>
+                <th style="text-align: right; padding: 0.25rem 0.375rem; font-size: 0.75rem;">Trades</th>
+                <th style="text-align: right; padding: 0.25rem 0.375rem; font-size: 0.75rem;">P&L</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% pb[:top_symbols].each do |sym| %>
+                <tr style="border-bottom: 1px solid var(--border);">
+                  <td style="padding: 0.25rem 0.375rem; font-weight: 600;"><%= sym[:name] %></td>
+                  <td style="text-align: right; padding: 0.25rem 0.375rem;"><%= sym[:count] %></td>
+                  <td style="text-align: right; padding: 0.25rem 0.375rem; color: <%= sym[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;">
+                    <%= sym[:total_pnl] >= 0 ? '+' : '' %>$<%= sym[:total_pnl] %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <!-- Footer -->
+  <div style="text-align: center; padding: 1rem 0; color: var(--text-secondary); font-size: 0.75rem; border-top: 1px solid var(--border);">
+    Generated on <%= Time.now.strftime("%B %d, %Y at %I:%M %p") %>
+  </div>
+</div>

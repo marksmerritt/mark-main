@@ -1,0 +1,167 @@
+<% content_for(:title) { "Writing Stats" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #9c27b0;">edit_note</span>
+    Writing Statistics
+  </h1>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Notes</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_notes %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Words</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_with_delimiter(@total_words) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Words</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @avg_words %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Writing Streak</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @writing_streak >= 3 ? 'var(--positive)' : 'var(--text)' %>;"><%= @writing_streak %> days</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notebooks</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @notebooks.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Favorites</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @favorites_count %></div>
+    </div>
+  </div>
+</div>
+
+<%# Weekly Writing Trend %>
+<% if @weekly_notes.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">trending_up</span> Weekly Writing Volume</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        wn_max = @weekly_notes.values.map { |v| v[:words] }.max.to_f
+        wn_max = 1 if wn_max == 0
+      %>
+      <svg viewBox="0 0 <%= @weekly_notes.count * 56 + 60 %> 160" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <% @weekly_notes.each_with_index do |(week, data), i| %>
+          <% bar_h = data[:words] / wn_max * 110 %>
+          <% x = 35 + i * 56 %>
+          <rect x="<%= x %>" y="<%= 130 - bar_h %>" width="40" height="<%= bar_h %>"
+                fill="#9c27b0" opacity="0.5" rx="3"/>
+          <text x="<%= x + 20 %>" y="<%= 130 - bar_h - 4 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="7"><%= data[:words] %>w</text>
+          <text x="<%= x + 20 %>" y="145" text-anchor="middle" fill="var(--text-secondary)" font-size="6"><%= Date.parse(week).strftime("%m/%d") rescue week[-5..] %></text>
+          <text x="<%= x + 20 %>" y="155" text-anchor="middle" fill="var(--text-secondary)" font-size="5"><%= data[:count] %> notes</text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<%# By Notebook %>
+<% if @by_notebook.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">book</span> Words by Notebook</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% nb_max = @by_notebook.values.map { |v| v[:words] }.max.to_f; nb_max = 1 if nb_max == 0 %>
+      <% @by_notebook.first(10).each do |nb, data| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+          <span style="width: 8rem; font-size: 0.8125rem; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= nb %></span>
+          <div style="flex: 1; height: 1.25rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= (data[:words] / nb_max * 100).round(1) %>%; background: #9c27b0; opacity: 0.5; border-radius: 4px;"></div>
+          </div>
+          <span style="min-width: 4rem; text-align: right; font-size: 0.8125rem; font-weight: 600;"><%= number_with_delimiter(data[:words]) %></span>
+          <span style="min-width: 2.5rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary);"><%= data[:count] %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Writing Time Distribution %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">schedule</span> Writing by Hour</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% hour_max = @hour_distribution.max.to_f; hour_max = 1 if hour_max == 0 %>
+      <div style="display: flex; gap: 2px; align-items: flex-end; height: 80px;">
+        <% @hour_distribution.each_with_index do |count, h| %>
+          <div style="flex: 1; background: <%= count > 0 ? '#9c27b0' : 'var(--bg)' %>; opacity: <%= count > 0 ? (0.3 + count / hour_max * 0.7).round(2) : 0.3 %>; border-radius: 2px 2px 0 0; height: <%= count > 0 ? (count / hour_max * 100).round(1) : 5 %>%;"
+               title="<%= h %>:00 — <%= count %> notes"></div>
+        <% end %>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 0.5625rem; color: var(--text-secondary); margin-top: 0.25rem;">
+        <span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span>
+      </div>
+    </div>
+  </div>
+
+  <%# Day of Week %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">view_week</span> Writing by Day</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% dow_max = @dow_distribution.max.to_f; dow_max = 1 if dow_max == 0 %>
+      <% %w[Sun Mon Tue Wed Thu Fri Sat].each_with_index do |day, i| %>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem;">
+          <span style="width: 2rem; font-size: 0.75rem; text-align: right; color: var(--text-secondary);"><%= day %></span>
+          <div style="flex: 1; height: 1rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= (@dow_distribution[i] / dow_max * 100).round(1) %>%; background: #9c27b0; opacity: 0.5; border-radius: 4px;"></div>
+          </div>
+          <span style="min-width: 1.5rem; font-size: 0.75rem; font-weight: 600; text-align: right;"><%= @dow_distribution[i] %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Top Tags %>
+<% if @tag_usage.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">sell</span> Most Used Tags</h2>
+    </div>
+    <div style="padding: 1.25rem; display: flex; flex-wrap: wrap; gap: 0.375rem;">
+      <% @tag_usage.each do |tag, count| %>
+        <span style="font-size: 0.75rem; padding: 0.25rem 0.75rem; border-radius: 9999px; background: var(--bg); border: 1px solid var(--border);">
+          <%= tag %> <span style="color: var(--text-secondary);">×<%= count %></span>
+        </span>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Notable Notes %>
+<% if @longest_note %>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem 1.25rem;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Longest Note</div>
+      <div style="font-weight: 600; margin-top: 0.25rem;"><%= @longest_note["title"].presence || "Untitled" %></div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary);"><%= number_with_delimiter(@longest_note["_word_count"]) %> words</div>
+    </div>
+    <% if @shortest_note %>
+      <div class="card" style="padding: 1rem 1.25rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Shortest Note</div>
+        <div style="font-weight: 600; margin-top: 0.25rem;"><%= @shortest_note["title"].presence || "Untitled" %></div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);"><%= @shortest_note["_word_count"] %> words</div>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Notes", notes_path, class: "btn" %>
+  <%= link_to "Productivity", productivity_notes_path, class: "btn" %>
+  <%= link_to "Knowledge Graph", knowledge_graph_notes_path, class: "btn" %>
+</div>

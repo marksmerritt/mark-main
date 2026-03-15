@@ -1,0 +1,120 @@
+<% content_for(:title) { "Smart Alerts" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #c62828;">notifications_active</span>
+    Smart Alerts
+  </h1>
+</div>
+
+<%# Alert Summary Card %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0;">
+    <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= @summary[:total] %></div>
+    </div>
+    <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Critical</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: <%= @summary[:critical] > 0 ? '#c62828' : 'var(--positive)' %>;"><%= @summary[:critical] %></div>
+    </div>
+    <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Warning</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: <%= @summary[:warning] > 0 ? '#f9ab00' : 'var(--text)' %>;"><%= @summary[:warning] %></div>
+    </div>
+    <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Info</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);"><%= @summary[:info] %></div>
+    </div>
+    <div style="padding: 0.75rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Success</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= @summary[:success] %></div>
+    </div>
+  </div>
+</div>
+
+<%
+  severity_config = {
+    "critical" => { label: "Critical", color: "#c62828", bg: "rgba(198,40,40,0.08)", icon: "error", border: "#c62828" },
+    "warning"  => { label: "Warnings", color: "#f9ab00", bg: "rgba(249,171,0,0.08)", icon: "warning", border: "#f9ab00" },
+    "info"     => { label: "Info", color: "#1a73e8", bg: "rgba(26,115,232,0.08)", icon: "info", border: "#1a73e8" },
+    "success"  => { label: "Opportunities", color: "#0d904f", bg: "rgba(13,144,79,0.08)", icon: "check_circle", border: "#0d904f" }
+  }
+  grouped = @alerts.group_by { |a| a[:severity] }
+%>
+
+<% if @alerts.any? %>
+  <% %w[critical warning info success].each do |severity| %>
+    <% next unless grouped[severity]&.any? %>
+    <%
+      config = severity_config[severity]
+    %>
+    <div style="margin-bottom: 1.5rem;">
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding-bottom: 0.375rem; border-bottom: 2px solid <%= config[:border] %>;">
+        <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= config[:color] %>;"><%= config[:icon] %></span>
+        <span style="font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: <%= config[:color] %>;"><%= config[:label] %></span>
+        <span style="margin-left: auto; font-size: 0.75rem; font-weight: 600; background: <%= config[:bg] %>; color: <%= config[:color] %>; padding: 0.125rem 0.5rem; border-radius: 9999px;"><%= grouped[severity].count %></span>
+      </div>
+
+      <div class="entries-list">
+        <% grouped[severity].each do |alert| %>
+          <div class="card entry-card" style="border-left: 3px solid <%= config[:border] %>; margin-bottom: 0.5rem;">
+            <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem 1rem;">
+              <div style="flex-shrink: 0; width: 36px; height: 36px; border-radius: 8px; background: <%= config[:bg] %>; display: flex; align-items: center; justify-content: center;">
+                <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= config[:color] %>;"><%= alert[:category] %></span>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.125rem;"><%= alert[:title] %></div>
+                <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.4;"><%= alert[:message] %></div>
+              </div>
+              <div style="flex-shrink: 0;">
+                <% if alert[:action_path].present? %>
+                  <%= link_to alert[:action_path], class: "btn btn-sm", style: "white-space: nowrap; font-size: 0.75rem;" do %>
+                    <%= alert[:action_text] %>
+                    <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; margin-left: 0.125rem;">arrow_forward</span>
+                  <% end %>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--positive); margin-bottom: 0.5rem;">verified</span>
+    <div style="font-size: 1.125rem; font-weight: 600; color: var(--text);">No Alerts</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Connect your APIs in <%= link_to "Settings", settings_path %> to generate smart alerts.</div>
+  </div>
+<% end %>
+
+<%# All Clear Section %>
+<% if @all_clear.any? %>
+  <div style="margin-top: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; padding-bottom: 0.375rem; border-bottom: 2px solid var(--positive);">
+      <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--positive);">check_circle</span>
+      <span style="font-weight: 700; font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--positive);">All Clear</span>
+      <span style="margin-left: auto; font-size: 0.75rem; font-weight: 600; background: rgba(13,144,79,0.08); color: var(--positive); padding: 0.125rem 0.5rem; border-radius: 9999px;"><%= @all_clear.count %></span>
+    </div>
+
+    <div class="card">
+      <div style="padding: 0.75rem 1rem;">
+        <% @all_clear.each_with_index do |item, i| %>
+          <div style="display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem 0;<%= i < @all_clear.count - 1 ? ' border-bottom: 1px solid var(--border);' : '' %>">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--positive);"><%= item[:icon] %></span>
+            <span style="font-size: 0.8125rem;"><%= item[:text] %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Navigation %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Dashboard", root_path, class: "btn" %>
+  <%= link_to "Notifications", notifications_path, class: "btn" %>
+  <%= link_to "Financial Pulse", financial_pulse_path, class: "btn" %>
+  <%= link_to "Daily Review", daily_review_path, class: "btn" %>
+</div>

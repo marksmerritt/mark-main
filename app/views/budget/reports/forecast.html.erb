@@ -1,0 +1,340 @@
+<div class="page-header">
+  <h1>Budget Forecast</h1>
+  <div class="page-actions">
+    <%= link_to "Back", budget_reports_spending_path, class: "btn" %>
+  </div>
+</div>
+
+<% if @data.is_a?(Hash) && @data["error"].nil? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Days Remaining</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @data["days_remaining"] %> / <%= @data["days_total"] %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Spent So Far</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(@data["spent_so_far"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Projected Total</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @data["on_track"] ? 'positive' : 'negative' %>">
+          <%= number_to_currency(@data["projected_total_spend"]) %>
+        </div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Safe to Spend / Day</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@data["safe_to_spend_daily"]) %></div>
+      </div>
+    </div>
+  </div>
+
+  <%
+    budget_income = @data["budget_income"].to_f
+    spent = @data["spent_so_far"].to_f
+    projected = @data["projected_total_spend"].to_f
+    days_elapsed = @data["days_elapsed"].to_i
+    days_total = @data["days_total"].to_i
+    days_remaining = @data["days_remaining"].to_i
+    daily_rate = @data["daily_spend_rate"].to_f
+    ideal_rate = @data["ideal_daily_spend"].to_f
+    pct_elapsed = days_total > 0 ? (days_elapsed.to_f / days_total * 100).round(0) : 0
+    pct_spent = budget_income > 0 ? (spent / budget_income * 100).round(0) : 0
+    pace_ratio = ideal_rate > 0 ? (daily_rate / ideal_rate * 100).round(0) : 0
+  %>
+
+  <%# Spending Pace Gauge %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Spending Pace</h2></div>
+    <div style="padding: 1.5rem 1.25rem; display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+      <%
+        gauge_pct = pace_ratio.clamp(0, 200)
+        gauge_color = pace_ratio <= 90 ? "var(--positive)" : pace_ratio <= 110 ? "var(--primary)" : pace_ratio <= 130 ? "#f9ab00" : "var(--negative)"
+        arc_pct = [gauge_pct / 200.0, 1.0].min
+        arc_angle = arc_pct * 180
+        arc_ex = 70 - 60 * Math.cos(arc_angle * Math::PI / 180)
+        arc_ey = 75 - 60 * Math.sin(arc_angle * Math::PI / 180)
+      %>
+      <div style="position: relative; width: 160px; height: 90px; flex-shrink: 0;">
+        <svg viewBox="0 0 140 80" style="width: 100%; height: 100%;">
+          <path d="M 10 75 A 60 60 0 0 1 130 75" fill="none" stroke="var(--border)" stroke-width="10" stroke-linecap="round" />
+          <%# Ideal zone (40-60% of arc = 80-110% pace) %>
+          <path d="M 10 75 A 60 60 0 0 1 130 75" fill="none" stroke="var(--positive)" stroke-width="10" stroke-linecap="round" opacity="0.1" />
+          <path d="M 10 75 A 60 60 0 <%= arc_angle > 180 ? 1 : 0 %> 1 <%= arc_ex.round(1) %> <%= arc_ey.round(1) %>"
+                fill="none" stroke="<%= gauge_color %>" stroke-width="10" stroke-linecap="round" />
+          <text x="70" y="68" text-anchor="middle" fill="<%= gauge_color %>" font-size="20" font-weight="700"><%= pace_ratio %>%</text>
+          <text x="70" y="52" text-anchor="middle" fill="var(--text-secondary)" font-size="7">OF IDEAL PACE</text>
+          <text x="10" y="12" fill="var(--text-secondary)" font-size="7" text-anchor="start">Under</text>
+          <text x="130" y="12" fill="var(--text-secondary)" font-size="7" text-anchor="end">Over</text>
+        </svg>
+      </div>
+      <div style="flex: 1;">
+        <div style="font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; color: <%= gauge_color %>;">
+          <% if pace_ratio <= 90 %>
+            Under Budget Pace — Nice restraint!
+          <% elsif pace_ratio <= 110 %>
+            On Track — Spending at a sustainable rate.
+          <% elsif pace_ratio <= 130 %>
+            Slightly Over Pace — Consider cutting back.
+          <% else %>
+            Over Budget Pace — Action needed.
+          <% end %>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8125rem;">
+          <div>
+            <span style="color: var(--text-secondary);">Actual rate:</span>
+            <strong><%= number_to_currency(daily_rate) %>/day</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-secondary);">Ideal rate:</span>
+            <strong><%= number_to_currency(ideal_rate) %>/day</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-secondary);">Safe to spend:</span>
+            <strong class="positive"><%= number_to_currency(@data["safe_to_spend_daily"]) %>/day</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-secondary);">Days left:</span>
+            <strong><%= days_remaining %></strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Budget Runway Visualization %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Budget Runway</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <%# Horizontal bar showing spent, projected remaining, and budget %>
+      <div style="position: relative; height: 40px; margin-bottom: 1rem;">
+        <%# Full budget bar %>
+        <div style="position: absolute; inset: 0; background: var(--bg); border-radius: var(--radius); border: 1px solid var(--border);"></div>
+        <%# Spent portion %>
+        <% spent_pct = budget_income > 0 ? (spent / budget_income * 100).clamp(0, 100) : 0 %>
+        <div style="position: absolute; left: 0; top: 0; bottom: 0; width: <%= spent_pct.round(1) %>%;
+                    background: var(--negative); opacity: 0.7; border-radius: var(--radius) 0 0 var(--radius);"></div>
+        <%# Projected additional spending %>
+        <% projected_additional = projected - spent %>
+        <% projected_add_pct = budget_income > 0 ? (projected_additional / budget_income * 100).clamp(0, 100 - spent_pct) : 0 %>
+        <div style="position: absolute; left: <%= spent_pct.round(1) %>%; top: 0; bottom: 0; width: <%= projected_add_pct.round(1) %>%;
+                    background: #f9ab00; opacity: 0.4; border-radius: 0;"></div>
+        <%# Day marker %>
+        <div style="position: absolute; left: <%= pct_elapsed %>%; top: -4px; bottom: -4px; width: 2px;
+                    background: var(--text); border-radius: 1px;" title="Today (Day <%= days_elapsed %>)"></div>
+        <%# Center labels %>
+        <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600;">
+          <%= number_to_currency(spent) %> spent of <%= number_to_currency(budget_income) %>
+        </div>
+      </div>
+      <div style="display: flex; gap: 1.5rem; font-size: 0.6875rem; color: var(--text-secondary);">
+        <span style="display: flex; align-items: center; gap: 4px;">
+          <span style="width: 10px; height: 10px; background: var(--negative); opacity: 0.7; border-radius: 2px;"></span> Spent
+        </span>
+        <span style="display: flex; align-items: center; gap: 4px;">
+          <span style="width: 10px; height: 10px; background: #f9ab00; opacity: 0.4; border-radius: 2px;"></span> Projected remaining spend
+        </span>
+        <span style="display: flex; align-items: center; gap: 4px;">
+          <span style="width: 10px; height: 2px; background: var(--text);"></span> Today
+        </span>
+      </div>
+      <div style="margin-top: 1rem; padding: 0.75rem; border-radius: var(--radius); background: var(--bg); font-size: 0.875rem;">
+        <span style="color: var(--text-secondary);">Projected end-of-month:</span>
+        <strong class="<%= @data["projected_remaining"].to_f >= 0 ? 'positive' : 'negative' %>">
+          <%= @data["projected_remaining"].to_f >= 0 ? "#{number_to_currency(@data["projected_remaining"])} surplus" : "#{number_to_currency(@data["projected_remaining"].to_f.abs)} deficit" %>
+        </strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="content-grid" style="margin-bottom: 1.5rem;">
+    <div class="card">
+      <div class="card-header"><h2>Pace Details</h2></div>
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Budget Income</span>
+          <span class="detail-value"><%= number_to_currency(budget_income) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Daily Spend Rate</span>
+          <span class="detail-value"><%= number_to_currency(daily_rate) %> / day</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Ideal Daily Spend</span>
+          <span class="detail-value"><%= number_to_currency(ideal_rate) %> / day</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Projected Remaining</span>
+          <span class="detail-value <%= @data["projected_remaining"].to_f >= 0 ? 'positive' : 'negative' %>">
+            <%= number_to_currency(@data["projected_remaining"]) %>
+          </span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Status</span>
+          <span class="detail-value">
+            <% if @data["on_track"] %>
+              <span class="badge badge-success">On Track</span>
+            <% else %>
+              <span class="badge badge-warning">Over Pace</span>
+            <% end %>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Time vs Spend</h2></div>
+      <div style="padding: 1.25rem;">
+        <div style="margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+            <span class="text-muted">Time Elapsed</span>
+            <span><%= pct_elapsed %>%</span>
+          </div>
+          <div class="budget-progress-bar">
+            <div class="budget-progress-fill progress-safe" style="width: <%= [pct_elapsed, 100].min %>%"></div>
+          </div>
+        </div>
+        <div style="margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+            <span class="text-muted">Budget Used</span>
+            <span><%= pct_spent %>%</span>
+          </div>
+          <div class="budget-progress-bar">
+            <div class="budget-progress-fill <%= pct_spent > pct_elapsed ? 'progress-warning' : 'progress-safe' %>" style="width: <%= [pct_spent, 100].min %>%"></div>
+          </div>
+        </div>
+        <% gap = pct_spent - pct_elapsed %>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+          <% if gap > 10 %>
+            <span class="negative">Spending is <%= gap %>pp ahead of time — you're burning through budget faster than the month is passing.</span>
+          <% elsif gap > 0 %>
+            <span style="color: #f9ab00;">Spending is slightly ahead (<%= gap %>pp) — minor adjustment needed.</span>
+          <% else %>
+            <span class="positive">Spending is on pace or behind — you have room.</span>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <% categories = @data["categories"] %>
+  <% if categories.is_a?(Array) && categories.any? %>
+    <% off_track = categories.select { |c| !c["on_track"] } %>
+    <% if off_track.any? %>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-header"><h2>Categories Over Pace</h2></div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th style="text-align: right;">Planned</th>
+              <th style="text-align: right;">Spent</th>
+              <th style="text-align: right;">Daily Rate</th>
+              <th style="text-align: right;">Projected</th>
+              <th style="text-align: right;">Over By</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% off_track.sort_by { |c| c["projected_vs_planned"].to_f }.reverse.each do |cat| %>
+              <tr>
+                <td><%= cat["name"] %></td>
+                <td style="text-align: right;"><%= number_to_currency(cat["planned"]) %></td>
+                <td style="text-align: right;"><%= number_to_currency(cat["spent"]) %></td>
+                <td style="text-align: right;"><%= number_to_currency(cat["daily_rate"]) %>/day</td>
+                <td style="text-align: right;" class="negative"><%= number_to_currency(cat["projected"]) %></td>
+                <td style="text-align: right;" class="negative"><%= number_to_currency(cat["projected_vs_planned"]) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>All Categories</h2></div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th style="text-align: right;">Planned</th>
+            <th style="text-align: right;">Spent</th>
+            <th style="text-align: right;">Projected</th>
+            <th>Pace</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% categories.each do |cat| %>
+            <%
+              cat_pct = cat["planned"].to_f > 0 ? (cat["spent"].to_f / cat["planned"].to_f * 100).clamp(0, 150).round(0) : 0
+            %>
+            <tr>
+              <td><%= cat["name"] %></td>
+              <td style="text-align: right;"><%= number_to_currency(cat["planned"]) %></td>
+              <td style="text-align: right;"><%= number_to_currency(cat["spent"]) %></td>
+              <td style="text-align: right;"><%= number_to_currency(cat["projected"]) %></td>
+              <td style="min-width: 80px;">
+                <div class="budget-progress-bar" style="height: 6px;">
+                  <div class="budget-progress-fill <%= cat["on_track"] ? 'progress-safe' : 'progress-warning' %>"
+                       style="width: <%= [cat_pct, 100].min %>%;"></div>
+                </div>
+              </td>
+              <td>
+                <span class="badge badge-<%= cat["on_track"] ? "success" : "warning" %>">
+                  <%= cat["on_track"] ? "On Track" : "Over Pace" %>
+                </span>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
+  <%# Actionable Recommendations %>
+  <%
+    recommendations = []
+    if !@data["on_track"] && days_remaining > 3
+      safe_daily = @data["safe_to_spend_daily"].to_f
+      if safe_daily < daily_rate
+        cut_amount = ((daily_rate - safe_daily) * days_remaining).round(0)
+        recommendations << { icon: "savings", type: "warning",
+          text: "Cut ~#{number_to_currency(cut_amount)} over the remaining #{days_remaining} days to finish on budget." }
+      end
+    end
+    if categories.is_a?(Array)
+      biggest_offender = categories.select { |c| !c["on_track"] }.max_by { |c| c["projected_vs_planned"].to_f }
+      if biggest_offender
+        recommendations << { icon: "category", type: "negative",
+          text: "#{biggest_offender["name"]} is the most over-budget category — projected #{number_to_currency(biggest_offender["projected_vs_planned"])} over plan." }
+      end
+      on_track_cats = categories.select { |c| c["on_track"] && c["spent"].to_f > 0 }
+      if on_track_cats.any?
+        best = on_track_cats.min_by { |c| c["spent"].to_f / [c["planned"].to_f, 1].max }
+        recommendations << { icon: "thumb_up", type: "positive",
+          text: "#{best["name"]} is well under control at #{number_to_currency(best["spent"])} of #{number_to_currency(best["planned"])} planned." }
+      end
+    end
+    if @data["on_track"]
+      recommendations << { icon: "check_circle", type: "positive",
+        text: "You're on track! At current pace, you'll end the month with #{number_to_currency(@data["projected_remaining"])} remaining." }
+    end
+  %>
+  <% if recommendations.any? %>
+    <div class="card">
+      <div class="card-header"><h2>Recommendations</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <% recommendations.each do |rec| %>
+          <div style="display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 0.75rem; font-size: 0.875rem;">
+            <span class="material-icons-outlined <%= rec[:type] %>" style="font-size: 1.125rem; flex-shrink: 0; margin-top: 1px;"><%= rec[:icon] %></span>
+            <span><%= rec[:text] %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p>No budget found for this month. <%= link_to "Create one", new_budget_budget_path %>.</p>
+  </div>
+<% end %>

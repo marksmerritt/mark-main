@@ -1,0 +1,189 @@
+<div class="page-header">
+  <h1>Sinking Funds</h1>
+  <div class="page-actions">
+    <%= link_to "New Fund", new_budget_fund_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<% if @funds.is_a?(Array) && @funds.any? %>
+  <%
+    active_funds = @funds.select { |f| f["status"] == "active" }
+    completed_funds = @funds.select { |f| f["status"] == "completed" }
+    total_saved = @funds.sum { |f| f["current_amount"].to_f }
+    total_target = active_funds.sum { |f| f["target_amount"].to_f }
+    total_remaining = active_funds.sum { |f| f["remaining_amount"].to_f }
+    overall_pct = total_target > 0 ? (total_saved / total_target * 100).clamp(0, 100).round(1) : 0
+    on_track_count = active_funds.count { |f| f["on_track"] }
+    total_monthly = active_funds.sum { |f| f["monthly_target"].to_f }
+  %>
+
+  <%# Portfolio hero %>
+  <div class="card" style="display: flex; align-items: center; gap: 2rem; padding: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+    <div style="flex-shrink: 0; text-align: center;">
+      <%
+        fp_r = 50; fp_cx = 60; fp_cy = 60
+        fp_circum = 2 * Math::PI * fp_r
+        fp_filled = fp_circum * [overall_pct, 100].min / 100.0
+        fp_color = overall_pct >= 75 ? "var(--positive)" : overall_pct >= 50 ? "var(--primary)" : "#f9ab00"
+      %>
+      <svg width="120" height="120" viewBox="0 0 120 120">
+        <circle cx="<%= fp_cx %>" cy="<%= fp_cy %>" r="<%= fp_r %>" fill="none" stroke="var(--border)" stroke-width="8" />
+        <circle cx="<%= fp_cx %>" cy="<%= fp_cy %>" r="<%= fp_r %>" fill="none" stroke="<%= fp_color %>" stroke-width="8"
+                stroke-dasharray="<%= fp_filled.round(1) %> <%= fp_circum.round(1) %>"
+                stroke-linecap="round" transform="rotate(-90 <%= fp_cx %> <%= fp_cy %>)" />
+        <text x="<%= fp_cx %>" y="<%= fp_cy - 4 %>" text-anchor="middle" font-size="18" font-weight="700" fill="<%= fp_color %>"><%= overall_pct.round(0) %>%</text>
+        <text x="<%= fp_cx %>" y="<%= fp_cy + 10 %>" text-anchor="middle" font-size="8" fill="var(--text-secondary)">FUNDED</text>
+      </svg>
+    </div>
+    <div style="flex: 1; min-width: 200px;">
+      <h2 style="margin-bottom: 0.5rem;">Savings Portfolio</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 1rem;">
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Saved</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(total_saved) %></div>
+        </div>
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Target</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(total_target) %></div>
+        </div>
+        <div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Remaining</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(total_remaining) %></div>
+        </div>
+        <% if total_monthly > 0 %>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Need</div>
+            <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(total_monthly) %></div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 0.375rem; font-size: 0.8125rem;">
+      <div style="display: flex; align-items: center; gap: 0.375rem;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--primary);">savings</span>
+        <strong><%= active_funds.count %></strong> active
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.375rem;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--positive);">check_circle</span>
+        <strong><%= completed_funds.count %></strong> completed
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.375rem;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; color: <%= on_track_count == active_funds.count ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= on_track_count == active_funds.count ? "thumb_up" : "warning" %>
+        </span>
+        <strong><%= on_track_count %>/<%= active_funds.count %></strong> on track
+      </div>
+    </div>
+  </div>
+
+  <%# Stacked allocation bar %>
+  <% if active_funds.count > 1 %>
+    <%
+      alloc_colors = ["#1a73e8", "#0d904f", "#e8710a", "#d93025", "#9334e6", "#00bcd4", "#f9ab00"]
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Fund Allocation</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <%# Stacked bar showing relative sizes %>
+        <div style="display: flex; height: 2rem; border-radius: var(--radius); overflow: hidden; margin-bottom: 0.75rem;">
+          <% active_funds.sort_by { |f| -f["target_amount"].to_f }.each_with_index do |fund, i| %>
+            <% width_pct = total_target > 0 ? (fund["target_amount"].to_f / total_target * 100).round(1) : 0 %>
+            <div style="width: <%= width_pct %>%; background: <%= alloc_colors[i % alloc_colors.length] %>; opacity: 0.7; display: flex; align-items: center; justify-content: center;"
+                 title="<%= fund["name"] %>: <%= number_to_currency(fund["target_amount"]) %>">
+              <% if width_pct > 8 %>
+                <span style="font-size: 0.625rem; color: white; font-weight: 600;"><%= width_pct %>%</span>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+        <%# Legend %>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+          <% active_funds.sort_by { |f| -f["target_amount"].to_f }.each_with_index do |fund, i| %>
+            <div style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem;">
+              <div style="width: 10px; height: 10px; border-radius: 2px; background: <%= alloc_colors[i % alloc_colors.length] %>; opacity: 0.7;"></div>
+              <span><%= fund["name"] %></span>
+              <span style="color: var(--text-secondary);"><%= number_to_currency(fund["target_amount"]) %></span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+
+    <%# Progress comparison %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Savings Progress</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <% active_funds.sort_by { |f| -f["percentage_funded"].to_f }.each do |fund| %>
+          <div style="margin-bottom: 0.75rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.8125rem; margin-bottom: 0.25rem;">
+              <strong><%= fund["name"] %></strong>
+              <span style="color: var(--text-secondary);"><%= fund["percentage_funded"] %>% — <%= number_to_currency(fund["current_amount"]) %> / <%= number_to_currency(fund["target_amount"]) %></span>
+            </div>
+            <div class="budget-progress-bar">
+              <div class="budget-progress-fill progress-<%= fund["on_track"] ? "safe" : "danger" %>" style="width: <%= [fund["percentage_funded"].to_f, 100].min %>%;"></div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="tags-grid">
+    <% @funds.sort_by { |f| f["status"] == "active" ? 0 : 1 }.each do |fund| %>
+      <%
+        f_pct = fund["percentage_funded"].to_f
+        f_color = fund["on_track"] ? "var(--positive)" : f_pct >= 50 ? "#f9ab00" : "var(--negative)"
+        f_r = 24; f_cx = 28; f_cy = 28
+        f_circum = 2 * Math::PI * f_r
+        f_filled = f_circum * [f_pct, 100].min / 100.0
+      %>
+      <div class="card">
+        <div style="display: flex; align-items: center; gap: 1rem; padding: 1.25rem;">
+          <div style="flex-shrink: 0;">
+            <svg viewBox="0 0 56 56" style="width: 48px; height: 48px;">
+              <circle cx="<%= f_cx %>" cy="<%= f_cy %>" r="<%= f_r %>" fill="none" stroke="var(--border)" stroke-width="4" />
+              <circle cx="<%= f_cx %>" cy="<%= f_cy %>" r="<%= f_r %>" fill="none" stroke="<%= f_color %>" stroke-width="4"
+                      stroke-dasharray="<%= f_filled.round(1) %> <%= (f_circum - f_filled).round(1) %>"
+                      stroke-linecap="round" transform="rotate(-90 <%= f_cx %> <%= f_cy %>)" />
+              <text x="<%= f_cx %>" y="<%= f_cy + 1 %>" text-anchor="middle" dominant-baseline="middle" fill="<%= f_color %>" font-size="10" font-weight="700"><%= f_pct.round(0) %>%</text>
+            </svg>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.125rem;">
+              <strong><%= link_to fund["name"], budget_fund_path(fund["id"]) %></strong>
+              <span class="badge badge-<%= fund["status"] == "completed" ? "success" : "primary" %>" style="font-size: 0.6rem;"><%= fund["status"]&.capitalize %></span>
+            </div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+              <%= number_to_currency(fund["current_amount"]) %> of <%= number_to_currency(fund["target_amount"]) %>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding: 0 1.25rem 0.75rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 0.5rem; font-size: 0.8125rem;">
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Remaining</div>
+            <div style="font-weight: 600;"><%= number_to_currency(fund["remaining_amount"]) %></div>
+          </div>
+          <% if fund["monthly_target"].to_f > 0 %>
+            <div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Monthly</div>
+              <div style="font-weight: 600;"><%= number_to_currency(fund["monthly_target"]) %></div>
+            </div>
+          <% end %>
+        </div>
+
+        <div style="padding: 0 1.25rem 1rem; display: flex; gap: 0.5rem;">
+          <%= link_to "Details", budget_fund_path(fund["id"]), class: "btn btn-sm" %>
+          <% if fund["status"] == "active" %>
+            <%= link_to "Contribute", budget_fund_path(fund["id"]), class: "btn btn-sm btn-primary" %>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No sinking funds yet. Create one to save for future expenses.</p>
+    <%= link_to "Create Fund", new_budget_fund_path, class: "btn btn-primary" %>
+  </div>
+<% end %>

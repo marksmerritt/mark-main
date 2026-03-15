@@ -1,0 +1,178 @@
+<% content_for(:title) { "Journal Insights" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #9c27b0;">psychology</span>
+    Journal Insights
+  </h1>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Entries</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_entries %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Current Streak</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @current_streak >= 3 ? 'var(--positive)' : 'var(--text)' %>;"><%= @current_streak %> days</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Longest Streak</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @longest_streak %> days</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Words</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_with_delimiter(@total_words) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Words/Entry</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @avg_words %></div>
+    </div>
+  </div>
+</div>
+
+<%# Insights %>
+<% if @insights.any? %>
+  <div style="display: grid; gap: 0.5rem; margin-bottom: 1.5rem;">
+    <% @insights.each do |ins| %>
+      <div class="card" style="padding: 0.75rem 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
+        <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= ins[:color] %>;"><%= ins[:icon] %></span>
+        <span style="font-size: 0.875rem;"><%= ins[:text] %></span>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Journaling vs Non-Journaling Performance %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">compare</span> Journal Effect on Trading</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; text-align: center;">
+        <div style="padding: 1rem; background: var(--bg); border-radius: 8px; border-left: 3px solid var(--positive);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">With Journal</div>
+          <div style="font-size: 1.375rem; font-weight: 700; color: <%= @journal_day_avg >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= number_to_currency(@journal_day_avg) %>
+          </div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">avg per trade · <%= @journal_day_trades %> trades</div>
+        </div>
+        <div style="padding: 1rem; background: var(--bg); border-radius: 8px; border-left: 3px solid var(--text-secondary);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Without Journal</div>
+          <div style="font-size: 1.375rem; font-weight: 700; color: <%= @no_journal_day_avg >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= number_to_currency(@no_journal_day_avg) %>
+          </div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">avg per trade · <%= @no_journal_day_trades %> trades</div>
+        </div>
+      </div>
+      <% diff = @journal_day_avg - @no_journal_day_avg %>
+      <% if @journal_day_trades >= 3 && @no_journal_day_trades >= 3 %>
+        <div style="text-align: center; margin-top: 0.75rem; font-size: 0.8125rem; color: <%= diff >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          Journal days: <strong><%= diff >= 0 ? '+' : '' %><%= number_to_currency(diff) %></strong> per trade difference
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Mood Distribution %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">mood</span> Mood Distribution</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% mood_max = @moods.values.max.to_f; mood_max = 1 if mood_max == 0 %>
+      <% mood_colors = { "Confident" => "var(--positive)", "Disciplined" => "var(--primary)", "Neutral" => "var(--text-secondary)", "Anxious" => "#fbbc04", "Frustrated" => "var(--negative)" } %>
+      <% @moods.each do |mood, count| %>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <span style="width: 5.5rem; font-size: 0.8125rem; text-align: right; font-weight: 500;"><%= mood %></span>
+          <div style="flex: 1; height: 1.25rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= (count / mood_max * 100).round(1) %>%; background: <%= mood_colors[mood] || 'var(--primary)' %>; opacity: 0.6; border-radius: 4px;"></div>
+          </div>
+          <span style="min-width: 2rem; font-size: 0.8125rem; font-weight: 600; text-align: right;"><%= count %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Mood → Performance %>
+<% if @mood_performance.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">analytics</span> Mood → Trading Performance</h2>
+    </div>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.625rem 1rem;">Mood</th>
+            <th style="text-align: right; padding: 0.625rem;">Days</th>
+            <th style="text-align: right; padding: 0.625rem;">Trades</th>
+            <th style="text-align: right; padding: 0.625rem;">Avg P&L</th>
+            <th style="text-align: right; padding: 0.625rem;">Total P&L</th>
+            <th style="text-align: right; padding: 0.625rem;">Win Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @mood_performance.sort_by { |_, d| -d[:avg_pnl] }.each do |mood, data| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem 1rem; font-weight: 600;"><%= mood %></td>
+              <td style="text-align: right; padding: 0.5rem;"><%= data[:days] %></td>
+              <td style="text-align: right; padding: 0.5rem;"><%= data[:total_trades] %></td>
+              <td style="text-align: right; padding: 0.5rem; font-weight: 700; color: <%= data[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                <%= number_to_currency(data[:avg_pnl]) %>
+              </td>
+              <td style="text-align: right; padding: 0.5rem; color: <%= data[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                <%= number_to_currency(data[:total_pnl]) %>
+              </td>
+              <td style="text-align: right; padding: 0.5rem; color: <%= data[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;">
+                <%= data[:win_rate] %>%
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Weekly Journaling Frequency %>
+<% if @weekly_frequency.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">calendar_view_week</span> Weekly Journaling Frequency</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        wf_max = @weekly_frequency.values.max.to_f
+        wf_max = 1 if wf_max == 0
+      %>
+      <svg viewBox="0 0 <%= @weekly_frequency.count * 52 + 60 %> 140" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <%# 7-day target line %>
+        <% target_y = 120 - 7 / wf_max * 100 %>
+        <line x1="30" y1="<%= target_y %>" x2="<%= @weekly_frequency.count * 52 + 50 %>" y2="<%= target_y %>" stroke="var(--positive)" stroke-width="1" stroke-dasharray="4"/>
+        <text x="<%= @weekly_frequency.count * 52 + 52 %>" y="<%= target_y + 3 %>" fill="var(--positive)" font-size="7">7/wk</text>
+
+        <% @weekly_frequency.each_with_index do |(week, count), i| %>
+          <% bar_h = count / wf_max * 100 %>
+          <% x = 35 + i * 52 %>
+          <rect x="<%= x %>" y="<%= 120 - bar_h %>" width="38" height="<%= bar_h %>"
+                fill="<%= count >= 5 ? 'var(--positive)' : count >= 3 ? 'var(--primary)' : 'var(--negative)' %>" opacity="0.5" rx="3"/>
+          <text x="<%= x + 19 %>" y="<%= 120 - bar_h - 4 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="7"><%= count %></text>
+          <text x="<%= x + 19 %>" y="135" text-anchor="middle" fill="var(--text-secondary)" font-size="6"><%= Date.parse(week).strftime("%m/%d") rescue week[-5..] %></text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Journal", journal_entries_path, class: "btn" %>
+  <%= link_to "Journal Calendar", calendar_journal_entries_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+  <%= link_to "Dashboard", root_path, class: "btn" %>
+</div>

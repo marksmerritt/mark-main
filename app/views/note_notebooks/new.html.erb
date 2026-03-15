@@ -1,0 +1,9 @@
+<div class="page-header">
+  <h1>New Notebook</h1>
+</div>
+
+<div class="card">
+  <%= render "form", notebook: @notebook,
+             form_url: note_notebooks_path, form_method: :post,
+             submit_label: "Create Notebook", cancel_path: note_notebooks_path %>
+</div>

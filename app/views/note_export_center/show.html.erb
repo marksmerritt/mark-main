@@ -1,0 +1,451 @@
+<% content_for(:title) { "Export Center" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #1565c0;">cloud_download</span>
+    Notes Export Center
+  </h1>
+  <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem;">
+    Backup planning, export tools, and library overview
+  </p>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Notes</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_notes %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Words</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_with_delimiter(@total_words) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Est. Backup Size</div>
+      <div style="font-size: 1.5rem; font-weight: 700;">
+        <%= @est_backup_mb >= 1 ? "#{@est_backup_mb} MB" : "#{@est_backup_kb} KB" %>
+      </div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Last Updated</div>
+      <div style="font-size: 1.5rem; font-weight: 700;">
+        <% if @newest_note %>
+          <span style="font-size: 1rem;"><%= Date.parse(@newest_note["updated_at"] || @newest_note["created_at"] || "").strftime("%b %d") rescue "---" %></span>
+        <% else %>
+          ---
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Full Library Export %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1565c0;">download</span> Full Library Export</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+      Download your entire notes library in one of these formats. Each export includes all <%= @total_notes %> notes.
+    </p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+      <%# Markdown export - per-note only, so link to data export JSON as the full library export %>
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; text-align: center; background: var(--surface);">
+        <span class="material-icons-outlined" style="font-size: 2rem; color: #1565c0;">description</span>
+        <div style="font-weight: 600; margin-top: 0.5rem;">Markdown</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          ~<%= format_bytes((@total_chars * 1.1).round) %> estimated
+        </div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;">Best for plain text editors</div>
+        <% if @notes.any? %>
+          <div style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);">
+            Export individual notes via
+            <span style="color: var(--primary);">note &rarr; export</span>
+          </div>
+        <% end %>
+      </div>
+
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; text-align: center; background: var(--surface);">
+        <span class="material-icons-outlined" style="font-size: 2rem; color: #e65100;">code</span>
+        <div style="font-weight: 600; margin-top: 0.5rem;">HTML</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          ~<%= format_bytes((@total_chars * 1.8).round) %> estimated
+        </div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;">Best for web viewing</div>
+        <% if @notes.any? %>
+          <div style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);">
+            Export individual notes via
+            <span style="color: var(--primary);">note &rarr; export</span>
+          </div>
+        <% end %>
+      </div>
+
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; text-align: center; background: var(--surface);">
+        <span class="material-icons-outlined" style="font-size: 2rem; color: #2e7d32;">data_object</span>
+        <div style="font-weight: 600; margin-top: 0.5rem;">JSON (Full Backup)</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          ~<%= format_bytes((@total_chars * 2.2).round) %> estimated
+        </div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;">Complete data with metadata</div>
+        <%= link_to "Download JSON", data_export_notes_json_path, class: "btn", style: "margin-top: 0.75rem; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.375rem;" %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Per-Notebook Export Section %>
+<% if @by_notebook.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #6a1b9a;">menu_book</span> By Notebook</h2>
+    </div>
+    <div style="padding: 0; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="background: var(--bg);">
+            <th style="padding: 0.625rem 1rem; text-align: left; font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; color: var(--text-secondary);">Notebook</th>
+            <th style="padding: 0.625rem 1rem; text-align: right; font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; color: var(--text-secondary);">Notes</th>
+            <th style="padding: 0.625rem 1rem; text-align: right; font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; color: var(--text-secondary);">Words</th>
+            <th style="padding: 0.625rem 1rem; text-align: right; font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; color: var(--text-secondary);">Est. Size</th>
+            <th style="padding: 0.625rem 1rem; text-align: right; font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; color: var(--text-secondary);">% of Library</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% max_words = @by_notebook.values.map { |v| v[:words] }.max.to_f
+             max_words = 1 if max_words == 0 %>
+          <% @by_notebook.each do |name, data| %>
+            <tr style="border-top: 1px solid var(--border);">
+              <td style="padding: 0.625rem 1rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="material-icons-outlined" style="font-size: 1rem; color: #6a1b9a;"><%= name == "No Notebook" ? "folder_off" : "folder" %></span>
+                  <span style="font-weight: 500;"><%= name %></span>
+                </div>
+              </td>
+              <td style="padding: 0.625rem 1rem; text-align: right;"><%= data[:count] %></td>
+              <td style="padding: 0.625rem 1rem; text-align: right;"><%= number_with_delimiter(data[:words]) %></td>
+              <td style="padding: 0.625rem 1rem; text-align: right; color: var(--text-secondary);"><%= format_bytes((data[:chars] * 1.1).round) %></td>
+              <td style="padding: 0.625rem 1rem; text-align: right;">
+                <% pct = @total_words > 0 ? (data[:words].to_f / @total_words * 100).round(1) : 0 %>
+                <div style="display: flex; align-items: center; gap: 0.5rem; justify-content: flex-end;">
+                  <div style="width: 60px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+                    <div style="width: <%= pct %>%; height: 100%; background: #1565c0; border-radius: 3px;"></div>
+                  </div>
+                  <span style="font-size: 0.75rem; min-width: 36px;"><%= pct %>%</span>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Export Size Estimates %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00838f;">storage</span> Export Size Estimates</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% max_bytes = @format_estimates.values.map { |v| v[:bytes] }.max.to_f
+       max_bytes = 1 if max_bytes == 0 %>
+    <div style="display: grid; gap: 1rem;">
+      <% @format_estimates.each do |format_name, data| %>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= data[:color] %>; min-width: 24px;"><%= data[:icon] %></span>
+          <div style="flex: 1;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+              <span style="font-size: 0.8125rem; font-weight: 500;"><%= format_name %></span>
+              <span style="font-size: 0.8125rem; font-weight: 600; color: <%= data[:color] %>;"><%= format_bytes(data[:bytes]) %></span>
+            </div>
+            <div style="width: 100%; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+              <div style="width: <%= (data[:bytes].to_f / max_bytes * 100).round(1) %>%; height: 100%; background: <%= data[:color] %>; border-radius: 4px; transition: width 0.3s;"></div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+    <div style="margin-top: 1rem; padding: 0.75rem; background: var(--bg); border-radius: 8px; font-size: 0.75rem; color: var(--text-secondary);">
+      <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">info</span>
+      Sizes are estimates based on text content (<%= number_with_delimiter(@total_chars) %> characters). Actual sizes may vary with formatting and metadata.
+    </div>
+  </div>
+</div>
+
+<%# Content Breakdown %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #4527a0;">pie_chart</span> Content Breakdown</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center;">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: #1565c0;">text_snippet</span>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;"><%= @text_only_notes %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Text-Only Notes</div>
+      </div>
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center;">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: #e65100;">image</span>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;"><%= @notes_with_images %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">With Images/Attachments</div>
+      </div>
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center;">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: #6a1b9a;">folder</span>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;"><%= @notebooks.count %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notebooks</div>
+      </div>
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; text-align: center;">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: #00838f;">straighten</span>
+        <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.25rem;"><%= @total_notes > 0 ? (@total_words / @total_notes).round(0) : 0 %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Words/Note</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Backup Health %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2e7d32;">health_and_safety</span> Backup Health</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+      <%# Recommended schedule %>
+      <div style="border: 2px solid <%= @backup_suggestion[:color] %>; border-radius: 8px; padding: 1.25rem; text-align: center;">
+        <span class="material-icons-outlined" style="font-size: 2rem; color: <%= @backup_suggestion[:color] %>;"><%= @backup_suggestion[:icon] %></span>
+        <div style="font-size: 1.125rem; font-weight: 700; margin-top: 0.5rem;"><%= @backup_suggestion[:frequency] %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-top: 0.125rem;">Recommended Backup Frequency</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;"><%= @backup_suggestion[:reason] %></div>
+      </div>
+
+      <%# Writing frequency %>
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.75rem;">Writing Frequency</div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+          <span style="font-size: 0.8125rem;">Notes per day</span>
+          <span style="font-weight: 600;"><%= @notes_per_day %></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+          <span style="font-size: 0.8125rem;">Notes per week</span>
+          <span style="font-weight: 600;"><%= @notes_per_week %></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+          <span style="font-size: 0.8125rem;">Total writing days</span>
+          <span style="font-weight: 600;"><%= @dates_written.count %></span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="font-size: 0.8125rem;">Library span</span>
+          <span style="font-weight: 600;"><%= @library_span_days %> days</span>
+        </div>
+      </div>
+
+      <%# Export readiness %>
+      <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; text-align: center;">
+        <% if @export_ready %>
+          <span class="material-icons-outlined" style="font-size: 2rem; color: #4caf50;">check_circle</span>
+          <div style="font-size: 1.125rem; font-weight: 700; color: #4caf50; margin-top: 0.5rem;">Export Ready</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">No issues detected in your library</div>
+        <% else %>
+          <span class="material-icons-outlined" style="font-size: 2rem; color: #f57c00;">warning</span>
+          <div style="font-size: 1.125rem; font-weight: 700; color: #f57c00; margin-top: 0.5rem;"><%= @issue_count %> Issue<%= @issue_count != 1 ? 's' : '' %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Review items below before exporting</div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Content Issues %>
+<% if @empty_notes.any? || @untitled_notes.any? || @large_notes.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #f57c00;">report_problem</span> Content Issues <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">(<%= @issue_count %> items need attention)</span></h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem; margin-bottom: 1rem;">
+        <% if @empty_notes.any? %>
+          <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; display: flex; align-items: center; gap: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1.5rem; color: #f57c00;">edit_note</span>
+            <div>
+              <div style="font-weight: 600; font-size: 0.8125rem;">Empty / Near-Empty Notes</div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @empty_notes.count %> note<%= @empty_notes.count != 1 ? 's' : '' %> with fewer than 10 words</div>
+            </div>
+          </div>
+        <% end %>
+        <% if @untitled_notes.any? %>
+          <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; display: flex; align-items: center; gap: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1.5rem; color: #e53935;">title</span>
+            <div>
+              <div style="font-weight: 600; font-size: 0.8125rem;">Untitled Notes</div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @untitled_notes.count %> note<%= @untitled_notes.count != 1 ? 's' : '' %> missing a title</div>
+            </div>
+          </div>
+        <% end %>
+        <% if @large_notes.any? %>
+          <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; display: flex; align-items: center; gap: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1.5rem; color: #00838f;">expand</span>
+            <div>
+              <div style="font-weight: 600; font-size: 0.8125rem;">Very Large Notes</div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @large_notes.count %> note<%= @large_notes.count != 1 ? 's' : '' %> over 5,000 words</div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+
+      <%# Detailed issue lists %>
+      <% if @untitled_notes.any? %>
+        <div style="margin-bottom: 1rem;">
+          <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #e53935; margin-bottom: 0.5rem;">Untitled Notes</div>
+          <% @untitled_notes.first(10).each do |note| %>
+            <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0; border-bottom: 1px solid var(--border);">
+              <span class="material-icons-outlined" style="font-size: 0.875rem; color: #e53935;">warning</span>
+              <div style="flex: 1; font-size: 0.8125rem; color: var(--text-secondary); font-style: italic;">
+                <%= (note["content"] || note["body"] || "").to_s.truncate(60) %>
+              </div>
+              <span style="font-size: 0.6875rem; color: var(--text-secondary);"><%= note["_word_count"] %> words</span>
+              <%= link_to "Edit", edit_note_path(note["id"]), style: "font-size: 0.6875rem; color: var(--primary); text-decoration: none; font-weight: 600;" %>
+            </div>
+          <% end %>
+          <% if @untitled_notes.count > 10 %>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); padding-top: 0.375rem;">...and <%= @untitled_notes.count - 10 %> more</div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <% if @empty_notes.any? %>
+        <div style="margin-bottom: 1rem;">
+          <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #f57c00; margin-bottom: 0.5rem;">Empty / Near-Empty Notes</div>
+          <% @empty_notes.first(10).each do |note| %>
+            <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0; border-bottom: 1px solid var(--border);">
+              <span class="material-icons-outlined" style="font-size: 0.875rem; color: #f57c00;">description</span>
+              <div style="flex: 1; font-size: 0.8125rem;">
+                <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--primary); text-decoration: none; font-weight: 500;" %>
+              </div>
+              <span style="font-size: 0.6875rem; color: var(--text-secondary);"><%= note["_word_count"] %> word<%= note["_word_count"] != 1 ? 's' : '' %></span>
+              <%= link_to "Edit", edit_note_path(note["id"]), style: "font-size: 0.6875rem; color: var(--primary); text-decoration: none; font-weight: 600;" %>
+            </div>
+          <% end %>
+          <% if @empty_notes.count > 10 %>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); padding-top: 0.375rem;">...and <%= @empty_notes.count - 10 %> more</div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <% if @large_notes.any? %>
+        <div>
+          <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #00838f; margin-bottom: 0.5rem;">Very Large Notes</div>
+          <% @large_notes.first(10).each do |note| %>
+            <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0; border-bottom: 1px solid var(--border);">
+              <span class="material-icons-outlined" style="font-size: 0.875rem; color: #00838f;">article</span>
+              <div style="flex: 1; font-size: 0.8125rem;">
+                <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--primary); text-decoration: none; font-weight: 500;" %>
+              </div>
+              <span style="font-size: 0.6875rem; font-weight: 600; color: #00838f;"><%= number_with_delimiter(note["_word_count"]) %> words</span>
+            </div>
+          <% end %>
+          <% if @large_notes.count > 10 %>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); padding-top: 0.375rem;">...and <%= @large_notes.count - 10 %> more</div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <div style="margin-top: 1rem; text-align: center;">
+        <%= link_to note_maintenance_path, class: "btn", style: "font-size: 0.8125rem;" do %>
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">build</span>
+          Fix Issues in Maintenance
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Library Timeline %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #3949ab;">timeline</span> Library Timeline</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">First Note</div>
+        <div style="font-size: 1rem; font-weight: 600;">
+          <%= @first_note_date ? @first_note_date.strftime("%b %d, %Y") : "---" %>
+        </div>
+      </div>
+      <div style="flex: 1; margin: 0 1rem; position: relative;">
+        <div style="height: 2px; background: linear-gradient(to right, #3949ab, #1565c0); border-radius: 1px;"></div>
+        <div style="text-align: center; font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.375rem;"><%= @library_span_days %> days</div>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Latest Note</div>
+        <div style="font-size: 1rem; font-weight: 600;">
+          <%= @latest_note_date ? @latest_note_date.strftime("%b %d, %Y") : "---" %>
+        </div>
+      </div>
+    </div>
+
+    <% if @monthly_notes.any? %>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">Monthly Note Count</div>
+      <%
+        mn_max = @monthly_notes.values.max.to_f
+        mn_max = 1 if mn_max == 0
+      %>
+      <div style="display: flex; align-items: flex-end; gap: 2px; height: 80px;">
+        <% @monthly_notes.each do |month, count| %>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center;" title="<%= month %>: <%= count %> notes">
+            <div style="width: 100%; max-width: 24px; height: <%= (count.to_f / mn_max * 64).round %>px; min-height: 2px; background: #1565c0; border-radius: 2px 2px 0 0; opacity: <%= 0.4 + (count.to_f / mn_max * 0.6) %>;"></div>
+          </div>
+        <% end %>
+      </div>
+      <div style="display: flex; gap: 2px; margin-top: 0.25rem;">
+        <% @monthly_notes.each do |month, _| %>
+          <div style="flex: 1; text-align: center; font-size: 0.5rem; color: var(--text-secondary); overflow: hidden; white-space: nowrap;">
+            <% if @monthly_notes.count <= 12 %>
+              <%= Date.parse("#{month}-01").strftime("%b") rescue month %>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      <% if @monthly_notes.count > 12 %>
+        <div style="display: flex; justify-content: space-between; margin-top: 0.25rem;">
+          <span style="font-size: 0.625rem; color: var(--text-secondary);"><%= @monthly_notes.keys.first %></span>
+          <span style="font-size: 0.625rem; color: var(--text-secondary);"><%= @monthly_notes.keys.last %></span>
+        </div>
+      <% end %>
+    <% end %>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+      <div style="text-align: center;">
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= @total_notes %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Total Notes</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= @notebooks.count %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Notebooks</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= number_with_delimiter(@total_words) %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Total Words</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= @dates_written.count %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Active Writing Days</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Bottom Navigation %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to notes_path, class: "btn", style: "margin: 0.25rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">description</span> Notes
+  <% end %>
+  <%= link_to note_maintenance_path, class: "btn", style: "margin: 0.25rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">build</span> Maintenance
+  <% end %>
+  <%= link_to writing_stats_path, class: "btn", style: "margin: 0.25rem;" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">edit_note</span> Writing Stats
+  <% end %>
+</div>
+

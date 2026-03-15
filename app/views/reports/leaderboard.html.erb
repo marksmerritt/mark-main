@@ -1,0 +1,509 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #FFD700;">emoji_events</span>
+    Trade Leaderboard
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Reports", reports_index_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Time filter %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="padding: 1rem 1.25rem; display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+    <span style="font-size: 0.8125rem; color: var(--text-secondary); margin-right: 0.25rem;">Time Window:</span>
+    <% [
+      [3, "3 Months"],
+      [6, "6 Months"],
+      [12, "12 Months"],
+      [0, "All Time"]
+    ].each do |val, label| %>
+      <% active = @months == val %>
+      <%= link_to label, reports_leaderboard_path(months: val, min_trades: @min_trades),
+          class: "btn#{active ? ' btn-primary' : ''}",
+          style: "font-size: 0.8125rem; padding: 0.375rem 0.75rem;" %>
+    <% end %>
+    <span style="margin-left: 1rem; font-size: 0.8125rem; color: var(--text-secondary);">Min trades/symbol:</span>
+    <% [1, 3, 5, 10].each do |val| %>
+      <% active = @min_trades == val %>
+      <%= link_to val.to_s, reports_leaderboard_path(months: @months, min_trades: val),
+          class: "btn#{active ? ' btn-primary' : ''}",
+          style: "font-size: 0.8125rem; padding: 0.375rem 0.5rem;" %>
+    <% end %>
+  </div>
+</div>
+
+<% if @total_trades == 0 %>
+  <div class="card"><p class="empty-state">No closed trades found in this time window.</p></div>
+<% else %>
+
+  <%# ===== Hall of Fame Hero Section ===== %>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <%# Biggest Single Win %>
+    <div class="card" style="border-top: 3px solid #FFD700; text-align: center;">
+      <div style="padding: 1.25rem;">
+        <span class="material-icons-outlined" style="font-size: 2.5rem; color: #FFD700;">emoji_events</span>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-top: 0.5rem;">Biggest Single Win</div>
+        <% if @hall_biggest_win %>
+          <div style="font-size: 2rem; font-weight: 700; color: var(--positive); margin: 0.25rem 0;"><%= number_to_currency(@hall_biggest_win[:pnl]) %></div>
+          <div style="font-size: 0.875rem; font-weight: 600;"><%= @hall_biggest_win[:symbol] %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @hall_biggest_win[:date] %></div>
+        <% else %>
+          <div style="font-size: 1rem; color: var(--text-secondary); margin-top: 0.5rem;">No wins yet</div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Best Trading Day %>
+    <div class="card" style="border-top: 3px solid #C0C0C0; text-align: center;">
+      <div style="padding: 1.25rem;">
+        <span class="material-icons-outlined" style="font-size: 2.5rem; color: #C0C0C0;">military_tech</span>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-top: 0.5rem;">Best Trading Day</div>
+        <% if @hall_best_day %>
+          <div style="font-size: 2rem; font-weight: 700; color: var(--positive); margin: 0.25rem 0;"><%= number_to_currency(@hall_best_day[:pnl]) %></div>
+          <div style="font-size: 0.875rem; font-weight: 600;"><%= @hall_best_day[:date] %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @hall_best_day[:count] %> trades</div>
+        <% else %>
+          <div style="font-size: 1rem; color: var(--text-secondary); margin-top: 0.5rem;">No data</div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Best Symbol Ever %>
+    <div class="card" style="border-top: 3px solid #CD7F32; text-align: center;">
+      <div style="padding: 1.25rem;">
+        <span class="material-icons-outlined" style="font-size: 2.5rem; color: #CD7F32;">workspace_premium</span>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-top: 0.5rem;">Best Symbol Ever</div>
+        <% if @hall_best_symbol %>
+          <div style="font-size: 2rem; font-weight: 700; color: var(--positive); margin: 0.25rem 0;"><%= number_to_currency(@hall_best_symbol[:pnl]) %></div>
+          <div style="font-size: 0.875rem; font-weight: 600;"><%= @hall_best_symbol[:symbol] %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @hall_best_symbol[:trades] %> trades</div>
+        <% else %>
+          <div style="font-size: 1rem; color: var(--text-secondary); margin-top: 0.5rem;">No data</div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# ===== Winners & Losers Two-Column Grid ===== %>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <%# Top Winners %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: var(--positive);">trending_up</span>
+          Top 10 Winners
+        </h2>
+      </div>
+      <% if @top_winners.any? %>
+        <div style="overflow-x: auto;">
+          <table class="data-table" style="width: 100%; font-size: 0.8125rem;">
+            <thead>
+              <tr>
+                <th style="width: 2rem;">#</th>
+                <th>Symbol</th>
+                <th style="text-align: right;">P&L</th>
+                <th>Date</th>
+                <th>Side</th>
+                <th style="text-align: right;">Hold</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @top_winners.each_with_index do |trade, i| %>
+                <%
+                  medal_color = case i
+                                when 0 then "#FFD700"
+                                when 1 then "#C0C0C0"
+                                when 2 then "#CD7F32"
+                                else nil
+                                end
+                %>
+                <tr>
+                  <td>
+                    <% if medal_color %>
+                      <span class="material-icons-outlined" style="font-size: 1rem; color: <%= medal_color %>;">emoji_events</span>
+                    <% else %>
+                      <%= i + 1 %>
+                    <% end %>
+                  </td>
+                  <td style="font-weight: 600;"><%= trade["symbol"] %></td>
+                  <td style="text-align: right; color: var(--positive); font-weight: 600;"><%= number_to_currency(trade["pnl"].to_f) %></td>
+                  <td style="color: var(--text-secondary);"><%= trade["entry_time"]&.to_s&.slice(0, 10) %></td>
+                  <td><%= trade["side"]&.capitalize %></td>
+                  <td style="text-align: right; color: var(--text-secondary);">
+                    <% if trade["_hold_hours"] %>
+                      <%= trade["_hold_hours"] < 24 ? "#{trade["_hold_hours"]}h" : "#{(trade["_hold_hours"] / 24.0).round(1)}d" %>
+                    <% else %>
+                      --
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <p class="empty-state">No winning trades found.</p>
+      <% end %>
+    </div>
+
+    <%# Top Losers %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: var(--negative);">trending_down</span>
+          Top 10 Losers
+        </h2>
+      </div>
+      <% if @top_losers.any? %>
+        <div style="overflow-x: auto;">
+          <table class="data-table" style="width: 100%; font-size: 0.8125rem;">
+            <thead>
+              <tr>
+                <th style="width: 2rem;">#</th>
+                <th>Symbol</th>
+                <th style="text-align: right;">P&L</th>
+                <th>Date</th>
+                <th>Side</th>
+                <th style="text-align: right;">Hold</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @top_losers.each_with_index do |trade, i| %>
+                <tr>
+                  <td><%= i + 1 %></td>
+                  <td style="font-weight: 600;"><%= trade["symbol"] %></td>
+                  <td style="text-align: right; color: var(--negative); font-weight: 600;"><%= number_to_currency(trade["pnl"].to_f) %></td>
+                  <td style="color: var(--text-secondary);"><%= trade["entry_time"]&.to_s&.slice(0, 10) %></td>
+                  <td><%= trade["side"]&.capitalize %></td>
+                  <td style="text-align: right; color: var(--text-secondary);">
+                    <% if trade["_hold_hours"] %>
+                      <%= trade["_hold_hours"] < 24 ? "#{trade["_hold_hours"]}h" : "#{(trade["_hold_hours"] / 24.0).round(1)}d" %>
+                    <% else %>
+                      --
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <p class="empty-state">No losing trades found.</p>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ===== By Symbol Performance Table ===== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: var(--primary);">leaderboard</span>
+        Win Rate by Symbol
+        <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">(min <%= @min_trades %> trade<%= @min_trades == 1 ? "" : "s" %>)</span>
+      </h2>
+    </div>
+    <% if @symbol_stats.any? %>
+      <div style="overflow-x: auto;">
+        <table class="data-table" style="width: 100%; font-size: 0.8125rem;">
+          <thead>
+            <tr>
+              <th style="width: 2rem;">#</th>
+              <th>Symbol</th>
+              <th style="text-align: right;">Trades</th>
+              <th style="text-align: right;">Wins</th>
+              <th style="text-align: right;">Losses</th>
+              <th style="text-align: right;">Win Rate</th>
+              <th style="text-align: right;">Total P&L</th>
+              <th style="text-align: right;">Avg P&L</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @symbol_stats.each_with_index do |stat, i| %>
+              <%
+                medal_color = case i
+                              when 0 then "#FFD700"
+                              when 1 then "#C0C0C0"
+                              when 2 then "#CD7F32"
+                              else nil
+                              end
+                wr_color = stat[:win_rate] >= 60 ? "var(--positive)" : stat[:win_rate] >= 40 ? "var(--text)" : "var(--negative)"
+              %>
+              <tr>
+                <td>
+                  <% if medal_color %>
+                    <span class="material-icons-outlined" style="font-size: 1rem; color: <%= medal_color %>;">military_tech</span>
+                  <% else %>
+                    <%= i + 1 %>
+                  <% end %>
+                </td>
+                <td style="font-weight: 600;"><%= stat[:symbol] %></td>
+                <td style="text-align: right;"><%= stat[:trades] %></td>
+                <td style="text-align: right; color: var(--positive);"><%= stat[:wins] %></td>
+                <td style="text-align: right; color: var(--negative);"><%= stat[:losses] %></td>
+                <td style="text-align: right; font-weight: 600; color: <%= wr_color %>;"><%= stat[:win_rate] %>%</td>
+                <td style="text-align: right; font-weight: 600;" class="<%= stat[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(stat[:total_pnl]) %></td>
+                <td style="text-align: right;" class="<%= stat[:avg_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(stat[:avg_pnl]) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="empty-state">No symbols meet the minimum trade count.</p>
+    <% end %>
+  </div>
+
+  <%# ===== Most Traded Symbols ===== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: var(--primary);">bar_chart</span>
+        Most Traded Symbols
+      </h2>
+    </div>
+    <% if @most_traded.any? %>
+      <div style="padding: 1rem 1.25rem;">
+        <% max_count = @most_traded.first[:count].to_f %>
+        <% @most_traded.each_with_index do |item, i| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+            <span style="width: 2rem; text-align: right; font-size: 0.8125rem; font-weight: 600; color: var(--text-secondary);"><%= i + 1 %>.</span>
+            <span style="width: 4rem; font-weight: 600; font-size: 0.875rem;"><%= item[:symbol] %></span>
+            <div style="flex: 1; height: 1.25rem; background: var(--border); border-radius: var(--radius); overflow: hidden;">
+              <div style="height: 100%; width: <%= (item[:count] / max_count * 100).round(0) %>%; background: var(--primary); border-radius: var(--radius); display: flex; align-items: center; justify-content: flex-end; padding-right: 0.5rem;">
+                <span style="font-size: 0.6875rem; font-weight: 600; color: white;"><%= item[:count] %></span>
+              </div>
+            </div>
+            <span style="width: 5rem; text-align: right; font-size: 0.8125rem; font-weight: 600;" class="<%= item[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(item[:total_pnl]) %></span>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <p class="empty-state">No trades found.</p>
+    <% end %>
+  </div>
+
+  <%# ===== Best R-Multiple Trades ===== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: var(--primary);">speed</span>
+        Best R-Multiple Trades
+      </h2>
+    </div>
+    <% if @best_r_multiples.any? %>
+      <div style="overflow-x: auto;">
+        <table class="data-table" style="width: 100%; font-size: 0.8125rem;">
+          <thead>
+            <tr>
+              <th style="width: 2rem;">#</th>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th style="text-align: right;">Entry</th>
+              <th style="text-align: right;">Stop</th>
+              <th style="text-align: right;">Exit</th>
+              <th style="text-align: right;">R-Multiple</th>
+              <th style="text-align: right;">P&L</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @best_r_multiples.each_with_index do |t, i| %>
+              <%
+                medal_color = case i
+                              when 0 then "#FFD700"
+                              when 1 then "#C0C0C0"
+                              when 2 then "#CD7F32"
+                              else nil
+                              end
+                r_color = t[:r_multiple] >= 3 ? "var(--positive)" : t[:r_multiple] >= 1 ? "var(--primary)" : "var(--text)"
+              %>
+              <tr>
+                <td>
+                  <% if medal_color %>
+                    <span class="material-icons-outlined" style="font-size: 1rem; color: <%= medal_color %>;">workspace_premium</span>
+                  <% else %>
+                    <%= i + 1 %>
+                  <% end %>
+                </td>
+                <td style="font-weight: 600;"><%= t[:symbol] %></td>
+                <td><%= t[:side]&.capitalize %></td>
+                <td style="text-align: right;"><%= number_to_currency(t[:entry]) %></td>
+                <td style="text-align: right; color: var(--negative);"><%= number_to_currency(t[:stop]) %></td>
+                <td style="text-align: right;"><%= number_to_currency(t[:exit_price]) %></td>
+                <td style="text-align: right; font-weight: 700; color: <%= r_color %>;"><%= t[:r_multiple] %>R</td>
+                <td style="text-align: right; font-weight: 600;" class="<%= t[:pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(t[:pnl]) %></td>
+                <td style="color: var(--text-secondary);"><%= t[:date] %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="empty-state">No trades with stop loss data found for R-multiple calculation.</p>
+    <% end %>
+  </div>
+
+  <%# ===== Winning Streak & Fastest Wins ===== %>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <%# Longest Winning Streak %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #FFD700;">local_fire_department</span>
+          Longest Winning Streak
+        </h2>
+      </div>
+      <% if @winning_streak[:count] > 0 %>
+        <div style="padding: 1.25rem; text-align: center;">
+          <div style="font-size: 3rem; font-weight: 700; color: var(--positive);"><%= @winning_streak[:count] %></div>
+          <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.5rem;">consecutive wins</div>
+          <div style="font-size: 1.25rem; font-weight: 600; color: var(--positive);"><%= number_to_currency(@winning_streak[:pnl]) %> total P&L</div>
+        </div>
+        <% if @winning_streak[:trades].any? %>
+          <div style="border-top: 1px solid var(--border); padding: 0.75rem 1.25rem;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">Streak Trades</div>
+            <% @winning_streak[:trades].first(5).each do |t| %>
+              <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; font-size: 0.8125rem;">
+                <span style="font-weight: 600;"><%= t["symbol"] %></span>
+                <span class="positive"><%= number_to_currency(t["pnl"].to_f) %></span>
+              </div>
+            <% end %>
+            <% if @winning_streak[:trades].count > 5 %>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">...and <%= @winning_streak[:trades].count - 5 %> more</div>
+            <% end %>
+          </div>
+        <% end %>
+      <% else %>
+        <p class="empty-state">No winning streaks found.</p>
+      <% end %>
+    </div>
+
+    <%# Fastest Wins %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: var(--primary);">bolt</span>
+          Fastest Wins
+        </h2>
+      </div>
+      <% if @fastest_wins.any? %>
+        <div style="overflow-x: auto;">
+          <table class="data-table" style="width: 100%; font-size: 0.8125rem;">
+            <thead>
+              <tr>
+                <th style="width: 2rem;">#</th>
+                <th>Symbol</th>
+                <th style="text-align: right;">P&L</th>
+                <th style="text-align: right;">Hold Time</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @fastest_wins.each_with_index do |t, i| %>
+                <%
+                  medal_color = case i
+                                when 0 then "#FFD700"
+                                when 1 then "#C0C0C0"
+                                when 2 then "#CD7F32"
+                                else nil
+                                end
+                  hold_label = if t[:hold_hours] < 1
+                                "#{(t[:hold_hours] * 60).round(0)}m"
+                              elsif t[:hold_hours] < 24
+                                "#{t[:hold_hours]}h"
+                              else
+                                "#{(t[:hold_hours] / 24.0).round(1)}d"
+                              end
+                %>
+                <tr>
+                  <td>
+                    <% if medal_color %>
+                      <span class="material-icons-outlined" style="font-size: 1rem; color: <%= medal_color %>;">bolt</span>
+                    <% else %>
+                      <%= i + 1 %>
+                    <% end %>
+                  </td>
+                  <td style="font-weight: 600;"><%= t[:symbol] %></td>
+                  <td style="text-align: right; color: var(--positive); font-weight: 600;"><%= number_to_currency(t[:pnl]) %></td>
+                  <td style="text-align: right; font-weight: 600;"><%= hold_label %></td>
+                  <td style="color: var(--text-secondary);"><%= t[:date] %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      <% else %>
+        <p class="empty-state">No winning trades with hold time data found.</p>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ===== Biggest Comebacks ===== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: var(--positive);">sync_alt</span>
+        Biggest Comebacks
+        <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">(most adverse before closing positive)</span>
+      </h2>
+    </div>
+    <% if @biggest_comebacks.any? %>
+      <div style="overflow-x: auto;">
+        <table class="data-table" style="width: 100%; font-size: 0.8125rem;">
+          <thead>
+            <tr>
+              <th style="width: 2rem;">#</th>
+              <th>Symbol</th>
+              <th>Side</th>
+              <th style="text-align: right;">Entry</th>
+              <th style="text-align: right;">Exit</th>
+              <th style="text-align: right;">Max Adversity</th>
+              <th style="text-align: right;">Final P&L</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @biggest_comebacks.each_with_index do |t, i| %>
+              <%
+                medal_color = case i
+                              when 0 then "#FFD700"
+                              when 1 then "#C0C0C0"
+                              when 2 then "#CD7F32"
+                              else nil
+                              end
+              %>
+              <tr>
+                <td>
+                  <% if medal_color %>
+                    <span class="material-icons-outlined" style="font-size: 1rem; color: <%= medal_color %>;">emoji_events</span>
+                  <% else %>
+                    <%= i + 1 %>
+                  <% end %>
+                </td>
+                <td style="font-weight: 600;"><%= t[:symbol] %></td>
+                <td><%= t[:side]&.capitalize %></td>
+                <td style="text-align: right;"><%= number_to_currency(t[:entry]) %></td>
+                <td style="text-align: right;"><%= number_to_currency(t[:exit_price]) %></td>
+                <td style="text-align: right; color: var(--negative); font-weight: 600;"><%= number_to_currency(t[:adversity]) %></td>
+                <td style="text-align: right; color: var(--positive); font-weight: 600;"><%= number_to_currency(t[:pnl]) %></td>
+                <td style="color: var(--text-secondary);"><%= t[:date] %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% else %>
+      <p class="empty-state">No comeback trades found.</p>
+    <% end %>
+  </div>
+
+  <%# Summary footer %>
+  <div class="card">
+    <div style="padding: 0.75rem 1.25rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; color: var(--text-secondary);">
+      <span>Analyzing <strong style="color: var(--text);"><%= @total_trades %></strong> closed trades</span>
+      <span><%= @months > 0 ? "Last #{@months} months" : "All time" %></span>
+    </div>
+  </div>
+
+<% end %>

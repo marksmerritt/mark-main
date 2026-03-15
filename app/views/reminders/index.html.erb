@@ -1,0 +1,101 @@
+<%
+  all_reminders = @reminders.is_a?(Array) ? @reminders : []
+  r_overdue = all_reminders.count { |r| !r["completed"] && r["remind_at"] && (Time.parse(r["remind_at"]) rescue Time.current) < Time.current }
+  r_upcoming = all_reminders.count { |r| !r["completed"] && r["remind_at"] && (Time.parse(r["remind_at"]) rescue Time.current) >= Time.current }
+  r_completed = all_reminders.count { |r| r["completed"] }
+%>
+
+<div class="page-header">
+  <h1>Reminders</h1>
+</div>
+
+<% if all_reminders.any? %>
+  <div class="card" style="margin-bottom: 1rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0;">
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= all_reminders.count %></div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Overdue</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= r_overdue > 0 ? 'var(--negative)' : 'var(--positive)' %>;"><%= r_overdue %></div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Upcoming</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);"><%= r_upcoming %></div>
+      </div>
+      <div style="padding: 0.75rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Done</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= r_completed %></div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div class="card">
+  <div class="filter-tabs">
+    <%= link_to "Upcoming", reminders_path(filter: "upcoming"), class: "filter-tab #{'filter-tab-active' if @filter == 'upcoming'}" %>
+    <%= link_to "Overdue", reminders_path(filter: "overdue"), class: "filter-tab #{'filter-tab-active' if @filter == 'overdue'}" %>
+    <%= link_to "Completed", reminders_path(filter: "completed"), class: "filter-tab #{'filter-tab-active' if @filter == 'completed'}" %>
+    <%= link_to "All", reminders_path(filter: "all"), class: "filter-tab #{'filter-tab-active' if @filter == 'all'}" %>
+  </div>
+</div>
+
+<% if @reminders.is_a?(Array) && @reminders.any? %>
+  <div class="entries-list">
+    <% @reminders.each do |reminder| %>
+      <div class="card entry-card">
+        <div class="entry-card-header">
+          <span class="entry-date">
+            <% if reminder.dig("note", "id") || reminder["note_id"] %>
+              <%= link_to reminder.dig("note", "title") || "Note", note_path(reminder.dig("note", "id") || reminder["note_id"]) %>
+            <% else %>
+              Reminder
+            <% end %>
+          </span>
+          <div>
+            <% if reminder["completed"] %>
+              <span class="badge badge-closed">Completed</span>
+            <% elsif reminder["remind_at"] && Time.parse(reminder["remind_at"]) < Time.current %>
+              <span class="badge badge-danger">Overdue</span>
+            <% else %>
+              <span class="badge badge-open">Upcoming</span>
+            <% end %>
+          </div>
+        </div>
+
+        <% if reminder["message"].present? %>
+          <p><%= reminder["message"] %></p>
+        <% end %>
+
+        <div class="entry-card-footer">
+          <span class="text-muted">
+            <% if reminder["remind_at"] %>
+              <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">schedule</span>
+              <%= Time.parse(reminder["remind_at"]).strftime("%b %d, %Y %l:%M %p") %>
+            <% end %>
+          </span>
+          <div style="display: flex; gap: 0.5rem;">
+            <% unless reminder["completed"] %>
+              <%= link_to reminder_path(reminder["id"], reminder: { completed: true }),
+                    data: { turbo_method: :patch },
+                    class: "btn btn-sm",
+                    title: "Mark complete" do %>
+                <span class="material-icons-outlined" style="font-size: 1rem;">check_circle</span> Done
+              <% end %>
+            <% end %>
+            <%= link_to reminder_path(reminder["id"]),
+                  data: { turbo_method: :delete, turbo_confirm: "Delete this reminder?" },
+                  class: "btn btn-sm btn-danger" do %>
+              <span class="material-icons-outlined" style="font-size: 1rem;">delete</span>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No reminders found.</p>
+  </div>
+<% end %>

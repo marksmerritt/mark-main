@@ -1,0 +1,133 @@
+<div class="page-header">
+  <h1>Settings</h1>
+</div>
+
+<h2 style="margin-bottom: 1rem;">API Connections</h2>
+
+<div class="content-grid" style="margin-bottom: 2rem;">
+  <% @connections.each do |conn| %>
+    <div class="card" style="padding: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0;"><%= conn[:name] %></h3>
+        <% case conn[:status] %>
+        <% when "connected" %>
+          <span class="badge badge-success">
+            <span class="material-icons-outlined" style="font-size: 0.9rem; vertical-align: middle;">check_circle</span>
+            Connected
+          </span>
+        <% when "no_token" %>
+          <span class="badge badge-warning">
+            <span class="material-icons-outlined" style="font-size: 0.9rem; vertical-align: middle;">warning</span>
+            No Token
+          </span>
+        <% when "unreachable" %>
+          <span class="badge badge-danger">
+            <span class="material-icons-outlined" style="font-size: 0.9rem; vertical-align: middle;">cloud_off</span>
+            Unreachable
+          </span>
+        <% when "auth_failed" %>
+          <span class="badge badge-danger">
+            <span class="material-icons-outlined" style="font-size: 0.9rem; vertical-align: middle;">lock</span>
+            Auth Failed
+          </span>
+        <% else %>
+          <span class="badge badge-danger">
+            <span class="material-icons-outlined" style="font-size: 0.9rem; vertical-align: middle;">error</span>
+            Error
+          </span>
+        <% end %>
+      </div>
+
+      <div style="font-size: 0.9rem;">
+        <div style="margin-bottom: 0.5rem;">
+          <span class="text-muted">URL:</span>
+          <code><%= conn[:base_url] %></code>
+        </div>
+        <div>
+          <span class="text-muted">Token:</span>
+          <% if conn[:token_present] %>
+            <code>••••••••</code>
+            <span class="text-muted" style="font-size: 0.8rem;">(set via ENV)</span>
+          <% else %>
+            <span style="color: var(--danger);">Not configured</span>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<h2 style="margin-bottom: 1rem;">Configuration</h2>
+
+<div class="card" style="max-width: 40rem; margin-bottom: 2rem;">
+  <div style="padding: 1.5rem;">
+    <p class="text-muted" style="margin-bottom: 1rem;">
+      API connections are configured via environment variables. Set these in your <code>.env</code> file or deployment config:
+    </p>
+    <table class="table" style="font-size: 0.85rem;">
+      <thead>
+        <tr>
+          <th>Variable</th>
+          <th>Description</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>TRADING_JOURNAL_TOKEN</code></td>
+          <td>API token for Trading Journal</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>TRADING_JOURNAL_URL</code></td>
+          <td>Trading Journal API URL</td>
+          <td><code>http://localhost:3001</code></td>
+        </tr>
+        <tr>
+          <td><code>NOTES_API_TOKEN</code></td>
+          <td>API token for Notes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>NOTES_API_URL</code></td>
+          <td>Notes API URL</td>
+          <td><code>http://localhost:3002</code></td>
+        </tr>
+        <tr>
+          <td><code>BUDGET_API_TOKEN</code></td>
+          <td>API token for Budget</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>BUDGET_API_URL</code></td>
+          <td>Budget API URL</td>
+          <td><code>http://localhost:3003</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h2 style="margin-bottom: 1rem;">Keyboard Shortcuts</h2>
+
+<div class="card" style="max-width: 40rem;">
+  <div style="padding: 1.5rem;">
+    <table class="table" style="font-size: 0.85rem;">
+      <thead>
+        <tr>
+          <th>Key</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td><kbd>?</kbd></td><td>Show shortcuts overlay</td></tr>
+        <tr><td><kbd>a</kbd></td><td>Quick add trade</td></tr>
+        <tr><td><kbd>q</kbd></td><td>Quick journal entry</td></tr>
+        <tr><td><kbd>g</kbd></td><td>Go to budget dashboard</td></tr>
+        <tr><td><kbd>b</kbd></td><td>Go to playbooks</td></tr>
+        <tr><td><kbd>v</kbd></td><td>Go to trade review</td></tr>
+        <tr><td><kbd>/</kbd></td><td>Focus search</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>

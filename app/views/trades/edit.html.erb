@@ -3,7 +3,7 @@
 </div>
 
 <div class="card">
-  <%= render "form", trade: @trade, tags: @tags,
+  <%= render "form", trade: @trade, tags: @tags, symbols: @symbols || [],
              form_url: trade_path(@trade["id"]), form_method: :patch,
              submit_label: "Update Trade", cancel_path: trade_path(@trade["id"]) %>
 </div>

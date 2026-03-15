@@ -1,0 +1,554 @@
+<div class="page-header">
+  <h1>Mood Analytics</h1>
+  <div class="page-actions">
+    <button onclick="window.print()" class="btn" title="Print">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">print</span> Print
+    </button>
+  </div>
+</div>
+
+<div class="card">
+  <%= form_with url: reports_mood_analytics_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :start_date, "Start Date" %>
+        <%= f.date_field :start_date, value: params[:start_date], class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :end_date, "End Date" %>
+        <%= f.date_field :end_date, value: params[:end_date], class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+        <%= link_to "Clear", reports_mood_analytics_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%
+  mood_icons = {
+    "calm" => "spa", "focused" => "center_focus_strong", "confident" => "verified",
+    "disciplined" => "verified", "excited" => "mood",
+    "anxious" => "warning", "fearful" => "report", "greedy" => "attach_money",
+    "fomo" => "trending_up", "revenge" => "gavel", "bored" => "bedtime",
+    "frustrated" => "sentiment_dissatisfied", "neutral" => "sentiment_neutral",
+    "untagged" => "help_outline"
+  }
+  mood_colors = {
+    "calm" => "#0d904f", "focused" => "#1a73e8", "confident" => "#0d904f",
+    "disciplined" => "#1a73e8", "excited" => "#e8710a",
+    "anxious" => "#f9ab00", "fearful" => "#d93025", "greedy" => "#e8710a",
+    "fomo" => "#d93025", "revenge" => "#d93025", "bored" => "#9aa0a6",
+    "frustrated" => "#d93025", "neutral" => "#80868b",
+    "untagged" => "#80868b"
+  }
+%>
+
+<% if @total_trades > 0 %>
+  <%
+    tag_pct = @total_trades > 0 ? (@tagged_count.to_f / @total_trades * 100).round(0) : 0
+    tagged_moods = @mood_performance.reject { |k, _| k == "untagged" }
+    highest_wr = tagged_moods.select { |_, d| d[:trades] >= 3 }.max_by { |_, d| d[:win_rate] }
+  %>
+
+  <%# ---- Summary Strip ---- %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+      <% if @best_mood %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Mood</div>
+          <div style="font-size: 1.25rem; font-weight: 700;" class="positive">
+            <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;"><%= mood_icons[@best_mood[0]] || "mood" %></span>
+            <%= @best_mood[0].capitalize %>
+          </div>
+          <div style="font-size: 0.75rem;" class="positive"><%= number_to_currency(@best_mood[1][:avg_pnl]) %> avg</div>
+        </div>
+      <% end %>
+      <% if @worst_mood %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Mood</div>
+          <div style="font-size: 1.25rem; font-weight: 700;" class="negative">
+            <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;"><%= mood_icons[@worst_mood[0]] || "mood" %></span>
+            <%= @worst_mood[0].capitalize %>
+          </div>
+          <div style="font-size: 0.75rem;" class="negative"><%= number_to_currency(@worst_mood[1][:avg_pnl]) %> avg</div>
+        </div>
+      <% end %>
+      <% if @most_common_mood %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Most Common Mood</div>
+          <div style="font-size: 1.25rem; font-weight: 700;">
+            <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px; color: <%= mood_colors[@most_common_mood[0]] %>;"><%= mood_icons[@most_common_mood[0]] || "mood" %></span>
+            <%= @most_common_mood[0].capitalize %>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @most_common_mood[1][:trades] %> trades</div>
+        </div>
+      <% end %>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Journal Streak</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @journal_streak %> days</div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @journal_count %> entries total</div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades Tagged</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @tagged_count %>/<%= @total_trades %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= tag_pct %>% coverage</div>
+      </div>
+    </div>
+  </div>
+
+  <%# ---- Mood Performance Cards ---- %>
+  <% if tagged_moods.any? %>
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+      <% tagged_moods.each do |mood, data| %>
+        <div class="card" style="padding: 1rem 1.25rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= mood_colors[mood] || '#80868b' %>;"><%= mood_icons[mood] || "mood" %></span>
+            <strong style="font-size: 1rem;"><%= mood.capitalize %></strong>
+            <span style="margin-left: auto; font-size: 0.75rem; color: var(--text-secondary);"><%= data[:trades] %> trades</span>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; font-size: 0.8125rem;">
+            <div>
+              <div style="color: var(--text-secondary); font-size: 0.6875rem;">Avg P&L</div>
+              <div style="font-weight: 700;" class="<%= data[:avg_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:avg_pnl]) %></div>
+            </div>
+            <div>
+              <div style="color: var(--text-secondary); font-size: 0.6875rem;">Win Rate</div>
+              <div style="font-weight: 700;"><%= data[:win_rate] %>%</div>
+            </div>
+            <div>
+              <div style="color: var(--text-secondary); font-size: 0.6875rem;">Avg Size</div>
+              <div style="font-weight: 700;"><%= data[:avg_size] %> shares</div>
+            </div>
+            <div>
+              <div style="color: var(--text-secondary); font-size: 0.6875rem;">Total P&L</div>
+              <div style="font-weight: 700;" class="<%= data[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:total_pnl]) %></div>
+            </div>
+          </div>
+          <%# Win rate indicator bar %>
+          <div style="margin-top: 0.75rem; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;">
+            <div style="height: 100%; width: <%= data[:win_rate] %>%; background: <%= data[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>; border-radius: 2px;"></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# ---- Distribution & Avg P&L Charts ---- %>
+  <% if tagged_moods.any? %>
+    <div class="content-grid" style="margin-bottom: 1.5rem;">
+      <%# SVG bar chart of mood distribution %>
+      <div class="card">
+        <div class="card-header"><h2>Mood Distribution</h2></div>
+        <div style="padding: 1rem 1.25rem;">
+          <%
+            dist_moods = @mood_distribution.sort_by { |_, c| -c }
+            max_count = dist_moods.map { |_, c| c }.max.to_f
+            max_count = 1 if max_count == 0
+            bar_count = dist_moods.count
+            chart_w = 520
+            chart_h = 220
+            bar_w = bar_count > 0 ? [(chart_w - 40) / bar_count - 8, 50].min : 40
+            bar_gap = 8
+            total_bar_w = bar_count * (bar_w + bar_gap)
+            offset_x = (chart_w - total_bar_w) / 2
+          %>
+          <svg viewBox="0 0 <%= chart_w %> <%= chart_h + 40 %>" style="width: 100%; max-width: 520px; height: auto;">
+            <%# Y axis gridlines %>
+            <% 5.times do |i| %>
+              <% y = 20 + (chart_h - 20) * i / 4.0 %>
+              <line x1="30" y1="<%= y %>" x2="<%= chart_w - 10 %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" />
+              <text x="26" y="<%= y + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="9"><%= (max_count * (4 - i) / 4.0).round(0) %></text>
+            <% end %>
+            <%# Bars %>
+            <% dist_moods.each_with_index do |(mood, count), i| %>
+              <%
+                bh = (count / max_count * (chart_h - 20)).round(1)
+                bx = offset_x + i * (bar_w + bar_gap)
+                by = chart_h - bh
+              %>
+              <rect x="<%= bx %>" y="<%= by %>" width="<%= bar_w %>" height="<%= bh %>"
+                    fill="<%= mood_colors[mood] || '#80868b' %>" rx="3" opacity="0.85">
+                <title><%= mood.capitalize %>: <%= count %> trades</title>
+              </rect>
+              <text x="<%= bx + bar_w / 2 %>" y="<%= by - 4 %>" text-anchor="middle" fill="var(--text)" font-size="9" font-weight="600"><%= count %></text>
+              <text x="<%= bx + bar_w / 2 %>" y="<%= chart_h + 16 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8"
+                    transform="rotate(-35, <%= bx + bar_w / 2 %>, <%= chart_h + 16 %>)"><%= mood.capitalize %></text>
+            <% end %>
+          </svg>
+        </div>
+      </div>
+
+      <%# P&L by mood diverging bar chart %>
+      <div class="card">
+        <div class="card-header"><h2>Avg P&L by Mood</h2></div>
+        <div style="padding: 1rem 1.25rem;">
+          <%
+            max_abs = tagged_moods.values.map { |d| d[:avg_pnl].abs }.max.to_f
+            max_abs = 1 if max_abs == 0
+          %>
+          <% tagged_moods.sort_by { |_, d| -d[:avg_pnl] }.each do |mood, data| %>
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+              <div style="min-width: 5.5rem; display: flex; align-items: center; gap: 0.25rem;">
+                <span class="material-icons-outlined" style="font-size: 0.875rem; color: <%= mood_colors[mood] %>;"><%= mood_icons[mood] || "mood" %></span>
+                <span style="font-size: 0.8125rem; font-weight: 600;"><%= mood.capitalize %></span>
+              </div>
+              <div style="flex: 1; position: relative; height: 1.25rem;">
+                <% bar_pct = (data[:avg_pnl].abs / max_abs * 100).round(1) %>
+                <% if data[:avg_pnl] >= 0 %>
+                  <div style="position: absolute; left: 50%; height: 100%; width: <%= bar_pct / 2 %>%; background: var(--positive); border-radius: 0 4px 4px 0; opacity: 0.8;"></div>
+                <% else %>
+                  <div style="position: absolute; right: 50%; height: 100%; width: <%= bar_pct / 2 %>%; background: var(--negative); border-radius: 4px 0 0 4px; opacity: 0.8;"></div>
+                <% end %>
+                <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border);"></div>
+              </div>
+              <span style="min-width: 4.5rem; text-align: right; font-size: 0.8125rem; font-weight: 600;" class="<%= data[:avg_pnl] >= 0 ? 'positive' : 'negative' %>">
+                <%= number_to_currency(data[:avg_pnl]) %>
+              </span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ---- Mood Score Trend (SVG Line Chart) ---- %>
+  <% if @monthly_mood_trend.count >= 2 %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Mood Score Trend Over Time</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+          Monthly average mood score (5 = Confident, 4 = Disciplined/Calm, 3 = Neutral, 2 = Anxious, 1 = Frustrated/Fearful)
+        </div>
+        <%
+          trend_months = @monthly_mood_trend.keys
+          trend_scores = trend_months.map { |m| @monthly_mood_trend[m][:avg_score] }
+          trend_pnls = trend_months.map { |m| @monthly_mood_trend[m][:pnl] }
+          svg_w = 600
+          svg_h = 200
+          pad_x = 50
+          pad_y = 20
+          plot_w = svg_w - pad_x - 20
+          plot_h = svg_h - pad_y * 2
+          min_score = 1.0
+          max_score = 5.0
+          max_pnl_abs = trend_pnls.map(&:abs).max.to_f
+          max_pnl_abs = 1 if max_pnl_abs == 0
+        %>
+        <svg viewBox="0 0 <%= svg_w %> <%= svg_h + 30 %>" style="width: 100%; height: auto;">
+          <%# Y axis gridlines and labels %>
+          <% (1..5).each do |score| %>
+            <% y = pad_y + plot_h - ((score - min_score) / (max_score - min_score) * plot_h) %>
+            <line x1="<%= pad_x %>" y1="<%= y %>" x2="<%= svg_w - 20 %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" />
+            <text x="<%= pad_x - 6 %>" y="<%= y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="9"><%= score %></text>
+          <% end %>
+
+          <%# P&L bars behind the line %>
+          <% trend_months.each_with_index do |month, i| %>
+            <%
+              x = pad_x + (trend_months.count > 1 ? (i.to_f / (trend_months.count - 1) * plot_w) : plot_w / 2)
+              pnl = trend_pnls[i]
+              bar_mid_y = pad_y + plot_h / 2.0
+              bar_h = (pnl.abs / max_pnl_abs * (plot_h / 2.0)).round(1)
+            %>
+            <% if pnl >= 0 %>
+              <rect x="<%= x - 8 %>" y="<%= bar_mid_y - bar_h %>" width="16" height="<%= bar_h %>"
+                    fill="var(--positive)" opacity="0.15" rx="2">
+                <title><%= month %>: <%= number_to_currency(pnl) %></title>
+              </rect>
+            <% else %>
+              <rect x="<%= x - 8 %>" y="<%= bar_mid_y %>" width="16" height="<%= bar_h %>"
+                    fill="var(--negative)" opacity="0.15" rx="2">
+                <title><%= month %>: <%= number_to_currency(pnl) %></title>
+              </rect>
+            <% end %>
+          <% end %>
+
+          <%# Mood score line %>
+          <%
+            points = trend_months.each_with_index.map do |month, i|
+              x = pad_x + (trend_months.count > 1 ? (i.to_f / (trend_months.count - 1) * plot_w) : plot_w / 2)
+              y = pad_y + plot_h - ((trend_scores[i] - min_score) / (max_score - min_score) * plot_h)
+              [x.round(1), y.round(1)]
+            end
+            polyline_str = points.map { |p| p.join(",") }.join(" ")
+          %>
+          <polyline points="<%= polyline_str %>" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" />
+          <% points.each_with_index do |(px, py), i| %>
+            <circle cx="<%= px %>" cy="<%= py %>" r="4" fill="var(--primary)" stroke="var(--surface)" stroke-width="2">
+              <title><%= trend_months[i] %>: Score <%= trend_scores[i] %>, P&L <%= number_to_currency(trend_pnls[i]) %></title>
+            </circle>
+          <% end %>
+
+          <%# X axis labels %>
+          <% trend_months.each_with_index do |month, i| %>
+            <% x = pad_x + (trend_months.count > 1 ? (i.to_f / (trend_months.count - 1) * plot_w) : plot_w / 2) %>
+            <text x="<%= x %>" y="<%= svg_h + 10 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8"
+                  transform="rotate(-30, <%= x %>, <%= svg_h + 10 %>)"><%= month %></text>
+          <% end %>
+
+          <%# Legend %>
+          <line x1="<%= svg_w - 150 %>" y1="8" x2="<%= svg_w - 132 %>" y2="8" stroke="var(--primary)" stroke-width="2.5" />
+          <text x="<%= svg_w - 128 %>" y="12" fill="var(--text-secondary)" font-size="9">Mood Score</text>
+          <rect x="<%= svg_w - 150 %>" y="18" width="18" height="8" fill="var(--positive)" opacity="0.3" rx="1" />
+          <text x="<%= svg_w - 128 %>" y="26" fill="var(--text-secondary)" font-size="9">P&L</text>
+        </svg>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ---- Journal Mood Correlation ---- %>
+  <% if @journal_mood_pnl.any? && @journal_mood_pnl.any? { |_, d| d[:trades] > 0 } %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -2px;">auto_stories</span> Journal Mood vs. Trading Performance</h2>
+      </div>
+      <div style="padding: 0.25rem 0;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Journal Mood</th>
+              <th>Journal Days</th>
+              <th>Trade Days</th>
+              <th>Trades</th>
+              <th>Avg P&L</th>
+              <th>Win Rate</th>
+              <th>Total P&L</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @journal_mood_pnl.sort_by { |_, d| -d[:avg_pnl] }.each do |mood, data| %>
+              <% next if data[:trades] == 0 %>
+              <tr>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 0.375rem;">
+                    <span class="material-icons-outlined" style="font-size: 1rem; color: <%= mood_colors[mood.downcase] || '#80868b' %>;"><%= mood_icons[mood.downcase] || "mood" %></span>
+                    <strong><%= mood %></strong>
+                  </div>
+                </td>
+                <td><%= data[:journal_days] %></td>
+                <td><%= data[:trade_days] %></td>
+                <td><%= data[:trades] %></td>
+                <td class="<%= data[:avg_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:avg_pnl]) %></td>
+                <td><%= data[:win_rate] %>%</td>
+                <td class="<%= data[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:total_pnl]) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+      <div style="padding: 0.5rem 1.25rem 1rem; font-size: 0.75rem; color: var(--text-secondary);">
+        Shows how trades performed on days when you logged a journal entry with each mood.
+      </div>
+    </div>
+  <% end %>
+
+  <%# ---- Detailed mood performance table ---- %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Mood Performance Breakdown</h2></div>
+    <table class="table" data-controller="sortable">
+      <thead>
+        <tr>
+          <th>Mood</th>
+          <th>Trades</th>
+          <th>Win Rate</th>
+          <th>Total P&L</th>
+          <th>Avg P&L</th>
+          <th>Avg Size</th>
+          <th>Best</th>
+          <th>Worst</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @mood_performance.each do |mood, data| %>
+          <tr>
+            <td>
+              <div style="display: flex; align-items: center; gap: 0.375rem;">
+                <span class="material-icons-outlined" style="font-size: 1rem; color: <%= mood_colors[mood] %>;"><%= mood_icons[mood] || "mood" %></span>
+                <strong><%= mood.capitalize %></strong>
+              </div>
+            </td>
+            <td><%= data[:trades] %></td>
+            <td><%= data[:win_rate] %>%</td>
+            <td class="<%= data[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:total_pnl]) %></td>
+            <td class="<%= data[:avg_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(data[:avg_pnl]) %></td>
+            <td><%= data[:avg_size] %></td>
+            <td class="positive"><%= number_to_currency(data[:best]) %></td>
+            <td class="negative"><%= number_to_currency(data[:worst]) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <%# ---- Mood Timeline ---- %>
+  <% if @mood_timeline.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Mood Timeline</h2></div>
+      <div style="padding: 1rem 1.25rem; overflow-x: auto;">
+        <%
+          timeline_dates = @mood_timeline.keys.sort.last(30)
+          max_day_pnl = timeline_dates.map { |d| @mood_timeline[d][:pnl].abs }.max.to_f
+          max_day_pnl = 1 if max_day_pnl == 0
+        %>
+        <div style="display: flex; gap: 2px; align-items: end; min-height: 120px;">
+          <% timeline_dates.each do |date| %>
+            <%
+              day = @mood_timeline[date]
+              bar_h = (day[:pnl].abs / max_day_pnl * 80).round(0)
+              bar_h = [bar_h, 4].max
+              dominant_mood = day[:moods].max_by { |_, v| v }&.first
+            %>
+            <div style="flex: 1; min-width: 14px; display: flex; flex-direction: column; align-items: center;" title="<%= date %>: <%= number_to_currency(day[:pnl]) %> -- <%= dominant_mood&.capitalize %>">
+              <div style="width: 100%; height: <%= bar_h %>px; background: <%= day[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; border-radius: 2px 2px 0 0; opacity: 0.7;"></div>
+              <div style="width: 8px; height: 8px; border-radius: 50%; background: <%= mood_colors[dominant_mood] || '#80868b' %>; margin-top: 4px;" title="<%= dominant_mood&.capitalize %>"></div>
+              <% if timeline_dates.count <= 15 %>
+                <span style="font-size: 0.5rem; color: var(--text-secondary); margin-top: 2px; transform: rotate(-45deg); white-space: nowrap;"><%= Date.parse(date).strftime("%-m/%-d") %></span>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+        <div style="margin-top: 0.75rem; display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.6875rem;">
+          <span style="color: var(--text-secondary);">Bars = P&L | Dots = dominant mood</span>
+          <% mood_colors.reject { |k, _| k == "untagged" }.each do |mood, color| %>
+            <span style="display: inline-flex; align-items: center; gap: 3px;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: <%= color %>;"></span>
+              <%= mood.capitalize %>
+            </span>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ---- Insights Section ---- %>
+  <% if tagged_moods.count >= 2 %>
+    <%
+      positive_moods = tagged_moods.select { |_, d| d[:avg_pnl] > 0 }
+      negative_moods = tagged_moods.select { |_, d| d[:avg_pnl] < 0 }
+      high_wr_moods = tagged_moods.select { |_, d| d[:trades] >= 3 && d[:win_rate] >= 60 }
+      low_wr_moods = tagged_moods.select { |_, d| d[:trades] >= 3 && d[:win_rate] < 40 }
+      overtrading_mood = tagged_moods.select { |_, d| d[:trades] >= 5 }.max_by { |_, d| d[:avg_size] }
+      # Mood score trend direction
+      trend_improving = false
+      trend_declining = false
+      if @monthly_mood_trend.count >= 3
+        recent = @monthly_mood_trend.values.last(3).map { |d| d[:avg_score] }
+        older = @monthly_mood_trend.values.first([@monthly_mood_trend.count - 3, 1].max).map { |d| d[:avg_score] }
+        recent_avg = recent.sum / recent.count
+        older_avg = older.sum / older.count
+        trend_improving = recent_avg > older_avg + 0.3
+        trend_declining = recent_avg < older_avg - 0.3
+      end
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -2px;">psychology</span> Insights</h2>
+      </div>
+      <div style="padding: 1rem 1.25rem; font-size: 0.875rem; line-height: 1.7;">
+        <% if positive_moods.any? %>
+          <div style="display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--positive); margin-top: 3px;">check_circle</span>
+            <p style="margin: 0;">You trade best when feeling <strong class="positive"><%= positive_moods.keys.map(&:capitalize).join(", ") %></strong>. These emotional states correlate with higher average P&L and better outcomes.</p>
+          </div>
+        <% end %>
+
+        <% if negative_moods.any? %>
+          <div style="display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--negative); margin-top: 3px;">warning</span>
+            <p style="margin: 0;">Be cautious when feeling <strong class="negative"><%= negative_moods.keys.map(&:capitalize).join(", ") %></strong>. Consider reducing position size or sitting out when you notice these states.</p>
+          </div>
+        <% end %>
+
+        <% if high_wr_moods.any? %>
+          <div style="display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--primary); margin-top: 3px;">insights</span>
+            <p style="margin: 0;">Your win rate exceeds 60% when feeling <strong><%= high_wr_moods.keys.map(&:capitalize).join(", ") %></strong> -- these moods produce your most consistent results.</p>
+          </div>
+        <% end %>
+
+        <% if low_wr_moods.any? %>
+          <div style="display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: #f9ab00; margin-top: 3px;">trending_down</span>
+            <p style="margin: 0;">Win rate drops below 40% when feeling <strong><%= low_wr_moods.keys.map(&:capitalize).join(", ") %></strong>. These moods may lead to poor decision-making.</p>
+          </div>
+        <% end %>
+
+        <% if overtrading_mood && @best_mood && overtrading_mood[0] != @best_mood[0] %>
+          <div style="display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: #e8710a; margin-top: 3px;">speed</span>
+            <p style="margin: 0;">You trade the largest positions when feeling <strong><%= overtrading_mood[0].capitalize %></strong> (avg <%= overtrading_mood[1][:avg_size] %> shares). Consider whether size is appropriate for that emotional state.</p>
+          </div>
+        <% end %>
+
+        <% if trend_improving %>
+          <div style="display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--positive); margin-top: 3px;">trending_up</span>
+            <p style="margin: 0;">Your overall mood trend is <strong class="positive">improving</strong>. Recent months show higher average mood scores than earlier periods.</p>
+          </div>
+        <% end %>
+
+        <% if trend_declining %>
+          <div style="display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--negative); margin-top: 3px;">trending_down</span>
+            <p style="margin: 0;">Your overall mood trend is <strong class="negative">declining</strong>. Recent months show lower average mood scores. Consider reviewing your trading routine and stress management.</p>
+          </div>
+        <% end %>
+
+        <% if @journal_mood_pnl.any? { |_, d| d[:trades] > 0 } %>
+          <%
+            best_journal_mood = @journal_mood_pnl.select { |_, d| d[:trades] >= 3 }.max_by { |_, d| d[:avg_pnl] }
+          %>
+          <% if best_journal_mood %>
+            <div style="display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; color: var(--primary); margin-top: 3px;">auto_stories</span>
+              <p style="margin: 0;">On days you journaled feeling <strong><%= best_journal_mood[0] %></strong>, your trades averaged <strong class="<%= best_journal_mood[1][:avg_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(best_journal_mood[1][:avg_pnl]) %></strong> with a <%= best_journal_mood[1][:win_rate] %>% win rate.</p>
+            </div>
+          <% end %>
+        <% end %>
+
+        <% if tag_pct < 50 %>
+          <div style="display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--text-secondary); margin-top: 3px;">info</span>
+            <p style="margin: 0; color: var(--text-secondary);">Only <strong><%= tag_pct %>%</strong> of your trades have mood tags. Tag more trades for more reliable insights.</p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ---- Related Reports ---- %>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+    <%= link_to reports_discipline_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">rule</span> Discipline
+    <% end %>
+    <%= link_to reports_execution_quality_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">verified</span> Execution Quality
+    <% end %>
+    <%= link_to reports_streak_analysis_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">local_fire_department</span> Streaks
+    <% end %>
+    <%= link_to reports_habits_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">psychology</span> Habits
+    <% end %>
+    <%= link_to journal_entries_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">auto_stories</span> Journal
+    <% end %>
+  </div>
+
+<% else %>
+  <div class="card empty-state">
+    <p>No closed trades found. Start logging trades with emotional states to see mood analytics.</p>
+  </div>
+<% end %>
+
+<style>
+  @media print {
+    .page-actions, .filter-form, .btn { display: none !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+    .page-header { margin-bottom: 0.5rem; }
+    body { font-size: 11pt; }
+    svg { max-width: 100% !important; }
+  }
+</style>

@@ -1,0 +1,204 @@
+<% content_for(:title) { "Writing Prompts" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #fdd835;">lightbulb</span>
+    Writing Prompts
+  </h1>
+  <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= Date.current.strftime("%A, %B %-d, %Y") %></span>
+</div>
+
+<%# Quick Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Prompts Available</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #fdd835;"><%= @total_prompts %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Categories</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @categorized.keys.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notebooks Neglected</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @neglected_notebooks.any? ? 'var(--negative)' : 'var(--positive)' %>;"><%= @neglected_notebooks.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Longest Gap</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @longest_gap >= 30 ? 'var(--negative)' : @longest_gap >= 14 ? '#ff9800' : 'var(--text)' %>;"><%= @longest_gap %> <span style="font-size: 0.75rem;">days</span></div>
+    </div>
+  </div>
+</div>
+
+<%# Prompt of the Day %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: linear-gradient(135deg, rgba(253,216,53,0.08), rgba(253,216,53,0.02)); border-left: 4px solid #fdd835;">
+  <div style="display: flex; align-items: flex-start; gap: 1rem;">
+    <span class="material-icons-outlined" style="font-size: 2.5rem; color: #fdd835;">auto_awesome</span>
+    <div style="flex: 1;">
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+        <span style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Prompt of the Day</span>
+        <%
+          potd_diff = @prompt_of_the_day[:difficulty]
+          potd_color = potd_diff == "easy" ? "var(--positive)" : potd_diff == "medium" ? "#ff9800" : "var(--negative)"
+        %>
+        <span style="font-size: 0.625rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: <%= potd_color %>22; color: <%= potd_color %>; font-weight: 600; text-transform: uppercase;"><%= potd_diff %></span>
+        <span style="font-size: 0.625rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--bg); color: var(--text-secondary);">
+          <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -2px;">schedule</span>
+          <%= @prompt_of_the_day[:estimated_time] %>
+        </span>
+      </div>
+      <div style="font-size: 1.125rem; font-weight: 600; line-height: 1.5; margin-bottom: 0.75rem;"><%= @prompt_of_the_day[:text] %></div>
+      <% if @prompt_of_the_day[:related_notes].any? %>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.375rem; margin-bottom: 0.75rem;">
+          <% @prompt_of_the_day[:related_notes].each do |rn| %>
+            <%= link_to rn[:title], note_path(rn[:id]), style: "font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: rgba(253,216,53,0.15); color: var(--text); text-decoration: none; border: 1px solid rgba(253,216,53,0.3);" %>
+          <% end %>
+        </div>
+      <% end %>
+      <%= link_to new_note_path, class: "btn btn-primary", style: "background: #fdd835; color: #333; border: none; font-weight: 600;" do %>
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">edit</span>
+        Start Writing
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Neglected Notebooks Alert %>
+<% if @neglected_notebooks.any? %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid #ff9800;">
+    <div class="card-header" style="padding-bottom: 0.5rem;">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff9800;">warning</span>
+        Notebooks Needing Attention
+      </h2>
+    </div>
+    <div style="padding: 0 1.25rem 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem;">
+        <% @neglected_notebooks.each do |name, data| %>
+          <% gap_days = (Date.current - data[:last_date]).to_i %>
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: 8px; border: 1px solid var(--border);">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; color: #ff9800;">book</span>
+              <span style="font-weight: 600; font-size: 0.875rem;"><%= name %></span>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              Last note: <%= data[:last_date].strftime("%-m/%-d/%Y") %> (<%= gap_days %> days ago)
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= data[:notes].count %> total note<%= data[:notes].count == 1 ? '' : 's' %></div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Category Tabs %>
+<%
+  category_config = {
+    "reflection" => { icon: "self_improvement", color: "#9c27b0", label: "Reflection" },
+    "continuation" => { icon: "arrow_forward", color: "#2196f3", label: "Continuation" },
+    "connection" => { icon: "hub", color: "#009688", label: "Connection" },
+    "challenge" => { icon: "fitness_center", color: "#f44336", label: "Challenge" },
+    "daily" => { icon: "today", color: "#4caf50", label: "Daily" },
+    "seasonal" => { icon: "wb_sunny", color: "#ff9800", label: "Seasonal" },
+    "creative" => { icon: "palette", color: "#e91e63", label: "Creative" }
+  }
+%>
+
+<div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem;">
+  <button onclick="showCategory('all')" class="btn" id="tab-all" style="font-size: 0.8125rem; font-weight: 600; background: #fdd835; color: #333; border: none;">
+    All (<%= @total_prompts %>)
+  </button>
+  <% category_config.each do |cat, config| %>
+    <% count = (@categorized[cat] || []).count %>
+    <% next if count == 0 %>
+    <button onclick="showCategory('<%= cat %>')" class="btn" id="tab-<%= cat %>" style="font-size: 0.8125rem;">
+      <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: <%= config[:color] %>;"><%= config[:icon] %></span>
+      <%= config[:label] %> (<%= count %>)
+    </button>
+  <% end %>
+</div>
+
+<%# Prompt Cards by Category %>
+<% category_config.each do |cat, config| %>
+  <% prompts = @categorized[cat] || [] %>
+  <% next if prompts.empty? %>
+  <div class="prompt-category" data-category="<%= cat %>" style="margin-bottom: 2rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= config[:color] %>;"><%= config[:icon] %></span>
+      <h2 style="margin: 0; font-size: 1.125rem;"><%= config[:label] %> Prompts</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary); margin-left: 0.25rem;">(<%= prompts.count %>)</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem;">
+      <% prompts.each do |prompt| %>
+        <%
+          diff = prompt[:difficulty]
+          diff_color = diff == "easy" ? "var(--positive)" : diff == "medium" ? "#ff9800" : "var(--negative)"
+        %>
+        <div class="card" style="padding: 1.25rem; display: flex; flex-direction: column; gap: 0.75rem; border-top: 3px solid <%= config[:color] %>;">
+          <div style="display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap;">
+            <span style="font-size: 0.625rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: <%= diff_color %>22; color: <%= diff_color %>; font-weight: 600; text-transform: uppercase;"><%= diff %></span>
+            <span style="font-size: 0.625rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--bg); color: var(--text-secondary);">
+              <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -2px;">schedule</span>
+              <%= prompt[:estimated_time] %>
+            </span>
+          </div>
+          <div style="font-size: 0.875rem; line-height: 1.5; flex: 1;"><%= prompt[:text] %></div>
+          <% if prompt[:related_notes].any? %>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.25rem;">
+              <% prompt[:related_notes].each do |rn| %>
+                <%= link_to rn[:title], note_path(rn[:id]), style: "font-size: 0.625rem; padding: 0.125rem 0.375rem; border-radius: 4px; background: var(--bg); color: var(--text-secondary); text-decoration: none; border: 1px solid var(--border); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; display: inline-block;" %>
+              <% end %>
+            </div>
+          <% end %>
+          <div>
+            <%= link_to new_note_path, class: "btn", style: "font-size: 0.75rem; padding: 0.375rem 0.75rem;" do %>
+              <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">edit</span>
+              Start Writing
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Nav %>
+<div style="text-align: center; margin-top: 2rem;">
+  <%= link_to "Notes", notes_path, class: "btn" %>
+  <%= link_to "Writing Stats", writing_stats_path, class: "btn" %>
+  <%= link_to "Writing Digest", writing_digest_path, class: "btn" %>
+</div>
+
+<script>
+  function showCategory(cat) {
+    var sections = document.querySelectorAll('.prompt-category');
+    var tabs = document.querySelectorAll('[id^="tab-"]');
+
+    tabs.forEach(function(tab) {
+      tab.style.background = '';
+      tab.style.color = '';
+      tab.style.border = '';
+    });
+
+    if (cat === 'all') {
+      sections.forEach(function(s) { s.style.display = ''; });
+      var allTab = document.getElementById('tab-all');
+      if (allTab) {
+        allTab.style.background = '#fdd835';
+        allTab.style.color = '#333';
+        allTab.style.border = 'none';
+      }
+    } else {
+      sections.forEach(function(s) {
+        s.style.display = s.dataset.category === cat ? '' : 'none';
+      });
+      var activeTab = document.getElementById('tab-' + cat);
+      if (activeTab) {
+        activeTab.style.background = '#fdd835';
+        activeTab.style.color = '#333';
+        activeTab.style.border = 'none';
+      }
+    }
+  }
+</script>

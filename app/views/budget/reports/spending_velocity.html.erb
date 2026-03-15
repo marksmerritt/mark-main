@@ -1,0 +1,287 @@
+<% content_for(:title) { "Spending Velocity" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px;">speed</span>
+    Spending Velocity
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Dashboard", budget_dashboard_path, class: "btn" %>
+    <%= link_to "Spending Report", budget_reports_spending_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Velocity gauge hero %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="padding: 2rem; text-align: center;">
+    <%# SVG speedometer gauge %>
+    <%
+      gauge_angle = [(@velocity_ratio * 90).round, 180].min
+      gauge_angle = [gauge_angle, 0].max
+    %>
+    <svg viewBox="0 0 200 120" style="width: 200px; margin: 0 auto; display: block;">
+      <%# Background arc %>
+      <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="var(--border)" stroke-width="12" stroke-linecap="round" />
+      <%# Colored sections %>
+      <path d="M 20 100 A 80 80 0 0 1 60 30" fill="none" stroke="var(--positive)" stroke-width="12" stroke-linecap="round" opacity="0.3" />
+      <path d="M 60 30 A 80 80 0 0 1 140 30" fill="none" stroke="#f9ab00" stroke-width="12" stroke-linecap="round" opacity="0.3" />
+      <path d="M 140 30 A 80 80 0 0 1 180 100" fill="none" stroke="var(--negative)" stroke-width="12" stroke-linecap="round" opacity="0.3" />
+      <%# Needle %>
+      <%
+        needle_angle = -90 + [gauge_angle, 180].min
+        rad = needle_angle * Math::PI / 180
+        nx = 100 + 65 * Math.cos(rad)
+        ny = 100 + 65 * Math.sin(rad)
+      %>
+      <line x1="100" y1="100" x2="<%= nx.round(1) %>" y2="<%= ny.round(1) %>" stroke="<%= @velocity_color %>" stroke-width="3" stroke-linecap="round" />
+      <circle cx="100" cy="100" r="6" fill="<%= @velocity_color %>" />
+      <%# Labels %>
+      <text x="20" y="115" text-anchor="middle" fill="var(--text-secondary)" font-size="7">Slow</text>
+      <text x="100" y="18" text-anchor="middle" fill="var(--text-secondary)" font-size="7">On Track</text>
+      <text x="180" y="115" text-anchor="middle" fill="var(--text-secondary)" font-size="7">Fast</text>
+    </svg>
+    <div style="font-size: 1.25rem; font-weight: 700; color: <%= @velocity_color %>; margin-top: 0.5rem;"><%= @velocity_status %></div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+      Spending at <%= (@velocity_ratio * 100).round(0) %>% of ideal pace
+    </div>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0; border-top: 1px solid var(--border);">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Day <%= @day_of_month %> of <%= @total_days %></div>
+      <div style="font-size: 1.125rem; font-weight: 700;"><%= @pct_through_month %>%</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">through month</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Budget Used</div>
+      <div style="font-size: 1.125rem; font-weight: 700; color: <%= @budget_used_pct > @pct_through_month ? 'var(--negative)' : 'var(--positive)' %>;"><%= @budget_used_pct %>%</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">of <%= number_to_currency(@total_budgeted) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Daily Rate</div>
+      <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(@daily_rate) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">vs ideal <%= number_to_currency(@ideal_daily_rate) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Remaining</div>
+      <div style="font-size: 1.125rem; font-weight: 700; color: <%= @total_remaining >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@total_remaining) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @days_remaining %> days left</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Safe Daily Spend</div>
+      <div style="font-size: 1.125rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@safe_daily_spend) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">to stay on budget</div>
+    </div>
+  </div>
+</div>
+
+<%# Cumulative spending chart %>
+<% if @cumulative.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">show_chart</span>
+        Spending Trajectory
+      </h2>
+    </div>
+    <div style="padding: 1rem; overflow-x: auto;">
+      <%
+        svg_w = 700
+        svg_h = 250
+        pad_l = 60
+        pad_r = 20
+        pad_t = 15
+        pad_b = 35
+        plot_w = svg_w - pad_l - pad_r
+        plot_h = svg_h - pad_t - pad_b
+
+        chart_max = [@total_budgeted, @projected_spend, @cumulative.last[:spent]].max * 1.05
+        chart_max = 1 if chart_max == 0
+
+        # Actual spending points
+        actual_pts = @cumulative.map { |p|
+          x = pad_l + (p[:day].to_f / @total_days * plot_w)
+          y = pad_t + (1 - p[:spent] / chart_max) * plot_h
+          "#{x.round(1)},#{y.round(1)}"
+        }.join(" ")
+
+        # Budget line (straight diagonal)
+        budget_x1 = pad_l
+        budget_y1 = pad_t + plot_h
+        budget_x2 = pad_l + plot_w
+        budget_y2 = pad_t + (1 - @total_budgeted / chart_max) * plot_h
+
+        # Projected line (from last actual to end of month)
+        proj_x1 = pad_l + (@day_of_month.to_f / @total_days * plot_w)
+        proj_y1 = pad_t + (1 - @cumulative.last[:spent] / chart_max) * plot_h
+        proj_x2 = pad_l + plot_w
+        proj_y2 = pad_t + (1 - @projected_spend / chart_max) * plot_h
+      %>
+      <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; max-width: 700px; height: auto;">
+        <%# Grid %>
+        <% 5.times do |i| %>
+          <% y = pad_t + plot_h * i / 4.0 %>
+          <% val = chart_max * (1 - i / 4.0) %>
+          <line x1="<%= pad_l %>" y1="<%= y %>" x2="<%= svg_w - pad_r %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" />
+          <text x="<%= pad_l - 8 %>" y="<%= y + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="9">$<%= (val / 1000).round(1) %>k</text>
+        <% end %>
+
+        <%# Today marker %>
+        <% today_x = pad_l + (@day_of_month.to_f / @total_days * plot_w) %>
+        <line x1="<%= today_x %>" y1="<%= pad_t %>" x2="<%= today_x %>" y2="<%= pad_t + plot_h %>" stroke="var(--text-secondary)" stroke-width="1" stroke-dasharray="3 3" opacity="0.5" />
+        <text x="<%= today_x %>" y="<%= pad_t - 4 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8">Today</text>
+
+        <%# Budget pace line (ideal) %>
+        <line x1="<%= budget_x1 %>" y1="<%= budget_y1 %>" x2="<%= budget_x2 %>" y2="<%= budget_y2 %>"
+              stroke="var(--positive)" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.6" />
+
+        <%# Actual spending line %>
+        <polyline points="<%= actual_pts %>" fill="none" stroke="<%= @velocity_color %>" stroke-width="2.5" />
+
+        <%# Projected extension %>
+        <line x1="<%= proj_x1 %>" y1="<%= proj_y1 %>" x2="<%= proj_x2 %>" y2="<%= proj_y2 %>"
+              stroke="<%= @velocity_color %>" stroke-width="1.5" stroke-dasharray="4 3" opacity="0.5" />
+
+        <%# Budget target dot %>
+        <circle cx="<%= budget_x2 %>" cy="<%= budget_y2 %>" r="4" fill="var(--positive)" stroke="var(--surface)" stroke-width="1.5">
+          <title>Budget: <%= number_to_currency(@total_budgeted) %></title>
+        </circle>
+
+        <%# Projected end dot %>
+        <circle cx="<%= proj_x2 %>" cy="<%= proj_y2 %>" r="4" fill="<%= @velocity_color %>" stroke="var(--surface)" stroke-width="1.5">
+          <title>Projected: <%= number_to_currency(@projected_spend) %></title>
+        </circle>
+
+        <%# X-axis labels %>
+        <% [1, (@total_days / 4.0).round, (@total_days / 2.0).round, (@total_days * 3 / 4.0).round, @total_days].uniq.each do |d| %>
+          <% x = pad_l + (d.to_f / @total_days * plot_w) %>
+          <text x="<%= x %>" y="<%= svg_h - 8 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="9"><%= d %></text>
+        <% end %>
+      </svg>
+      <div style="display: flex; justify-content: center; gap: 1.5rem; margin-top: 0.5rem; font-size: 0.75rem;">
+        <span style="display: flex; align-items: center; gap: 4px;">
+          <span style="width: 16px; height: 3px; background: <%= @velocity_color %>; border-radius: 2px;"></span> Actual
+        </span>
+        <span style="display: flex; align-items: center; gap: 4px;">
+          <span style="width: 16px; height: 3px; background: var(--positive); border-radius: 2px; opacity: 0.6;"></span> Budget Pace
+        </span>
+        <span style="display: flex; align-items: center; gap: 4px;">
+          <span style="width: 16px; height: 3px; background: <%= @velocity_color %>; border-radius: 2px; opacity: 0.5;"></span> Projected
+        </span>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Projection card %>
+<div class="card" style="margin-bottom: 1.5rem; border-left: 3px solid <%= @projected_over_under >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+  <div style="padding: 1.25rem;">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 2rem; color: <%= @projected_over_under >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @projected_over_under >= 0 ? 'trending_down' : 'trending_up' %></span>
+      <div>
+        <div style="font-size: 0.875rem; font-weight: 600;">End-of-Month Projection</div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+          <% if @projected_over_under >= 0 %>
+            At your current pace, you'll spend <strong><%= number_to_currency(@projected_spend) %></strong> by month's end,
+            leaving <strong style="color: var(--positive);"><%= number_to_currency(@projected_over_under) %> under budget</strong>.
+          <% else %>
+            At your current pace, you'll spend <strong><%= number_to_currency(@projected_spend) %></strong> by month's end,
+            going <strong style="color: var(--negative);"><%= number_to_currency(@projected_over_under.abs) %> over budget</strong>.
+            <% if @safe_daily_spend > 0 %>
+              Limit spending to <strong><%= number_to_currency(@safe_daily_spend) %>/day</strong> to stay on track.
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Category velocity breakdown %>
+<% if @category_velocity.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">category</span>
+        Category Velocity
+      </h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Month is <%= @pct_through_month %>% complete</span>
+    </div>
+    <div style="overflow-x: auto;">
+      <table class="data-table" style="width: 100%; font-size: 0.875rem;">
+        <thead>
+          <tr>
+            <th style="text-align: left; padding: 0.625rem 1rem;">Category</th>
+            <th style="text-align: right; padding: 0.625rem 0.5rem;">Budgeted</th>
+            <th style="text-align: right; padding: 0.625rem 0.5rem;">Spent</th>
+            <th style="text-align: right; padding: 0.625rem 0.5rem;">Remaining</th>
+            <th style="padding: 0.625rem 0.5rem; width: 180px;">Pace</th>
+            <th style="text-align: center; padding: 0.625rem 1rem;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @category_velocity.each do |cat| %>
+            <%
+              pace_color = case cat[:status]
+                           when "over" then "var(--negative)"
+                           when "watch" then "#f9ab00"
+                           else "var(--positive)"
+                           end
+              status_label = case cat[:status]
+                             when "over" then "Ahead"
+                             when "watch" then "Watch"
+                             else "On Track"
+                             end
+            %>
+            <tr>
+              <td style="padding: 0.625rem 1rem; font-weight: 600;"><%= cat[:name] %></td>
+              <td style="padding: 0.625rem 0.5rem; text-align: right;"><%= number_to_currency(cat[:budgeted]) %></td>
+              <td style="padding: 0.625rem 0.5rem; text-align: right; font-weight: 600;"><%= number_to_currency(cat[:spent]) %></td>
+              <td style="padding: 0.625rem 0.5rem; text-align: right; color: <%= cat[:remaining] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(cat[:remaining]) %></td>
+              <td style="padding: 0.625rem 0.5rem;">
+                <div style="position: relative; height: 16px; background: var(--bg); border-radius: 8px; overflow: hidden;">
+                  <%# Budget pace marker %>
+                  <div style="position: absolute; left: <%= @pct_through_month %>%; top: 0; bottom: 0; width: 2px; background: var(--text-secondary); opacity: 0.3; z-index: 1;"></div>
+                  <%# Actual usage %>
+                  <div style="height: 100%; width: <%= [cat[:pct_used], 100].min %>%; background: <%= pace_color %>; opacity: 0.7; border-radius: 8px;"></div>
+                </div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= cat[:pct_used] %>% used</div>
+              </td>
+              <td style="padding: 0.625rem 1rem; text-align: center;">
+                <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 3px; font-weight: 600; background: <%= pace_color %>15; color: <%= pace_color %>;"><%= status_label %></span>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Month-over-month comparison %>
+<% if @prev_spent > 0 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">compare_arrows</span>
+        vs Last Month
+      </h2>
+    </div>
+    <div style="padding: 1rem 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+      <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">This Month (so far)</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(@total_spent) %></div>
+      </div>
+      <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Last Month (total)</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(@prev_spent) %></div>
+      </div>
+      <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">MoM Change</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: <%= @mom_change <= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @mom_change > 0 ? '+' : '' %><%= @mom_change %>%
+        </div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">(at same point in month)</div>
+      </div>
+    </div>
+  </div>
+<% end %>

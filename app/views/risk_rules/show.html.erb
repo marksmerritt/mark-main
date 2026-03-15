@@ -1,0 +1,232 @@
+<% content_for(:title) { "Risk Rules Engine" } %>
+
+<div data-controller="risk-rules" data-risk-rules-metrics-value="<%= @metrics_json %>">
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #5c6bc0;">gavel</span>
+    Risk Rules Engine
+  </h1>
+  <div class="page-actions">
+    <button class="btn" style="background: #c62828; color: white;" data-action="click->risk-rules#pauseTrading">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">pause_circle</span>
+      Pause Trading
+    </button>
+    <%= link_to "Risk Dashboard", risk_dashboard_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Pause Trading Banner %>
+<div data-risk-rules-target="pauseBanner" class="hidden" style="background: linear-gradient(135deg, #c62828, #e53935); color: #fff; padding: 1rem 1.5rem; border-radius: 8px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+  <span class="material-icons-outlined" style="font-size: 1.5rem;">front_hand</span>
+  <div>
+    <div style="font-weight: 700; font-size: 1rem;">Trading Paused</div>
+    <div style="font-size: 0.8125rem; opacity: 0.9;">You have chosen to pause trading. Click "Pause Trading" again to resume.</div>
+  </div>
+</div>
+
+<%# Traffic Light Summary %>
+<div class="card" style="margin-bottom: 1.5rem;" data-risk-rules-target="summaryBadge">
+  <div style="padding: 1.25rem; display: flex; align-items: center; justify-content: center; gap: 2rem; flex-wrap: wrap;">
+    <div style="text-align: center;">
+      <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--positive); opacity: 0.85; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.375rem;">
+        <span class="material-icons-outlined" style="color: white; font-size: 1.5rem;">check</span>
+      </div>
+      <div style="font-size: 1.25rem; font-weight: 700;" data-risk-rules-target="safeCount">—</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">Safe</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="width: 48px; height: 48px; border-radius: 50%; background: #f9a825; opacity: 0.85; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.375rem;">
+        <span class="material-icons-outlined" style="color: white; font-size: 1.5rem;">warning</span>
+      </div>
+      <div style="font-size: 1.25rem; font-weight: 700;" data-risk-rules-target="warningCount">—</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">Warning</div>
+    </div>
+    <div style="text-align: center;">
+      <div style="width: 48px; height: 48px; border-radius: 50%; background: var(--negative); opacity: 0.85; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.375rem;">
+        <span class="material-icons-outlined" style="color: white; font-size: 1.5rem;">dangerous</span>
+      </div>
+      <div style="font-size: 1.25rem; font-weight: 700;" data-risk-rules-target="breachedCount">—</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">Breached</div>
+    </div>
+  </div>
+</div>
+
+<%# Today's Metrics %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">today</span> Today's Trading</h2>
+  </div>
+  <div style="padding: 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1rem;">
+    <div style="text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Today's P&L</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: <%= @today_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@today_pnl) %></div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades Today</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= @today_trade_count %></div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Open Positions</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= @open_position_count %></div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Consec. Losses</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: <%= [@consecutive_losses_today, @current_losing_streak].max > 0 ? 'var(--negative)' : 'var(--text)' %>;"><%= [@consecutive_losses_today, @current_losing_streak].max %></div>
+    </div>
+    <div style="text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Max Position</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@max_position_value, precision: 0) %></div>
+    </div>
+  </div>
+</div>
+
+<%# Rules Grid %>
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;" data-risk-rules-target="rulesGrid">
+  <%
+    rules = [
+      { id: "max_daily_loss", name: "Max Daily Loss", icon: "money_off", current_key: "today_pnl", current: @today_pnl.abs, default_limit: 500, unit: "$", inverse: true, description: "Maximum acceptable loss in a single day" },
+      { id: "max_trades", name: "Max Trades/Day", icon: "repeat", current_key: "today_trade_count", current: @today_trade_count, default_limit: 10, unit: "", description: "Maximum number of trades in a single day" },
+      { id: "max_position", name: "Max Position Size", icon: "straighten", current_key: "max_position_value", current: @max_position_value, default_limit: 10000, unit: "$", description: "Maximum dollar value of a single position" },
+      { id: "max_consec_losses", name: "Max Consecutive Losses", icon: "trending_down", current_key: "consecutive_losses_today", current: [@consecutive_losses_today, @current_losing_streak].max, default_limit: 3, unit: "", description: "Stop trading after this many losses in a row" },
+      { id: "max_open", name: "Max Open Positions", icon: "layers", current_key: "open_position_count", current: @open_position_count, default_limit: 5, unit: "", description: "Maximum concurrent open positions" },
+      { id: "min_rr", name: "Min Risk/Reward", icon: "swap_vert", current_key: "avg_rr_ratio", current: @avg_rr_ratio, default_limit: 2.0, unit: ":1", inverse: false, higher_better: true, description: "Minimum acceptable risk-to-reward ratio" },
+      { id: "max_pct_account", name: "Max % per Trade", icon: "pie_chart", current_key: "max_pct_of_account", current: @max_pct_of_account, default_limit: 5, unit: "%", description: "Maximum percentage of account in a single trade" }
+    ]
+  %>
+
+  <% rules.each do |rule| %>
+    <%
+      limit = rule[:default_limit]
+      current = rule[:current]
+      # Calculate status
+      if rule[:higher_better]
+        ratio = limit > 0 ? (current / limit) : 1
+        status = ratio >= 1 ? "safe" : (ratio >= 0.6 ? "warning" : "breached")
+      elsif rule[:inverse] && @today_pnl >= 0
+        status = "safe"
+      else
+        ratio = limit > 0 ? (current.to_f / limit) : 0
+        status = ratio <= 0.6 ? "safe" : (ratio <= 1.0 ? "warning" : "breached")
+      end
+      status_color = case status
+                     when "safe" then "var(--positive)"
+                     when "warning" then "#f9a825"
+                     else "var(--negative)"
+                     end
+      status_icon = case status
+                    when "safe" then "check_circle"
+                    when "warning" then "warning"
+                    else "dangerous"
+                    end
+      bar_pct = rule[:higher_better] ? [(current / [limit, 0.01].max * 100).round, 100].min : [(current.to_f / [limit, 0.01].max * 100).round, 100].min
+    %>
+    <div class="card" style="border-left: 4px solid <%= status_color %>;" data-rule-id="<%= rule[:id] %>">
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= status_color %>;"><%= rule[:icon] %></span>
+            <span style="font-size: 0.875rem; font-weight: 600;"><%= rule[:name] %></span>
+          </div>
+          <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= status_color %>;"><%= status_icon %></span>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.75rem;"><%= rule[:description] %></div>
+        <div style="display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.5rem;">
+          <span style="font-size: 1.25rem; font-weight: 700; color: <%= status_color %>;">
+            <%= rule[:unit] == "$" ? number_to_currency(current) : "#{current}#{rule[:unit]}" %>
+          </span>
+          <span style="font-size: 0.75rem; color: var(--text-secondary);"> / </span>
+          <span style="font-size: 0.875rem; color: var(--text-secondary);">
+            <span data-risk-rules-target="limit" data-rule="<%= rule[:id] %>"><%= rule[:unit] == "$" ? number_to_currency(limit) : "#{limit}#{rule[:unit]}" %></span>
+          </span>
+        </div>
+        <div style="height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+          <div style="width: <%= bar_pct %>%; height: 100%; background: <%= status_color %>; border-radius: 3px; transition: width 0.3s;"></div>
+        </div>
+        <div style="margin-top: 0.5rem;">
+          <label style="font-size: 0.6875rem; color: var(--text-secondary);">Limit:</label>
+          <input type="number" value="<%= limit %>" step="<%= rule[:unit] == ':1' ? '0.1' : '1' %>" style="width: 80px; font-size: 0.75rem; padding: 0.25rem 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text);"
+                 data-action="change->risk-rules#updateRule"
+                 data-risk-rules-rule-param="<%= rule[:id] %>">
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Breach History %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">history</span> 30-Day Breach History</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Breach Days</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= @rule_breach_history[:breach_days] > 0 ? 'var(--negative)' : 'var(--positive)' %>;"><%= @rule_breach_history[:breach_days] %></div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trading Days</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @rule_breach_history[:total_days] %></div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Compliance Rate</div>
+        <% compliance = @rule_breach_history[:total_days] > 0 ? ((@rule_breach_history[:total_days] - @rule_breach_history[:breach_days]).to_f / @rule_breach_history[:total_days] * 100).round(0) : 100 %>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= compliance >= 80 ? 'var(--positive)' : (compliance >= 60 ? '#f9a825' : 'var(--negative)') %>;"><%= compliance %>%</div>
+      </div>
+      <% if @rule_breach_history[:worst_day_date] %>
+        <div style="text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Day</div>
+          <div style="font-size: 1rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@rule_breach_history[:worst_day_pnl]) %></div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= @rule_breach_history[:worst_day_date] %></div>
+        </div>
+      <% end %>
+    </div>
+
+    <%# Mini daily P&L bars for last 30 days %>
+    <% if @rule_breach_history[:daily_pnl_last_30].any? %>
+      <%
+        dpnl = @rule_breach_history[:daily_pnl_last_30]
+        max_abs = dpnl.values.map(&:abs).max
+        max_abs = [max_abs, 1].max
+      %>
+      <div style="display: flex; gap: 2px; align-items: center; height: 60px; margin-top: 0.75rem;">
+        <% dpnl.each do |date, pnl| %>
+          <% bar_h = (pnl.abs / max_abs * 25).round %>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+            <% if pnl >= 0 %>
+              <div style="display: flex; align-items: flex-end; height: 50%;">
+                <div style="width: 100%; height: <%= bar_h %>px; min-height: 1px; background: var(--positive); border-radius: 1px 1px 0 0; opacity: 0.8;"></div>
+              </div>
+              <div style="height: 50%;"></div>
+            <% else %>
+              <div style="height: 50%;"></div>
+              <div style="display: flex; align-items: flex-start; height: 50%;">
+                <div style="width: 100%; height: <%= bar_h %>px; min-height: 1px; background: <%= pnl < -500 ? '#c62828' : 'var(--negative)' %>; border-radius: 0 0 1px 1px; opacity: <%= pnl < -500 ? '1' : '0.8' %>;"></div>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      <div style="text-align: center; font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
+        Last 30 trading days &middot; <span style="color: #c62828;">Dark red</span> = exceeded $500 daily loss limit
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Action Buttons %>
+<div style="display: flex; gap: 1rem; justify-content: center; margin-bottom: 1.5rem;">
+  <button class="btn" data-action="click->risk-rules#resetDefaults">
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">restart_alt</span> Reset to Defaults
+  </button>
+</div>
+
+</div>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Risk Dashboard", risk_dashboard_path, class: "btn" %>
+  <%= link_to "Drawdown Tracker", drawdown_tracker_path, class: "btn" %>
+  <%= link_to "Risk Analysis", reports_risk_analysis_path, class: "btn" %>
+  <%= link_to "Sizing Advisor", sizing_advisor_path, class: "btn" %>
+</div>

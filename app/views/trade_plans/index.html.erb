@@ -1,0 +1,210 @@
+<div class="page-header">
+  <h1>Trade Plans</h1>
+  <div class="page-actions">
+    <%= link_to "New Plan", new_trade_plan_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2>Filters</h2>
+  </div>
+
+  <%= form_with url: trade_plans_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :status, "Status" %>
+        <%= f.select :status,
+              options_for_select([["Planned", "planned"], ["Active", "active"], ["Completed", "completed"], ["Cancelled", "cancelled"]], params[:status]),
+              { include_blank: "All" },
+              { class: "form-control" } %>
+      </div>
+
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Filter", class: "btn btn-primary" %>
+        <%= link_to "Clear", trade_plans_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%
+  completed = @trade_plans.is_a?(Array) ? @trade_plans.count { |p| p["status"] == "completed" } : 0
+  cancelled = @trade_plans.is_a?(Array) ? @trade_plans.count { |p| p["status"] == "cancelled" } : 0
+  execution_rate = @total_plans > 0 ? (completed.to_f / @total_plans * 100).round(0) : 0
+%>
+<%
+  # R:R distribution
+  rr_data = []
+  if @trade_plans.is_a?(Array)
+    @trade_plans.each do |plan|
+      entry = plan["target_entry"]&.to_f
+      stop = plan["stop_loss"]&.to_f
+      tp = plan["take_profit"]&.to_f
+      next unless entry && entry > 0 && stop && stop > 0 && tp && tp > 0
+      risk = (entry - stop).abs
+      reward = (tp - entry).abs
+      rr = risk > 0 ? (reward / risk).round(1) : nil
+      rr_data << { symbol: plan["symbol"], rr: rr, status: plan["status"] } if rr
+    end
+  end
+  avg_rr = rr_data.any? ? (rr_data.sum { |r| r[:rr] } / rr_data.count).round(1) : nil
+  good_rr = rr_data.count { |r| r[:rr] >= 2 }
+  poor_rr = rr_data.count { |r| r[:rr] < 1 }
+%>
+
+<%# Pipeline overview %>
+<%
+  planned = @trade_plans.is_a?(Array) ? @trade_plans.count { |p| p["status"] == "planned" } : 0
+  active = @active_plans || 0
+  pipeline_stages = [
+    { label: "Planned", count: planned, icon: "pending_actions", color: "var(--primary)" },
+    { label: "Active", count: active, icon: "play_circle", color: "#6366f1" },
+    { label: "Executed", count: completed, icon: "check_circle", color: "var(--positive)" },
+    { label: "Cancelled", count: cancelled, icon: "cancel", color: "var(--text-secondary)" }
+  ]
+%>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: center; flex-wrap: wrap;">
+    <% pipeline_stages.each_with_index do |stage, i| %>
+      <div style="flex: 1; min-width: 100px; padding: 1rem; text-align: center; position: relative; <%= i < pipeline_stages.size - 1 ? 'border-right: 1px solid var(--border);' : '' %>">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: <%= stage[:color] %>; display: block; margin-bottom: 0.25rem;"><%= stage[:icon] %></span>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= stage[:color] %>;"><%= stage[:count] %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;"><%= stage[:label] %></div>
+      </div>
+    <% end %>
+  </div>
+  <div style="padding: 0.5rem 1.25rem 0.75rem; border-top: 1px solid var(--border); display: flex; gap: 1.5rem; font-size: 0.8125rem;">
+    <div>
+      <span style="color: var(--text-secondary);">Execution Rate:</span>
+      <span style="font-weight: 600;"><%= execution_rate %>%</span>
+    </div>
+    <% if avg_rr %>
+      <div>
+        <span style="color: var(--text-secondary);">Avg R:R:</span>
+        <span style="font-weight: 600; color: <%= avg_rr >= 2 ? 'var(--positive)' : avg_rr >= 1 ? 'var(--primary)' : 'var(--negative)' %>;">1:<%= avg_rr %></span>
+      </div>
+      <div>
+        <span style="color: var(--text-secondary);">Quality Plans (2R+):</span>
+        <span style="font-weight: 600; color: var(--positive);"><%= good_rr %>/<%= rr_data.count %></span>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# R:R Distribution visual %>
+<% if rr_data.count >= 3 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Risk:Reward Distribution</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <%
+        rr_buckets = { "< 1:1" => 0, "1:1 - 1.5:1" => 0, "1.5:1 - 2:1" => 0, "2:1 - 3:1" => 0, "3:1+" => 0 }
+        rr_data.each do |r|
+          case r[:rr]
+          when 0...1 then rr_buckets["< 1:1"] += 1
+          when 1...1.5 then rr_buckets["1:1 - 1.5:1"] += 1
+          when 1.5...2 then rr_buckets["1.5:1 - 2:1"] += 1
+          when 2...3 then rr_buckets["2:1 - 3:1"] += 1
+          else rr_buckets["3:1+"] += 1
+          end
+        end
+        rr_max = rr_buckets.values.max.to_f
+        rr_max = 1 if rr_max == 0
+        rr_colors = ["var(--negative)", "#f9ab00", "var(--primary)", "var(--positive)", "#0d904f"]
+      %>
+      <div style="display: flex; gap: 0.5rem; align-items: end; height: 80px;">
+        <% rr_buckets.each_with_index do |(label, count), i| %>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: end;">
+            <span style="font-size: 0.6875rem; font-weight: 700; margin-bottom: 0.25rem;"><%= count %></span>
+            <div style="width: 80%; height: <%= (count / rr_max * 60).round(0) %>px; min-height: 4px; background: <%= rr_colors[i] %>; opacity: 0.7; border-radius: 3px 3px 0 0;"></div>
+          </div>
+        <% end %>
+      </div>
+      <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem;">
+        <% rr_buckets.keys.each do |label| %>
+          <div style="flex: 1; text-align: center; font-size: 0.5625rem; color: var(--text-secondary);"><%= label %></div>
+        <% end %>
+      </div>
+      <% if poor_rr > good_rr && rr_data.count >= 5 %>
+        <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.75rem;">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">info</span>
+          Most of your plans have R:R below 2:1. Consider being more selective with entries or widening targets.
+        </p>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<% if @trade_plans.is_a?(Array) && @trade_plans.any? %>
+  <div class="card">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Side</th>
+          <th>Target Entry</th>
+          <th>Stop / Target</th>
+          <th>R:R</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @trade_plans.each do |plan| %>
+          <%
+            entry = plan["target_entry"]&.to_f
+            stop = plan["stop_loss"]&.to_f
+            tp = plan["take_profit"]&.to_f
+            rr = nil
+            if entry && entry > 0 && stop && stop > 0 && tp && tp > 0
+              risk = (entry - stop).abs
+              reward = (tp - entry).abs
+              rr = risk > 0 ? (reward / risk).round(1) : nil
+            end
+          %>
+          <tr>
+            <td><strong><%= link_to plan["symbol"], trade_plan_path(plan["id"]) %></strong></td>
+            <td><%= plan["side"]&.capitalize %></td>
+            <td><%= entry && entry > 0 ? number_to_currency(entry) : "—" %></td>
+            <td>
+              <% if stop && stop > 0 %>
+                <span class="negative"><%= number_to_currency(stop) %></span>
+              <% end %>
+              <% if tp && tp > 0 %>
+                <span class="positive" style="margin-left: 0.25rem;"><%= number_to_currency(tp) %></span>
+              <% end %>
+              <% unless (stop && stop > 0) || (tp && tp > 0) %>—<% end %>
+            </td>
+            <td>
+              <% if rr %>
+                <div style="display: flex; align-items: center; gap: 0.375rem;">
+                  <div style="width: 40px; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; width: <%= [rr / 4.0 * 100, 100].min.round(0) %>%; background: <%= rr >= 2 ? 'var(--positive)' : rr >= 1 ? 'var(--primary)' : 'var(--negative)' %>; opacity: 0.7; border-radius: 3px;"></div>
+                  </div>
+                  <span style="font-weight: 600; font-size: 0.8125rem; color: <%= rr >= 2 ? 'var(--positive)' : rr >= 1 ? 'var(--primary)' : 'var(--negative)' %>;">
+                    1:<%= rr %>
+                  </span>
+                </div>
+              <% else %>
+                —
+              <% end %>
+            </td>
+            <td><span class="badge badge-<%= plan["status"] %>"><%= plan["status"]&.capitalize %></span></td>
+            <td style="white-space: nowrap;">
+              <%= link_to "View", trade_plan_path(plan["id"]), class: "btn btn-sm" %>
+              <% if plan["status"] == "planned" || plan["status"] == "active" %>
+                <%= link_to "Execute", execute_trade_plan_path(plan["id"]), data: { turbo_method: :post, turbo_confirm: "Execute this trade plan?" }, class: "btn btn-sm btn-primary" %>
+              <% else %>
+                <%= link_to "Edit", edit_trade_plan_path(plan["id"]), class: "btn btn-sm" %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <div class="card">
+    <p class="empty-state">No trade plans match your filters.</p>
+  </div>
+<% end %>

@@ -1,0 +1,254 @@
+<% content_for(:title) { "Win/Loss Analysis" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #1565c0;">compare_arrows</span>
+    Win/Loss Analysis
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Summary Stats %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem;">
+  <div class="card" style="padding: 0.75rem 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+    <div style="font-size: 1.5rem; font-weight: 700; color: <%= @summary[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @summary[:win_rate] %>%</div>
+    <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= @summary[:wins] %>W / <%= @summary[:losses] %>L</div>
+  </div>
+  <div class="card" style="padding: 0.75rem 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win</div>
+    <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@summary[:avg_win]) %></div>
+  </div>
+  <div class="card" style="padding: 0.75rem 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss</div>
+    <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@summary[:avg_loss]) %></div>
+  </div>
+  <div class="card" style="padding: 0.75rem 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Payoff Ratio</div>
+    <div style="font-size: 1.25rem; font-weight: 700; color: <%= @summary[:payoff_ratio] >= 1.5 ? 'var(--positive)' : '#f9a825' %>;"><%= @summary[:payoff_ratio] %>x</div>
+  </div>
+  <div class="card" style="padding: 0.75rem 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Expectancy</div>
+    <div style="font-size: 1.25rem; font-weight: 700; color: <%= @summary[:expectancy] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@summary[:expectancy]) %></div>
+  </div>
+  <div class="card" style="padding: 0.75rem 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Win</div>
+    <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@summary[:largest_win]) %></div>
+  </div>
+</div>
+
+<%# Win vs Loss Visual Bar %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+  <div style="display: flex; height: 32px; border-radius: 6px; overflow: hidden;">
+    <% wr = @summary[:win_rate] %>
+    <div style="width: <%= wr %>%; background: var(--positive); display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem; font-weight: 600; min-width: 30px;">
+      <%= wr %>% Win
+    </div>
+    <div style="width: <%= 100 - wr %>%; background: var(--negative); display: flex; align-items: center; justify-content: center; color: white; font-size: 0.75rem; font-weight: 600; min-width: 30px;">
+      <%= (100 - wr).round(1) %>% Loss
+    </div>
+  </div>
+  <div style="display: flex; justify-content: space-between; margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+    <span>Total won: <%= number_to_currency(@summary[:total_win_pnl]) %></span>
+    <span>Total lost: <%= number_to_currency(@summary[:total_loss_pnl]) %></span>
+  </div>
+</div>
+
+<%# Side-by-side Profiles %>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+  <div class="card" style="border-top: 3px solid var(--positive);">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">thumb_up</span> Winner Profile</h2>
+    </div>
+    <div style="padding: 1.25rem; font-size: 0.8125rem;">
+      <div style="margin-bottom: 0.5rem;"><strong><%= @win_profile[:count] %></strong> winning trades</div>
+      <div style="margin-bottom: 0.5rem;">Avg P&L: <strong class="positive"><%= number_to_currency(@win_profile[:avg_pnl]) %></strong></div>
+      <div style="margin-bottom: 0.5rem;">Median P&L: <strong class="positive"><%= number_to_currency(@win_profile[:median_pnl]) %></strong></div>
+      <div style="margin-bottom: 0.5rem;">Avg Hold: <strong><%= @win_profile[:avg_hold_minutes] %> min</strong></div>
+      <% if @win_profile[:top_symbols].any? %>
+        <div style="margin-top: 0.75rem; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Top Symbols</div>
+        <% @win_profile[:top_symbols].each do |sym| %>
+          <div style="display: flex; justify-content: space-between; padding: 0.25rem 0;"><%= sym[:name] %> <span><%= sym[:count] %></span></div>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="card" style="border-top: 3px solid var(--negative);">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">thumb_down</span> Loser Profile</h2>
+    </div>
+    <div style="padding: 1.25rem; font-size: 0.8125rem;">
+      <div style="margin-bottom: 0.5rem;"><strong><%= @loss_profile[:count] %></strong> losing trades</div>
+      <div style="margin-bottom: 0.5rem;">Avg P&L: <strong class="negative"><%= number_to_currency(@loss_profile[:avg_pnl]) %></strong></div>
+      <div style="margin-bottom: 0.5rem;">Median P&L: <strong class="negative"><%= number_to_currency(@loss_profile[:median_pnl]) %></strong></div>
+      <div style="margin-bottom: 0.5rem;">Avg Hold: <strong><%= @loss_profile[:avg_hold_minutes] %> min</strong></div>
+      <% if @loss_profile[:top_symbols].any? %>
+        <div style="margin-top: 0.75rem; font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Top Symbols</div>
+        <% @loss_profile[:top_symbols].each do |sym| %>
+          <div style="display: flex; justify-content: space-between; padding: 0.25rem 0;"><%= sym[:name] %> <span><%= sym[:count] %></span></div>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Comparison Tables %>
+<% @comparisons.each do |comp| %>
+  <% next if comp[:data].empty? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><%= comp[:title] %></h2>
+    </div>
+    <div style="padding: 0; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.5rem 1rem; text-align: left;">Name</th>
+            <th style="padding: 0.5rem 0.75rem; text-align: center;">Wins</th>
+            <th style="padding: 0.5rem 0.75rem; text-align: center;">Losses</th>
+            <th style="padding: 0.5rem 0.75rem; text-align: right;">Win Rate</th>
+            <th style="padding: 0.5rem 1rem; text-align: right;">Visual</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% comp[:data].each do |row| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem 1rem; font-weight: 600;"><%= row[:name] %></td>
+              <td style="padding: 0.5rem 0.75rem; text-align: center; color: var(--positive);"><%= row[:wins] %></td>
+              <td style="padding: 0.5rem 0.75rem; text-align: center; color: var(--negative);"><%= row[:losses] %></td>
+              <td style="padding: 0.5rem 0.75rem; text-align: right; font-weight: 600; color: <%= row[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= row[:win_rate] %>%</td>
+              <td style="padding: 0.5rem 1rem;">
+                <div style="display: flex; height: 8px; border-radius: 4px; overflow: hidden; min-width: 80px;">
+                  <div style="width: <%= row[:win_rate] %>%; background: var(--positive);"></div>
+                  <div style="width: <%= 100 - row[:win_rate] %>%; background: var(--negative);"></div>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Time of Day Analysis %>
+<% if @time_analysis.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">schedule</span> Win Rate by Hour</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: flex; gap: 4px; align-items: flex-end; height: 120px;">
+        <% @time_analysis.each do |h| %>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; height: 100%; justify-content: flex-end;">
+            <div style="font-size: 0.5625rem; color: <%= h[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= h[:win_rate] %>%</div>
+            <div style="width: 100%; height: <%= h[:win_rate] %>%; background: <%= h[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>; border-radius: 3px 3px 0 0; opacity: 0.8; min-height: 4px;"></div>
+          </div>
+        <% end %>
+      </div>
+      <div style="display: flex; gap: 4px;">
+        <% @time_analysis.each do |h| %>
+          <div style="flex: 1; text-align: center; font-size: 0.5625rem; color: var(--text-secondary);"><%= h[:label] %></div>
+        <% end %>
+      </div>
+      <div style="text-align: center; margin-top: 0.5rem; font-size: 0.625rem; color: var(--text-secondary);">50% line is breakeven — bars above are your edge hours</div>
+    </div>
+  </div>
+<% end %>
+
+<%# Hold Time & Size Analysis %>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+  <% if @hold_analysis.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">timer</span> By Hold Time</h2>
+      </div>
+      <div style="padding: 0;">
+        <% @hold_analysis.each do |b| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1.25rem; border-bottom: 1px solid var(--border); font-size: 0.8125rem;">
+            <span style="width: 80px;"><%= b[:name] %></span>
+            <div style="flex: 1; display: flex; height: 8px; border-radius: 4px; overflow: hidden;">
+              <div style="width: <%= b[:win_rate] %>%; background: var(--positive);"></div>
+              <div style="width: <%= 100 - b[:win_rate] %>%; background: var(--negative);"></div>
+            </div>
+            <span style="width: 50px; text-align: right; font-weight: 600; color: <%= b[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= b[:win_rate] %>%</span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @size_analysis.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">straighten</span> By Position Size</h2>
+      </div>
+      <div style="padding: 0;">
+        <% @size_analysis.each do |b| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1.25rem; border-bottom: 1px solid var(--border); font-size: 0.8125rem;">
+            <span style="width: 80px;"><%= b[:name] %></span>
+            <div style="flex: 1; display: flex; height: 8px; border-radius: 4px; overflow: hidden;">
+              <div style="width: <%= b[:win_rate] %>%; background: var(--positive);"></div>
+              <div style="width: <%= 100 - b[:win_rate] %>%; background: var(--negative);"></div>
+            </div>
+            <span style="width: 50px; text-align: right; font-weight: 600; color: <%= b[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= b[:win_rate] %>%</span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Edge Factors %>
+<% if @edge_factors.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">gps_fixed</span> Edge Factors</h2>
+    </div>
+    <div style="padding: 0;">
+      <% @edge_factors.each do |f| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= f[:positive] ? 'var(--positive)' : 'var(--negative)' %>;"><%= f[:positive] ? 'trending_up' : 'trending_down' %></span>
+          <div style="flex: 1;">
+            <div style="font-size: 0.875rem; font-weight: 500;"><%= f[:factor] %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= f[:sample] %> trades</div>
+          </div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: <%= f[:positive] ? 'var(--positive)' : 'var(--negative)' %>;"><%= f[:win_rate] %>%</div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Recent Pattern %>
+<% if @recent_pattern.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">timeline</span> Last 30 Trades</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: flex; gap: 3px; flex-wrap: wrap;">
+        <% @recent_pattern.reverse.each do |t| %>
+          <div style="width: 24px; height: 24px; border-radius: 3px; background: <%= t[:win] ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.8; display: flex; align-items: center; justify-content: center;"
+               title="<%= t[:symbol] %>: <%= number_to_currency(t[:pnl]) %>">
+            <span style="font-size: 0.5rem; color: white; font-weight: 700;"><%= t[:win] ? 'W' : 'L' %></span>
+          </div>
+        <% end %>
+      </div>
+      <div style="margin-top: 0.5rem; font-size: 0.625rem; color: var(--text-secondary);">
+        Oldest → Most Recent. Hover for details.
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Streaks", reports_streak_analysis_path, class: "btn" %>
+  <%= link_to "By Symbol", reports_by_symbol_path, class: "btn" %>
+  <%= link_to "Edge Finder", edge_finder_path, class: "btn" %>
+  <%= link_to "W/L Patterns", wl_patterns_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+</div>

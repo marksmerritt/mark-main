@@ -1,0 +1,297 @@
+<div class="page-header">
+  <h1>Playbooks</h1>
+  <div class="page-actions">
+    <%= link_to new_playbook_path, class: "btn btn-primary" do %>
+      <span class="material-icons-outlined">add</span> New Playbook
+    <% end %>
+  </div>
+</div>
+
+<div class="card">
+  <div class="playbook-filters" style="display: flex; gap: 0.5rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+    <%= link_to "All", playbooks_path, class: "btn btn-sm #{params[:status].blank? ? 'btn-primary' : ''}" %>
+    <%= link_to "Active", playbooks_path(status: "active"), class: "btn btn-sm #{params[:status] == 'active' ? 'btn-primary' : ''}" %>
+    <%= link_to "Archived", playbooks_path(status: "archived"), class: "btn btn-sm #{params[:status] == 'archived' ? 'btn-primary' : ''}" %>
+  </div>
+</div>
+
+<%# Playbook Portfolio Overview %>
+<% if @playbook_stats.is_a?(Hash) && @playbook_stats.any? %>
+  <%
+    sorted_stats = @playbook_stats.sort_by { |_, s| -s[:total_pnl] }
+    max_abs_pnl = sorted_stats.map { |_, s| s[:total_pnl].abs }.max.to_f
+    max_abs_pnl = 1 if max_abs_pnl == 0
+    total_trades = @playbook_stats.values.sum { |s| s[:trades] }
+    total_pnl = @playbook_stats.values.sum { |s| s[:total_pnl] }
+    profitable_count = @playbook_stats.count { |_, s| s[:total_pnl] > 0 }
+    best_pb = sorted_stats.first
+    worst_pb = sorted_stats.last
+    best_wr = @playbook_stats.select { |_, s| s[:trades] >= 3 }.max_by { |_, s| s[:win_rate] }
+  %>
+
+  <%# Summary strip %>
+  <div class="card" style="margin-bottom: 1rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Playbooks</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @playbook_stats.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= total_trades %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Combined P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= total_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(total_pnl) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; <%= best_wr ? 'border-right: 1px solid var(--border);' : '' %>">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profitable</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= profitable_count %> / <%= @playbook_stats.count %></div>
+      </div>
+      <% if best_wr %>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Win Rate</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= best_wr[1][:win_rate] %>%</div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= best_wr[0] %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Best performer highlight %>
+  <% if best_pb && best_pb[1][:total_pnl] > 0 && @playbook_stats.count >= 2 %>
+    <div class="card" style="margin-bottom: 1rem; border-left: 3px solid var(--positive);">
+      <div style="padding: 1rem 1.25rem; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--positive);">emoji_events</span>
+        <div style="flex: 1;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Top Performing Playbook</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= best_pb[0] %></div>
+        </div>
+        <div style="display: flex; gap: 1.5rem; font-size: 0.875rem;">
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">P&L</div>
+            <div style="font-weight: 700;" class="positive"><%= number_to_currency(best_pb[1][:total_pnl]) %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Win Rate</div>
+            <div style="font-weight: 700;"><%= best_pb[1][:win_rate] %>%</div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Trades</div>
+            <div style="font-weight: 700;"><%= best_pb[1][:trades] %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg P&L</div>
+            <div style="font-weight: 700;" class="positive"><%= number_to_currency(best_pb[1][:avg_pnl]) %></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Radar chart comparing playbooks (3+ with data) %>
+  <% qualified_pbs = @playbook_stats.select { |_, s| s[:trades] >= 3 } %>
+  <% if qualified_pbs.count >= 2 && qualified_pbs.count <= 6 %>
+    <%
+      pb_colors = ["#1a73e8", "#0d904f", "#e8710a", "#d93025", "#9334e6", "#00bcd4"]
+      radar_dims = ["Win Rate", "Avg P&L", "Volume", "Consistency"]
+      max_wr = qualified_pbs.values.map { |s| s[:win_rate] }.max.to_f
+      max_avg = qualified_pbs.values.map { |s| s[:avg_pnl].abs }.max.to_f
+      max_trades = qualified_pbs.values.map { |s| s[:trades] }.max.to_f
+      max_wr = 1 if max_wr == 0
+      max_avg = 1 if max_avg == 0
+      max_trades = 1 if max_trades == 0
+      rc_cx = 100; rc_cy = 100; rc_r = 80
+      rc_dims_count = radar_dims.length
+      rc_angle_step = 360.0 / rc_dims_count
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Playbook Comparison</h2></div>
+      <div style="padding: 1rem 1.25rem; display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+        <svg viewBox="0 0 200 200" style="width: 220px; flex-shrink: 0;">
+          <%# Grid rings %>
+          <% [0.25, 0.5, 0.75, 1.0].each do |ring| %>
+            <polygon points="<%= radar_dims.each_index.map { |j|
+              angle = (rc_angle_step * j - 90) * Math::PI / 180
+              x = rc_cx + rc_r * ring * Math.cos(angle)
+              y = rc_cy + rc_r * ring * Math.sin(angle)
+              "#{x.round(1)},#{y.round(1)}"
+            }.join(' ') %>" fill="none" stroke="var(--border)" stroke-width="0.5" opacity="0.5" />
+          <% end %>
+          <%# Axis lines %>
+          <% radar_dims.each_index do |j| %>
+            <%
+              angle = (rc_angle_step * j - 90) * Math::PI / 180
+              lx = rc_cx + rc_r * Math.cos(angle)
+              ly = rc_cy + rc_r * Math.sin(angle)
+            %>
+            <line x1="<%= rc_cx %>" y1="<%= rc_cy %>" x2="<%= lx.round(1) %>" y2="<%= ly.round(1) %>" stroke="var(--border)" stroke-width="0.5" opacity="0.4" />
+          <% end %>
+          <%# Dimension labels %>
+          <% radar_dims.each_with_index do |dim, j| %>
+            <%
+              angle = (rc_angle_step * j - 90) * Math::PI / 180
+              lx = rc_cx + (rc_r + 14) * Math.cos(angle)
+              ly = rc_cy + (rc_r + 14) * Math.sin(angle)
+            %>
+            <text x="<%= lx.round(1) %>" y="<%= ly.round(1) %>" text-anchor="middle" dominant-baseline="middle"
+                  fill="var(--text-secondary)" font-size="7"><%= dim %></text>
+          <% end %>
+          <%# Playbook polygons %>
+          <% qualified_pbs.each_with_index do |(name, stats), i| %>
+            <%
+              wr_score = stats[:win_rate] / max_wr * 100
+              pnl_score = stats[:avg_pnl] > 0 ? (stats[:avg_pnl] / max_avg * 100) : 0
+              vol_score = stats[:trades] / max_trades * 100
+              consistency_score = stats[:win_rate] >= 50 && stats[:avg_pnl] > 0 ? [wr_score, pnl_score].min : [wr_score, 20].max
+              scores = [wr_score, pnl_score, vol_score, consistency_score]
+              color = pb_colors[i % pb_colors.length]
+            %>
+            <polygon points="<%= scores.each_with_index.map { |sc, j|
+              angle = (rc_angle_step * j - 90) * Math::PI / 180
+              x = rc_cx + rc_r * [sc, 100].min / 100.0 * Math.cos(angle)
+              y = rc_cy + rc_r * [sc, 100].min / 100.0 * Math.sin(angle)
+              "#{x.round(1)},#{y.round(1)}"
+            }.join(' ') %>" fill="<%= color %>" fill-opacity="0.1" stroke="<%= color %>" stroke-width="1.5" />
+          <% end %>
+        </svg>
+        <div style="flex: 1; min-width: 150px;">
+          <% qualified_pbs.each_with_index do |(name, stats), i| %>
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <span style="width: 10px; height: 10px; border-radius: 50%; background: <%= pb_colors[i % pb_colors.length] %>;"></span>
+              <span style="font-size: 0.8125rem; font-weight: 600;"><%= name %></span>
+              <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: auto;"><%= stats[:trades] %> trades</span>
+            </div>
+          <% end %>
+          <p style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.75rem;">
+            Dimensions: Win Rate, Average P&L, Trade Volume, and Consistency (min of WR & P&L scores).
+            Only playbooks with 3+ trades shown.
+          </p>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Performance butterfly bars %>
+  <% if @playbook_stats.count >= 2 %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Playbook Performance</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <% sorted_stats.each do |name, stats| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.875rem; padding-bottom: 0.875rem; border-bottom: 1px solid var(--border);">
+            <div style="min-width: 8rem;">
+              <div style="font-size: 0.875rem; font-weight: 600;"><%= name %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= stats[:trades] %> trades</div>
+            </div>
+            <div style="flex: 1; position: relative; height: 1.5rem;">
+              <% bar_pct = (stats[:total_pnl].abs / max_abs_pnl * 50).round(1) %>
+              <% if stats[:total_pnl] >= 0 %>
+                <div style="position: absolute; left: 50%; height: 100%; width: <%= bar_pct %>%; background: var(--positive); border-radius: 0 4px 4px 0; opacity: 0.7;"></div>
+              <% else %>
+                <div style="position: absolute; right: 50%; height: 100%; width: <%= bar_pct %>%; background: var(--negative); border-radius: 4px 0 0 4px; opacity: 0.7;"></div>
+              <% end %>
+              <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border);"></div>
+            </div>
+            <div style="min-width: 10rem; display: flex; gap: 0.75rem; align-items: center;">
+              <span style="font-size: 0.8125rem; font-weight: 700; min-width: 4.5rem; text-align: right;" class="<%= stats[:total_pnl] >= 0 ? 'positive' : 'negative' %>">
+                <%= number_to_currency(stats[:total_pnl]) %>
+              </span>
+              <span style="font-size: 0.75rem; padding: 0.125rem 0.375rem; border-radius: 3px; background: <%= stats[:win_rate] >= 50 ? 'rgba(13,144,79,0.1)' : 'rgba(217,48,37,0.1)' %>;">
+                <%= stats[:win_rate] %>%
+              </span>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% end %>
+
+<% if @playbooks.present? && @playbooks.any? %>
+  <div class="playbook-grid">
+    <% @playbooks.each do |playbook| %>
+      <div class="card playbook-card">
+        <div class="playbook-card-header">
+          <div>
+            <h3><%= link_to playbook["name"], playbook_path(playbook["id"]) %></h3>
+            <% if playbook["status"] == "archived" %>
+              <span class="badge badge-closed">Archived</span>
+            <% else %>
+              <span class="badge badge-open">Active</span>
+            <% end %>
+          </div>
+          <div class="playbook-card-actions">
+            <%= link_to edit_playbook_path(playbook["id"]), class: "btn-icon", title: "Edit" do %>
+              <span class="material-icons-outlined">edit</span>
+            <% end %>
+          </div>
+        </div>
+
+        <% if playbook["description"].present? %>
+          <p class="playbook-description"><%= truncate(playbook["description"], length: 120) %></p>
+        <% end %>
+
+        <div class="playbook-meta">
+          <% if playbook["asset_classes"].present? %>
+            <span class="playbook-meta-item">
+              <span class="material-icons-outlined" style="font-size: 0.875rem;">category</span>
+              <%= playbook["asset_classes"] %>
+            </span>
+          <% end %>
+          <% if playbook["timeframes"].present? %>
+            <span class="playbook-meta-item">
+              <span class="material-icons-outlined" style="font-size: 0.875rem;">schedule</span>
+              <%= playbook["timeframes"] %>
+            </span>
+          <% end %>
+        </div>
+
+        <% pb_perf = @playbook_stats[playbook["name"]] %>
+        <% if pb_perf %>
+          <div style="display: flex; gap: 0.75rem; padding: 0.5rem 0; margin-bottom: 0.5rem; border-top: 1px solid var(--border); font-size: 0.75rem;">
+            <span><strong><%= pb_perf[:trades] %></strong> trades</span>
+            <span class="<%= pb_perf[:win_rate] >= 50 ? 'positive' : 'negative' %>"><%= pb_perf[:win_rate] %>% WR</span>
+            <span class="<%= pb_perf[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(pb_perf[:total_pnl]) %></span>
+            <span style="color: var(--text-secondary);">avg <%= number_to_currency(pb_perf[:avg_pnl]) %></span>
+          </div>
+        <% end %>
+
+        <%# Completeness indicator %>
+        <%
+          rule_sections = [
+            { key: "setup_rules", icon: "visibility", label: "Setup" },
+            { key: "entry_criteria", icon: "login", label: "Entry" },
+            { key: "exit_criteria", icon: "logout", label: "Exit" },
+            { key: "risk_rules", icon: "shield", label: "Risk" }
+          ]
+          filled = rule_sections.count { |s| playbook[s[:key]].present? }
+          completeness_pct = (filled.to_f / rule_sections.length * 100).round(0)
+          completeness_color = completeness_pct == 100 ? "var(--positive)" : completeness_pct >= 50 ? "#f9ab00" : "var(--negative)"
+        %>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; padding: 0.375rem 0; border-top: 1px solid var(--border);">
+          <span style="font-size: 0.6875rem; color: var(--text-secondary);">Completeness</span>
+          <div style="flex: 1; height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden;">
+            <div style="height: 100%; width: <%= completeness_pct %>%; background: <%= completeness_color %>; border-radius: 2px;"></div>
+          </div>
+          <span style="font-size: 0.6875rem; font-weight: 600; color: <%= completeness_color %>;"><%= filled %>/<%= rule_sections.length %></span>
+        </div>
+        <div class="playbook-rules-preview">
+          <% rule_sections.each do |section| %>
+            <% defined = playbook[section[:key]].present? %>
+            <div class="playbook-rule-chip" style="<%= defined ? '' : 'opacity: 0.4;' %>">
+              <span class="material-icons-outlined" style="font-size: 0.75rem; color: <%= defined ? 'var(--positive)' : 'var(--text-secondary)' %>;"><%= defined ? 'check_circle' : section[:icon] %></span>
+              <%= section[:label] %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card empty-state" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); display: block; margin-bottom: 1rem;">menu_book</span>
+    <h3>No playbooks yet</h3>
+    <p class="text-muted" style="margin: 0.5rem 0 1rem;">Playbooks let you document your trading strategies with clear rules for entries, exits, and risk management.</p>
+    <%= link_to "Create Your First Playbook", new_playbook_path, class: "btn btn-primary" %>
+  </div>
+<% end %>

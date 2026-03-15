@@ -1,0 +1,213 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">hub</span>
+    Knowledge Graph
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Notes", notes_path, class: "btn" %>
+    <%= link_to "Productivity", productivity_notes_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Summary strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Notes</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_notes %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Connected</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @connected_notes %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Links</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_links %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Orphans</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @orphan_count > 0 ? '#f9ab00' : 'var(--positive)' %>;"><%= @orphan_count %></div>
+    </div>
+    <% if @most_connected %>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Most Connected</div>
+        <div style="font-size: 0.875rem; font-weight: 700;"><%= truncate(@most_connected[:title], length: 20) %></div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= @most_connected[:connections] %> links</div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<% if @nodes.any? %>
+  <%
+    notebook_names = @nodes.map { |n| n[:notebook] }.uniq
+    palette = ["#1a73e8", "#0d904f", "#e8710a", "#d93025", "#9334e6", "#00bcd4", "#f9ab00", "#ec407a", "#5c6bc0", "#26a69a"]
+    notebook_colors = notebook_names.each_with_index.map { |nb, i| [nb, palette[i % palette.length]] }.to_h
+  %>
+
+  <div class="card" style="margin-bottom: 1.5rem; position: relative;"
+       data-controller="knowledge-graph"
+       data-knowledge-graph-nodes-value="<%= @nodes.to_json %>"
+       data-knowledge-graph-edges-value="<%= @edges.to_json %>">
+
+    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);">
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; font-size: 0.75rem;">
+        <% notebook_colors.each do |nb, color| %>
+          <span style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: <%= color %>;"></span>
+            <%= nb %>
+          </span>
+        <% end %>
+      </div>
+      <div style="display: flex; gap: 0.25rem; align-items: center;">
+        <button class="btn btn-sm" data-action="knowledge-graph#zoomOut" title="Zoom out">
+          <span class="material-icons-outlined" style="font-size: 1rem;">remove</span>
+        </button>
+        <span style="font-size: 0.75rem; min-width: 3rem; text-align: center;" data-knowledge-graph-target="zoomLevel">100%</span>
+        <button class="btn btn-sm" data-action="knowledge-graph#zoomIn" title="Zoom in">
+          <span class="material-icons-outlined" style="font-size: 1rem;">add</span>
+        </button>
+        <button class="btn btn-sm" data-action="knowledge-graph#resetView" title="Reset view" style="margin-left: 0.25rem;">
+          <span class="material-icons-outlined" style="font-size: 1rem;">fit_screen</span>
+        </button>
+      </div>
+    </div>
+
+    <svg data-knowledge-graph-target="canvas"
+         style="width: 100%; height: 500px; background: var(--bg); cursor: grab;"
+         data-action="mousedown->knowledge-graph#handleMouseDown
+                      mousemove->knowledge-graph#handleMouseMove
+                      mouseup->knowledge-graph#handleMouseUp
+                      click->knowledge-graph#handleClick
+                      dblclick->knowledge-graph#handleDblClick
+                      wheel->knowledge-graph#handleWheel">
+    </svg>
+
+    <div data-knowledge-graph-target="tooltip"
+         style="display: none; position: fixed; z-index: 100; background: var(--surface); border: 1px solid var(--border);
+                border-radius: var(--radius); padding: 0.5rem 0.75rem; font-size: 0.8125rem; max-width: 280px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15); pointer-events: none;">
+    </div>
+
+    <div style="padding: 0.5rem 1.25rem; border-top: 1px solid var(--border); font-size: 0.6875rem; color: var(--text-secondary);">
+      Click a node to highlight connections. Double-click to open note. Scroll to zoom. Drag to pan.
+      Use <code>[[Note Title]]</code> in your notes to create links.
+    </div>
+  </div>
+
+  <%# Top connected notes list %>
+  <% connected_nodes = @nodes.select { |n| n[:connections] > 0 }.sort_by { |n| -n[:connections] } %>
+  <% if connected_nodes.any? %>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem;">
+      <div class="card">
+        <div class="card-header"><h2>Most Connected Notes</h2></div>
+        <div style="padding: 0;">
+          <% connected_nodes.first(10).each do |node| %>
+            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+              <span style="width: 10px; height: 10px; border-radius: 50%; background: <%= notebook_colors[node[:notebook]] %>;"></span>
+              <div style="flex: 1;">
+                <%= link_to node[:title], note_path(node[:id]), style: "font-size: 0.875rem; font-weight: 600; text-decoration: none;" %>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+                  <%= node[:notebook] %> &middot; <%= node[:word_count] %> words
+                  <% if node[:tags].any? %>
+                    &middot; <%= node[:tags].first(3).join(", ") %>
+                  <% end %>
+                </div>
+              </div>
+              <span style="font-size: 0.875rem; font-weight: 700; color: var(--primary);"><%= node[:connections] %></span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+      <%# Orphan notes - no connections %>
+      <% orphans = @nodes.select { |n| n[:connections] == 0 } %>
+      <% if orphans.any? %>
+        <div class="card">
+          <div class="card-header">
+            <h2>Orphan Notes</h2>
+            <span class="text-muted" style="font-size: 0.75rem;"><%= orphans.count %> unlinked</span>
+          </div>
+          <p style="padding: 0 1.25rem; font-size: 0.8125rem; color: var(--text-secondary); margin: 0.5rem 0;">
+            These notes have no backlinks. Consider linking them to related notes using <code>[[Note Title]]</code> syntax.
+          </p>
+          <div style="padding: 0;">
+            <% orphans.first(15).each do |node| %>
+              <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1.25rem; border-bottom: 1px solid var(--border);">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: <%= notebook_colors[node[:notebook]] %>; opacity: 0.4;"></span>
+                <div style="flex: 1;">
+                  <%= link_to node[:title], note_path(node[:id]), style: "font-size: 0.8125rem; text-decoration: none;" %>
+                  <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.25rem;"><%= node[:notebook] %></span>
+                </div>
+                <%= link_to edit_note_path(node[:id]), class: "btn btn-sm", title: "Edit to add links", style: "padding: 0.125rem 0.375rem;" do %>
+                  <span class="material-icons-outlined" style="font-size: 0.875rem;">edit</span>
+                <% end %>
+              </div>
+            <% end %>
+            <% if orphans.count > 15 %>
+              <div style="padding: 0.5rem 1.25rem; text-align: center; font-size: 0.75rem; color: var(--text-secondary);">
+                ...and <%= orphans.count - 15 %> more
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# Notebook connection matrix %>
+  <% if notebook_names.count >= 2 %>
+    <%
+      nb_connections = {}
+      notebook_names.each do |a|
+        nb_connections[a] = {}
+        notebook_names.each { |b| nb_connections[a][b] = 0 }
+      end
+      @edges.each do |e|
+        src = @nodes.find { |n| n[:id] == e[:source] }
+        tgt = @nodes.find { |n| n[:id] == e[:target] }
+        next unless src && tgt
+        nb_connections[src[:notebook]][tgt[:notebook]] += 1
+        nb_connections[tgt[:notebook]][src[:notebook]] += 1 if src[:notebook] != tgt[:notebook]
+      end
+      max_conn = nb_connections.values.flat_map(&:values).max.to_f
+      max_conn = 1 if max_conn == 0
+    %>
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header"><h2>Notebook Connection Matrix</h2></div>
+      <div style="overflow-x: auto; padding: 1rem 1.25rem;">
+        <table class="table" style="font-size: 0.8125rem;">
+          <thead>
+            <tr>
+              <th></th>
+              <% notebook_names.each do |nb| %>
+                <th style="text-align: center; font-size: 0.6875rem;"><%= truncate(nb, length: 12) %></th>
+              <% end %>
+            </tr>
+          </thead>
+          <tbody>
+            <% notebook_names.each do |row_nb| %>
+              <tr>
+                <td style="font-weight: 600; font-size: 0.75rem;">
+                  <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: <%= notebook_colors[row_nb] %>; margin-right: 4px;"></span>
+                  <%= truncate(row_nb, length: 15) %>
+                </td>
+                <% notebook_names.each do |col_nb| %>
+                  <% val = nb_connections[row_nb][col_nb] %>
+                  <% opacity = val > 0 ? (val / max_conn * 0.7 + 0.1).round(2) : 0 %>
+                  <td style="text-align: center; background: <%= val > 0 ? "rgba(26,115,232,#{opacity})" : 'transparent' %>; font-weight: <%= val > 0 ? '600' : '400' %>; color: <%= val > 0 ? (opacity > 0.4 ? '#fff' : 'var(--text)') : 'var(--text-secondary)' %>;">
+                    <%= val > 0 ? val : "—" %>
+                  </td>
+                <% end %>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card">
+    <p class="empty-state">No notes found. Create some notes and link them with <code>[[Note Title]]</code> to build your knowledge graph.</p>
+  </div>
+<% end %>

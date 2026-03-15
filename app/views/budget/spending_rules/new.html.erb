@@ -1,0 +1,83 @@
+<div class="page-header">
+  <h1>New Spending Rule</h1>
+</div>
+
+<% if @errors.present? %>
+  <div class="alert alert-danger" style="margin-bottom: 1.5rem;">
+    <ul style="margin: 0; padding-left: 1.25rem;">
+      <% @errors.each do |error| %>
+        <li><%= error %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<div class="card" style="max-width: 40rem;">
+  <div style="padding: 1.5rem;">
+    <%= form_with url: budget_spending_rules_path, method: :post, local: true do |f| %>
+      <div class="form-group">
+        <label for="rule_name">Name</label>
+        <input type="text" id="rule_name" name="spending_rule[name]" class="form-control"
+               value="<%= @rule["name"] || @rule[:name] %>" placeholder="e.g. Daily Coffee Limit" required>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+          <label for="rule_type">Rule Type</label>
+          <select id="rule_type" name="spending_rule[rule_type]" class="form-control" required>
+            <option value="">Select type...</option>
+            <% %w[single_transaction merchant_total category_total daily_total weekly_total monthly_total].each do |t| %>
+              <option value="<%= t %>" <%= "selected" if (@rule["rule_type"] || @rule[:rule_type]) == t %>><%= t.humanize %></option>
+            <% end %>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="rule_period">Period</label>
+          <select id="rule_period" name="spending_rule[period]" class="form-control">
+            <option value="">Auto (based on type)</option>
+            <% %w[daily weekly monthly].each do |p| %>
+              <option value="<%= p %>" <%= "selected" if (@rule["period"] || @rule[:period]) == p %>><%= p.capitalize %></option>
+            <% end %>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="rule_threshold">Threshold ($)</label>
+        <input type="number" id="rule_threshold" name="spending_rule[threshold]" class="form-control"
+               step="0.01" min="0" value="<%= @rule["threshold"] || @rule[:threshold] %>" placeholder="50.00" required>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="form-group">
+          <label for="rule_merchant">Merchant Pattern <span class="text-muted">(optional)</span></label>
+          <input type="text" id="rule_merchant" name="spending_rule[merchant_pattern]" class="form-control"
+                 value="<%= @rule["merchant_pattern"] || @rule[:merchant_pattern] %>" placeholder="e.g. Starbucks">
+          <small class="text-muted">Matches merchants containing this text</small>
+        </div>
+
+        <div class="form-group">
+          <label for="rule_category">Category Name <span class="text-muted">(optional)</span></label>
+          <input type="text" id="rule_category" name="spending_rule[category_name]" class="form-control"
+                 value="<%= @rule["category_name"] || @rule[:category_name] %>" placeholder="e.g. Dining Out">
+          <small class="text-muted">Matches category name exactly</small>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+          <input type="hidden" name="spending_rule[active]" value="false">
+          <input type="checkbox" name="spending_rule[active]" value="true"
+                 <%= "checked" if @rule["active"] != false && @rule[:active] != false %>>
+          Active
+        </label>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Create Rule</button>
+        <%= link_to "Cancel", budget_spending_rules_path, class: "btn" %>
+      </div>
+    <% end %>
+  </div>
+</div>

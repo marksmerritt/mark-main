@@ -1,0 +1,446 @@
+<% content_for(:title) { "Position Sizing Optimizer" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px;">tune</span>
+    Position Sizing Optimizer
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Calculator", position_calculator_path, class: "btn" %>
+    <%= link_to "Risk of Ruin", reports_risk_of_ruin_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Account size parameter %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="padding: 1rem 1.25rem;">
+    <form method="get" style="display: flex; align-items: end; gap: 1rem; flex-wrap: wrap;">
+      <div class="form-group" style="margin: 0;">
+        <label style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem; display: block;">Account Size ($)</label>
+        <input type="number" name="account_size" value="<%= @account_size || 25000 %>" class="form-control" style="width: 160px;" step="1000" min="1000">
+      </div>
+      <button type="submit" class="btn btn-primary">Optimize</button>
+    </form>
+  </div>
+</div>
+
+<% if @total_trades.to_i < 10 %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); display: block; margin-bottom: 1rem;">tune</span>
+    <h3>Need More Data</h3>
+    <p class="text-muted">At least 10 closed trades are required to backtest position sizing strategies. You have <%= @total_trades %> trade<%= @total_trades == 1 ? '' : 's' %>.</p>
+  </div>
+<% else %>
+
+  <%# Trading stats strip %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0; border-bottom: 1px solid var(--border);">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @total_trades %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @win_rate %>%</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@avg_win) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@avg_loss) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Kelly %</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @kelly %>%</div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Expectancy</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= @expectancy >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@expectancy) %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Strategy comparison table %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">leaderboard</span>
+        Strategy Comparison
+      </h2>
+    </div>
+    <div style="overflow-x: auto;">
+      <table class="data-table" style="width: 100%; font-size: 0.875rem;">
+        <thead>
+          <tr>
+            <th style="text-align: left; padding: 0.75rem 1rem;">Rank</th>
+            <th style="text-align: left; padding: 0.75rem 0.5rem;">Strategy</th>
+            <th style="text-align: right; padding: 0.75rem 0.5rem;">Final Equity</th>
+            <th style="text-align: right; padding: 0.75rem 0.5rem;">Return</th>
+            <th style="text-align: right; padding: 0.75rem 0.5rem;">Max DD</th>
+            <th style="text-align: right; padding: 0.75rem 0.5rem;">Sharpe</th>
+            <th style="text-align: right; padding: 0.75rem 0.5rem;">Avg Risk</th>
+            <th style="text-align: center; padding: 0.75rem 1rem;">Grade</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @ranked.each_with_index do |(key, strat), idx| %>
+            <%
+              is_best = idx == 0
+              return_color = strat[:total_return] >= 0 ? "var(--positive)" : "var(--negative)"
+              dd_severity = strat[:max_drawdown] > 30 ? "var(--negative)" : strat[:max_drawdown] > 15 ? "#f9ab00" : "var(--positive)"
+              # Grade based on return/dd ratio
+              rd_ratio = strat[:max_drawdown] > 0 ? strat[:total_return] / strat[:max_drawdown] : strat[:total_return]
+              grade = if rd_ratio >= 3 then "A+"
+                      elsif rd_ratio >= 2 then "A"
+                      elsif rd_ratio >= 1.5 then "B+"
+                      elsif rd_ratio >= 1 then "B"
+                      elsif rd_ratio >= 0.5 then "C"
+                      elsif rd_ratio >= 0 then "D"
+                      else "F"
+                      end
+              grade_color = case grade[0]
+                            when "A" then "var(--positive)"
+                            when "B" then "#1a73e8"
+                            when "C" then "#f9ab00"
+                            else "var(--negative)"
+                            end
+            %>
+            <tr style="<%= is_best ? 'background: rgba(13,144,79,0.05);' : '' %>">
+              <td style="padding: 0.75rem 1rem;">
+                <% if is_best %>
+                  <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--positive); color: #fff; border-radius: 50%; font-size: 0.75rem; font-weight: 700;">1</span>
+                <% else %>
+                  <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--bg); border-radius: 50%; font-size: 0.75rem; color: var(--text-secondary);"><%= idx + 1 %></span>
+                <% end %>
+              </td>
+              <td style="padding: 0.75rem 0.5rem;">
+                <div style="font-weight: 600;"><%= strat[:name] %></div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= strat[:description] %></div>
+              </td>
+              <td style="padding: 0.75rem 0.5rem; text-align: right; font-weight: 700;"><%= number_to_currency(strat[:final_equity]) %></td>
+              <td style="padding: 0.75rem 0.5rem; text-align: right; font-weight: 700; color: <%= return_color %>;"><%= strat[:total_return] > 0 ? '+' : '' %><%= strat[:total_return] %>%</td>
+              <td style="padding: 0.75rem 0.5rem; text-align: right; color: <%= dd_severity %>;">-<%= strat[:max_drawdown] %>%</td>
+              <td style="padding: 0.75rem 0.5rem; text-align: right;"><%= strat[:sharpe] %></td>
+              <td style="padding: 0.75rem 0.5rem; text-align: right;"><%= number_to_currency(strat[:avg_risk]) %></td>
+              <td style="padding: 0.75rem 1rem; text-align: center;">
+                <span style="display: inline-block; padding: 0.125rem 0.5rem; border-radius: 3px; font-weight: 700; font-size: 0.75rem; background: <%= grade_color %>20; color: <%= grade_color %>;"><%= grade %></span>
+              </td>
+            </tr>
+          <% end %>
+          <%# Actual results row %>
+          <tr style="border-top: 2px solid var(--border);">
+            <td style="padding: 0.75rem 1rem; color: var(--text-secondary);">&mdash;</td>
+            <td style="padding: 0.75rem 0.5rem;">
+              <div style="font-weight: 600; color: var(--text-secondary);">Actual (No Sizing)</div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">Your real trade results</div>
+            </td>
+            <td style="padding: 0.75rem 0.5rem; text-align: right; font-weight: 700; color: var(--text-secondary);"><%= number_to_currency(@actual_curve.last[:equity]) %></td>
+            <td style="padding: 0.75rem 0.5rem; text-align: right; color: var(--text-secondary);"><%= @actual_return > 0 ? '+' : '' %><%= @actual_return %>%</td>
+            <td colspan="4" style="padding: 0.75rem 0.5rem; text-align: center; color: var(--text-secondary); font-size: 0.75rem;">baseline</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# Equity curves chart %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">show_chart</span>
+        Backtested Equity Curves
+      </h2>
+    </div>
+    <%
+      # Collect all curves for SVG rendering
+      all_curves = @ranked.map { |key, strat| { key: key, name: strat[:name], curve: strat[:curve] } }
+      all_curves << { key: "actual", name: "Actual", curve: @actual_curve }
+
+      all_equities = all_curves.flat_map { |c| c[:curve].map { |p| p[:equity] } }
+      chart_min = [all_equities.min.to_f * 0.95, 0].max
+      chart_max = all_equities.max.to_f * 1.05
+      chart_max = chart_min + 1 if chart_max <= chart_min
+      chart_range = chart_max - chart_min
+
+      svg_w = 900
+      svg_h = 350
+      pad_l = 70
+      pad_r = 20
+      pad_t = 20
+      pad_b = 40
+      plot_w = svg_w - pad_l - pad_r
+      plot_h = svg_h - pad_t - pad_b
+
+      max_trades = @total_trades
+
+      colors = ["#0d904f", "#1a73e8", "#9c27b0", "#f9ab00", "#e91e63", "#00bcd4"]
+    %>
+    <div style="padding: 1rem; overflow-x: auto;">
+      <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; max-width: 900px; height: auto;">
+        <%# Grid lines %>
+        <% 5.times do |i| %>
+          <% y = pad_t + plot_h * i / 4.0 %>
+          <% val = chart_max - chart_range * i / 4.0 %>
+          <line x1="<%= pad_l %>" y1="<%= y %>" x2="<%= svg_w - pad_r %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" />
+          <text x="<%= pad_l - 8 %>" y="<%= y + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="10">$<%= number_with_delimiter(val.round(0)) %></text>
+        <% end %>
+
+        <%# X-axis labels %>
+        <% [0, max_trades / 4, max_trades / 2, max_trades * 3 / 4, max_trades].each do |t| %>
+          <% x = pad_l + (t.to_f / [max_trades, 1].max * plot_w) %>
+          <text x="<%= x %>" y="<%= svg_h - 8 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="10">#<%= t %></text>
+        <% end %>
+
+        <%# Starting equity reference line %>
+        <% start_y = pad_t + (chart_max - @account_size) / chart_range * plot_h %>
+        <line x1="<%= pad_l %>" y1="<%= start_y %>" x2="<%= svg_w - pad_r %>" y2="<%= start_y %>" stroke="var(--text-secondary)" stroke-width="1" stroke-dasharray="4 4" />
+
+        <%# Draw each curve %>
+        <% all_curves.each_with_index do |c, ci| %>
+          <%
+            is_actual = c[:key] == "actual"
+            color = is_actual ? "var(--text-secondary)" : colors[ci % colors.length]
+            opacity = is_actual ? "0.5" : "1"
+            dash = is_actual ? "4 3" : "none"
+            points = c[:curve].map { |p|
+              x = pad_l + (p[:trade].to_f / [max_trades, 1].max * plot_w)
+              y = pad_t + (chart_max - p[:equity]) / chart_range * plot_h
+              "#{x.round(1)},#{y.round(1)}"
+            }.join(" ")
+          %>
+          <polyline points="<%= points %>" fill="none" stroke="<%= color %>" stroke-width="<%= is_actual ? 1.5 : 2 %>" stroke-dasharray="<%= dash %>" opacity="<%= opacity %>" />
+        <% end %>
+      </svg>
+
+      <%# Legend %>
+      <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem; justify-content: center;">
+        <% all_curves.each_with_index do |c, ci| %>
+          <%
+            is_actual = c[:key] == "actual"
+            color = is_actual ? "var(--text-secondary)" : colors[ci % colors.length]
+          %>
+          <div style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem;">
+            <span style="width: 16px; height: 3px; background: <%= color %>; border-radius: 2px; <%= is_actual ? 'opacity: 0.5;' : '' %>"></span>
+            <span style="color: var(--text-secondary);"><%= c[:name] %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Recommended strategy highlight %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 3px solid var(--positive);">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: var(--positive);">recommend</span>
+        Recommended Strategy
+      </h2>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+        <div style="width: 48px; height: 48px; background: rgba(13,144,79,0.1); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+          <span class="material-icons-outlined" style="color: var(--positive);">emoji_events</span>
+        </div>
+        <div>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= @best[:name] %></div>
+          <div style="font-size: 0.875rem; color: var(--text-secondary);"><%= @best[:description] %></div>
+        </div>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem;">
+        <div style="background: var(--bg); padding: 0.75rem; border-radius: var(--radius); text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Final Equity</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(@best[:final_equity]) %></div>
+        </div>
+        <div style="background: var(--bg); padding: 0.75rem; border-radius: var(--radius); text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Return</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: <%= @best[:total_return] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= @best[:total_return] > 0 ? '+' : '' %><%= @best[:total_return] %>%
+          </div>
+        </div>
+        <div style="background: var(--bg); padding: 0.75rem; border-radius: var(--radius); text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Max Drawdown</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: <%= @best[:max_drawdown] > 20 ? 'var(--negative)' : 'var(--text)' %>;">-<%= @best[:max_drawdown] %>%</div>
+        </div>
+        <div style="background: var(--bg); padding: 0.75rem; border-radius: var(--radius); text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Sharpe Ratio</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= @best[:sharpe] %></div>
+        </div>
+      </div>
+
+      <%# How much better than actual %>
+      <% improvement = @best[:total_return] - @actual_return %>
+      <% if improvement > 0 %>
+        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(13,144,79,0.05); border-radius: var(--radius); font-size: 0.875rem;">
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px; color: var(--positive);">trending_up</span>
+          Using <strong><%= @best[:name] %></strong> would have improved your returns by <strong style="color: var(--positive);">+<%= improvement.round(1) %> percentage points</strong> compared to your actual trading.
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Strategy details cards %>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <% @ranked.each_with_index do |(key, strat), idx| %>
+      <%
+        return_color = strat[:total_return] >= 0 ? "var(--positive)" : "var(--negative)"
+        is_best = idx == 0
+      %>
+      <div class="card" style="<%= is_best ? 'border: 1px solid var(--positive);' : '' %>">
+        <div style="padding: 1rem 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <div>
+              <% if is_best %>
+                <span style="font-size: 0.5625rem; padding: 0.0625rem 0.375rem; background: rgba(13,144,79,0.1); color: var(--positive); border-radius: 3px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Best</span>
+              <% end %>
+              <div style="font-size: 1rem; font-weight: 700; margin-top: 0.25rem;"><%= strat[:name] %></div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 1.25rem; font-weight: 700; color: <%= return_color %>;"><%= strat[:total_return] > 0 ? '+' : '' %><%= strat[:total_return] %>%</div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= number_to_currency(strat[:final_equity]) %></div>
+            </div>
+          </div>
+
+          <%# Mini metrics %>
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; font-size: 0.75rem;">
+            <div style="text-align: center; padding: 0.375rem; background: var(--bg); border-radius: 4px;">
+              <div style="color: var(--text-secondary);">Max DD</div>
+              <div style="font-weight: 600;">-<%= strat[:max_drawdown] %>%</div>
+            </div>
+            <div style="text-align: center; padding: 0.375rem; background: var(--bg); border-radius: 4px;">
+              <div style="color: var(--text-secondary);">Sharpe</div>
+              <div style="font-weight: 600;"><%= strat[:sharpe] %></div>
+            </div>
+            <div style="text-align: center; padding: 0.375rem; background: var(--bg); border-radius: 4px;">
+              <div style="color: var(--text-secondary);">Avg Risk</div>
+              <div style="font-weight: 600;"><%= number_to_currency(strat[:avg_risk]) %></div>
+            </div>
+          </div>
+
+          <%# Mini equity curve %>
+          <%
+            mini_curve = strat[:curve]
+            mini_vals = mini_curve.map { |p| p[:equity] }
+            mini_min = [mini_vals.min.to_f * 0.98, 0].max
+            mini_max = mini_vals.max.to_f * 1.02
+            mini_range = mini_max - mini_min
+            mini_range = 1 if mini_range == 0
+            mini_w = 240
+            mini_h = 60
+            mini_points = mini_curve.map { |p|
+              x = (p[:trade].to_f / [max_trades, 1].max * mini_w)
+              y = mini_h - ((p[:equity] - mini_min) / mini_range * mini_h)
+              "#{x.round(1)},#{y.round(1)}"
+            }.join(" ")
+            fill_points = "0,#{mini_h} " + mini_points + " #{mini_w},#{mini_h}"
+          %>
+          <svg viewBox="0 0 <%= mini_w %> <%= mini_h %>" style="width: 100%; height: 60px; margin-top: 0.75rem;">
+            <polygon points="<%= fill_points %>" fill="<%= return_color %>" opacity="0.08" />
+            <polyline points="<%= mini_points %>" fill="none" stroke="<%= return_color %>" stroke-width="1.5" />
+          </svg>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Insights %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">lightbulb</span>
+        Sizing Insights
+      </h2>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="display: grid; gap: 0.75rem;">
+        <%# Kelly insight %>
+        <% if @kelly > 0 %>
+          <div style="display: flex; gap: 0.75rem; padding: 0.75rem; background: var(--bg); border-radius: var(--radius);">
+            <span class="material-icons-outlined" style="color: #1a73e8; margin-top: 2px;">functions</span>
+            <div>
+              <div style="font-size: 0.875rem; font-weight: 600;">Kelly Criterion: <%= @kelly %>%</div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                Based on your <%= @win_rate %>% win rate and <%= @payoff_ratio %>:1 payoff ratio, the Kelly formula suggests risking
+                <%= @kelly %>% per trade. Use half-Kelly (<%= @half_kelly %>%) for a safer approach.
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <%# Drawdown warning %>
+        <% worst_dd = @ranked.values.map { |s| s[:max_drawdown] }.max %>
+        <% if worst_dd > 25 %>
+          <div style="display: flex; gap: 0.75rem; padding: 0.75rem; background: rgba(234,67,53,0.05); border-radius: var(--radius);">
+            <span class="material-icons-outlined" style="color: var(--negative); margin-top: 2px;">warning</span>
+            <div>
+              <div style="font-size: 0.875rem; font-weight: 600;">Drawdown Warning</div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                Some strategies show max drawdowns exceeding 25%. Consider prioritizing strategies with lower drawdowns
+                over raw returns to preserve capital during losing streaks.
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <%# Volatility insight %>
+        <% vol_strat = @strategies["volatility_scaled"] %>
+        <% fixed_strat = @strategies["fixed_1pct"] %>
+        <% if vol_strat && fixed_strat && vol_strat[:max_drawdown] < fixed_strat[:max_drawdown] %>
+          <div style="display: flex; gap: 0.75rem; padding: 0.75rem; background: var(--bg); border-radius: var(--radius);">
+            <span class="material-icons-outlined" style="color: #9c27b0; margin-top: 2px;">speed</span>
+            <div>
+              <div style="font-size: 0.875rem; font-weight: 600;">Volatility Scaling Helps</div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                The volatility-scaled strategy reduced max drawdown from <%= fixed_strat[:max_drawdown] %>% to
+                <%= vol_strat[:max_drawdown] %>% compared to fixed 1%. Your P&L volatility varies enough
+                that adaptive sizing adds value.
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <%# Anti-martingale insight %>
+        <% am_strat = @strategies["anti_martingale"] %>
+        <% if am_strat && fixed_strat %>
+          <% am_better = am_strat[:total_return] > fixed_strat[:total_return] %>
+          <div style="display: flex; gap: 0.75rem; padding: 0.75rem; background: var(--bg); border-radius: var(--radius);">
+            <span class="material-icons-outlined" style="color: #f9ab00; margin-top: 2px;"><%= am_better ? 'trending_up' : 'trending_down' %></span>
+            <div>
+              <div style="font-size: 0.875rem; font-weight: 600;">Streak Sensitivity</div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+                <% if am_better %>
+                  Your wins tend to cluster. Anti-Martingale (pressing winners) returned
+                  <%= am_strat[:total_return] %>% vs Fixed 1%'s <%= fixed_strat[:total_return] %>%.
+                  Consider increasing size after wins.
+                <% else %>
+                  Your wins are evenly distributed. Anti-Martingale sizing didn't outperform fixed sizing,
+                  suggesting you should stick with consistent position sizes.
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+
+        <%# General sizing recommendation %>
+        <div style="display: flex; gap: 0.75rem; padding: 0.75rem; background: rgba(13,144,79,0.05); border-radius: var(--radius);">
+          <span class="material-icons-outlined" style="color: var(--positive); margin-top: 2px;">check_circle</span>
+          <div>
+            <div style="font-size: 0.875rem; font-weight: 600;">Bottom Line</div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+              <% if @expectancy > 0 %>
+                Your positive expectancy ($<%= @expectancy %>/trade) means position sizing matters.
+                The <strong><%= @best[:name] %></strong> strategy maximized returns while keeping drawdowns manageable.
+                Risk no more than <strong><%= [@half_kelly, 3.0].min.round(1) %>%</strong> per trade.
+              <% else %>
+                Your expectancy is negative ($<%= @expectancy %>/trade). Focus on improving your edge
+                (win rate or payoff ratio) before optimizing position sizing. Use conservative 0.5-1% risk until your edge improves.
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<% end %>

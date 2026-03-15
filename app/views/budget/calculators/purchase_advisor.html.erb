@@ -1,0 +1,317 @@
+<% content_for(:title) { "Purchase Advisor" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #1976d2;">shopping_cart</span>
+    Purchase Decision Advisor
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Dashboard", budget_dashboard_path, class: "btn btn-sm" %>
+    <%= link_to "Income Allocator", budget_income_allocator_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<%# Amount Input %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+  <%= form_tag budget_purchase_advisor_path, method: :get, style: "display: flex; gap: 1rem; align-items: end; flex-wrap: wrap;" do %>
+    <div style="flex: 1; min-width: 200px;">
+      <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Purchase Amount ($)</label>
+      <input type="number" name="amount" value="<%= @amount.round(2) %>" step="0.01" min="0.01" class="form-control" style="font-size: 1.125rem; font-weight: 600;">
+    </div>
+    <div>
+      <button type="submit" class="btn btn-primary" style="height: 2.5rem;">
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">calculate</span>
+        Analyze Purchase
+      </button>
+    </div>
+  <% end %>
+</div>
+
+<%# Verdict Card %>
+<div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid <%= @affordability[:color] %>;">
+  <div style="padding: 1.5rem;">
+    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+      <span class="material-icons-outlined" style="font-size: 2.5rem; color: <%= @affordability[:color] %>;"><%= @affordability[:icon] %></span>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Can I Afford This?</div>
+        <div style="font-size: 1.75rem; font-weight: 700; color: <%= @affordability[:color] %>; text-transform: uppercase;"><%= @affordability[:verdict] %></div>
+      </div>
+    </div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary); line-height: 1.5;"><%= @affordability[:message] %></div>
+  </div>
+</div>
+
+<%# Stats Strip %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <div class="card" style="padding: 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Surplus</div>
+    <div style="font-size: 1.5rem; font-weight: 700; color: <%= @avg_monthly_surplus >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@avg_monthly_surplus) %></div>
+  </div>
+  <div class="card" style="padding: 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Months of Surplus</div>
+    <div style="font-size: 1.5rem; font-weight: 700;"><%= @months_of_surplus ? @months_of_surplus : "N/A" %></div>
+    <div style="font-size: 0.6875rem; color: var(--text-secondary);">to cover this purchase</div>
+  </div>
+  <div class="card" style="padding: 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Work Hours</div>
+    <div style="font-size: 1.5rem; font-weight: 700; color: #1976d2;"><%= @work_hours %> hrs</div>
+    <div style="font-size: 0.6875rem; color: var(--text-secondary);">at <%= number_to_currency(@estimated_hourly) %>/hr</div>
+  </div>
+  <div class="card" style="padding: 1rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Opportunity Cost (5yr)</div>
+    <% five_yr = @opportunity_cost.find { |o| o[:years] == 5 } %>
+    <div style="font-size: 1.5rem; font-weight: 700; color: #e65100;"><%= number_to_currency(five_yr[:future_value]) %></div>
+    <div style="font-size: 0.6875rem; color: var(--text-secondary);">if invested at 7%</div>
+  </div>
+</div>
+
+<%# Cost-Per-Use Table %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">repeat</span> Cost Per Use Analysis</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">How the cost breaks down depending on how often you use the item (over 1 year):</p>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+      <thead>
+        <tr style="border-bottom: 2px solid var(--border);">
+          <th style="text-align: left; padding: 0.5rem;">Usage Frequency</th>
+          <th style="text-align: right; padding: 0.5rem;">Uses/Year</th>
+          <th style="text-align: right; padding: 0.5rem;">Cost Per Use</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @cost_per_use.each do |row| %>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.5rem;"><%= row[:frequency] %></td>
+            <td style="text-align: right; padding: 0.5rem;"><%= row[:uses_per_year] %></td>
+            <td style="text-align: right; padding: 0.5rem; font-weight: 600;">
+              <% color = row[:cost] < 1.0 ? "var(--positive)" : (row[:cost] < 5.0 ? "#f9a825" : "var(--negative)") %>
+              <span style="color: <%= color %>;"><%= number_to_currency(row[:cost]) %></span>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%# Opportunity Cost SVG Chart %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">trending_up</span> Opportunity Cost Over Time</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+      What <%= number_to_currency(@amount) %> could grow to if invested at 7% annual return:
+    </p>
+    <% max_val = @opportunity_cost.last[:future_value] %>
+    <% chart_width = 100 %>
+    <% chart_height = 200 %>
+    <% bar_count = @opportunity_cost.size %>
+    <% bar_width = (chart_width.to_f / bar_count * 0.6).round(1) %>
+    <% gap = (chart_width.to_f / bar_count).round(1) %>
+    <svg viewBox="0 0 <%= chart_width %> <%= chart_height + 30 %>" style="width: 100%; max-width: 600px; display: block; margin: 0 auto;">
+      <%# Baseline (original amount) %>
+      <% baseline_y = chart_height - (@amount / max_val * chart_height * 0.85).round(1) %>
+      <line x1="0" y1="<%= baseline_y %>" x2="<%= chart_width %>" y2="<%= baseline_y %>" stroke="var(--border)" stroke-dasharray="3,3" stroke-width="0.5"/>
+      <text x="2" y="<%= baseline_y - 2 %>" fill="var(--text-secondary)" font-size="3.5"><%= number_to_currency(@amount, precision: 0) %></text>
+      <% @opportunity_cost.each_with_index do |oc, i| %>
+        <% bar_height = (oc[:future_value] / max_val * chart_height * 0.85).round(1) %>
+        <% x = (i * gap + gap * 0.2).round(1) %>
+        <% y = chart_height - bar_height %>
+        <%# Growth portion %>
+        <rect x="<%= x %>" y="<%= y %>" width="<%= bar_width %>" height="<%= bar_height %>" rx="2" fill="#1976d2" opacity="0.7"/>
+        <%# Original amount portion %>
+        <% orig_height = (@amount / max_val * chart_height * 0.85).round(1) %>
+        <rect x="<%= x %>" y="<%= chart_height - orig_height %>" width="<%= bar_width %>" height="<%= orig_height %>" rx="2" fill="#1976d2" opacity="0.3"/>
+        <%# Value label %>
+        <text x="<%= x + bar_width / 2 %>" y="<%= y - 3 %>" text-anchor="middle" fill="var(--text)" font-size="3.5" font-weight="600"><%= number_to_currency(oc[:future_value], precision: 0) %></text>
+        <%# Year label %>
+        <text x="<%= x + bar_width / 2 %>" y="<%= chart_height + 10 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="3.5"><%= oc[:years] %>yr</text>
+        <%# Growth annotation %>
+        <text x="<%= x + bar_width / 2 %>" y="<%= chart_height + 18 %>" text-anchor="middle" fill="var(--positive)" font-size="2.8">+<%= number_to_currency(oc[:growth], precision: 0) %></text>
+      <% end %>
+    </svg>
+  </div>
+</div>
+
+<%# Work Hours Equivalent %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">schedule</span> Work Hours Equivalent</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: flex; align-items: center; gap: 1.5rem; margin-bottom: 1rem;">
+      <div>
+        <div style="font-size: 2.5rem; font-weight: 700; color: #1976d2;"><%= @work_hours %></div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">hours of work</div>
+      </div>
+      <div style="font-size: 1.25rem; color: var(--text-secondary);">=</div>
+      <div>
+        <div style="font-size: 2.5rem; font-weight: 700;"><%= @work_days %></div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">work days</div>
+      </div>
+    </div>
+    <%# Visual time bar %>
+    <div style="margin-top: 1rem;">
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Time at work to pay for this purchase:</div>
+      <div style="background: var(--bg); border-radius: 8px; height: 2rem; overflow: hidden; position: relative;">
+        <% bar_pct = [(@work_hours / 40.0 * 100), 100].min.round(1) %>
+        <div style="height: 100%; width: <%= bar_pct %>%; background: linear-gradient(90deg, #1976d2, #42a5f5); border-radius: 8px; display: flex; align-items: center; justify-content: center; min-width: 3rem;">
+          <span style="font-size: 0.6875rem; font-weight: 600; color: white;"><%= @work_hours %>h</span>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
+        <span>0h</span>
+        <span>1 work week (40h)</span>
+      </div>
+    </div>
+    <div style="margin-top: 0.75rem; font-size: 0.8125rem; color: var(--text-secondary);">
+      Based on estimated hourly income of <strong><%= number_to_currency(@estimated_hourly) %>/hr</strong> (monthly income / 160 hours)
+    </div>
+  </div>
+</div>
+
+<%# Durability Analysis %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">build</span> Durability Analysis</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">Cost per day based on how long the item lasts:</p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem;">
+      <% @durability.each do |d| %>
+        <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;"><%= d[:lifespan] %></div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: #1976d2;"><%= number_to_currency(d[:cost_per_day]) %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">per day</div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Budget Impact %>
+<% if @budget_impacts.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">account_balance_wallet</span> Budget Impact</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">Which budget categories would be affected by this <%= number_to_currency(@amount) %> purchase:</p>
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.5rem;">Category</th>
+            <th style="text-align: right; padding: 0.5rem;">Budgeted</th>
+            <th style="text-align: right; padding: 0.5rem;">Spent</th>
+            <th style="text-align: right; padding: 0.5rem;">Remaining</th>
+            <th style="text-align: center; padding: 0.5rem;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @budget_impacts.each do |bi| %>
+            <tr style="border-bottom: 1px solid var(--border); <%= bi[:would_exceed] ? 'background: rgba(244,67,54,0.05);' : '' %>">
+              <td style="padding: 0.5rem; font-weight: 500;"><%= bi[:category] %></td>
+              <td style="text-align: right; padding: 0.5rem;"><%= number_to_currency(bi[:budgeted]) %></td>
+              <td style="text-align: right; padding: 0.5rem;"><%= number_to_currency(bi[:spent]) %></td>
+              <td style="text-align: right; padding: 0.5rem; font-weight: 600; color: <%= bi[:remaining] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(bi[:remaining]) %></td>
+              <td style="text-align: center; padding: 0.5rem;">
+                <% if bi[:would_exceed] %>
+                  <span class="material-icons-outlined" style="font-size: 1rem; color: var(--negative);" title="Would exceed budget">warning</span>
+                <% elsif bi[:remaining] >= @amount %>
+                  <span class="material-icons-outlined" style="font-size: 1rem; color: var(--positive);" title="Within budget">check_circle</span>
+                <% else %>
+                  <span class="material-icons-outlined" style="font-size: 1rem; color: #f9a825;" title="Tight fit">info</span>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# 30-Day Rule Reminder %>
+<% if @show_thirty_day_rule %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid #f9a825;">
+    <div style="padding: 1.25rem;">
+      <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+        <span class="material-icons-outlined" style="font-size: 2rem; color: #f9a825;">hourglass_top</span>
+        <div>
+          <h3 style="font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem;">30-Day Rule</h3>
+          <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+            This purchase is over <%= number_to_currency(@thirty_day_threshold) %>. The 30-day rule suggests waiting 30 days before making non-essential purchases. If you still want it after 30 days, it's more likely a considered decision rather than an impulse buy.
+          </p>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <div style="padding: 0.5rem 1rem; background: var(--bg); border-radius: 6px; font-size: 0.8125rem;">
+              <span style="color: var(--text-secondary);">Decision date:</span>
+              <strong><%= (Date.current + 30.days).strftime("%B %d, %Y") %></strong>
+            </div>
+            <div style="padding: 0.5rem 1rem; background: var(--bg); border-radius: 6px; font-size: 0.8125rem;">
+              <span style="color: var(--text-secondary);">If you save that daily:</span>
+              <strong><%= number_to_currency(@amount / 30.0) %>/day</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Past Purchase Context %>
+<% if @largest_purchases.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">history</span> Your Largest Recent Purchases</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">For comparison, here are your biggest recent purchases by category:</p>
+      <div style="display: grid; gap: 0.5rem;">
+        <% @largest_purchases.each do |lp| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; background: var(--bg); border-radius: 6px;">
+            <div style="flex: 1;">
+              <div style="font-size: 0.8125rem; font-weight: 600;"><%= lp[:description] %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= lp[:category] %> &middot; <%= lp[:date] %></div>
+            </div>
+            <div style="font-size: 0.875rem; font-weight: 700;">
+              <% if lp[:amount] > @amount %>
+                <span style="color: var(--negative);"><%= number_to_currency(lp[:amount]) %></span>
+              <% elsif lp[:amount] > @amount * 0.5 %>
+                <span style="color: #f9a825;"><%= number_to_currency(lp[:amount]) %></span>
+              <% else %>
+                <span style="color: var(--positive);"><%= number_to_currency(lp[:amount]) %></span>
+              <% end %>
+            </div>
+            <%# Comparison bar %>
+            <div style="width: 4rem;">
+              <% ratio = @amount > 0 ? [(lp[:amount] / @amount * 100), 100].min.round(0) : 0 %>
+              <div style="height: 0.375rem; background: var(--border); border-radius: 2px; overflow: hidden;">
+                <div style="height: 100%; width: <%= ratio %>%; background: #1976d2; border-radius: 2px;"></div>
+              </div>
+              <div style="font-size: 0.5625rem; color: var(--text-secondary); text-align: center;"><%= ratio %>%</div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Navigation %>
+<div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+  <%= link_to budget_dashboard_path, class: "card", style: "flex: 1; min-width: 160px; padding: 1rem; text-align: center; text-decoration: none; color: inherit;" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #f9a825; display: block; margin-bottom: 0.25rem;">dashboard</span>
+    <span style="font-size: 0.8125rem; font-weight: 600;">Dashboard</span>
+  <% end %>
+  <%= link_to budget_income_allocator_path, class: "card", style: "flex: 1; min-width: 160px; padding: 1rem; text-align: center; text-decoration: none; color: inherit;" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--positive); display: block; margin-bottom: 0.25rem;">pie_chart</span>
+    <span style="font-size: 0.8125rem; font-weight: 600;">Income Allocator</span>
+  <% end %>
+  <%= link_to budget_savings_challenges_path, class: "card", style: "flex: 1; min-width: 160px; padding: 1rem; text-align: center; text-decoration: none; color: inherit;" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #1976d2; display: block; margin-bottom: 0.25rem;">emoji_events</span>
+    <span style="font-size: 0.8125rem; font-weight: 600;">Savings Challenges</span>
+  <% end %>
+</div>

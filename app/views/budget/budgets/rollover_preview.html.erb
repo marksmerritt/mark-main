@@ -1,0 +1,91 @@
+<div class="page-header">
+  <h1>Rollover Preview</h1>
+  <div class="page-actions">
+    <%= link_to "Back", budget_budget_path(@budget["id"]), class: "btn" %>
+  </div>
+</div>
+
+<p class="text-muted" style="margin-bottom: 1.5rem;">
+  Review how unspent and overspent amounts from <strong><%= @budget["display_name"] %></strong> will adjust the next month's budget.
+  Surplus amounts increase the next month's planned amount. Overspent amounts decrease it (floored at $0).
+</p>
+
+<% if @preview.any? %>
+  <% surplus = @preview.select { |p| p["type"] == "surplus" } %>
+  <% overspent = @preview.select { |p| p["type"] == "overspent" } %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Items to Roll Over</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @preview.size %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Surplus</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= number_to_currency(surplus.sum { |s| s["rollover_amount"].to_f }) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Overspent</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(overspent.sum { |s| s["rollover_amount"].to_f.abs }) %></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Category</th>
+          <th>Item</th>
+          <th style="text-align: right;">Planned</th>
+          <th style="text-align: right;">Spent</th>
+          <th style="text-align: right;">Rollover</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @preview.each do |item| %>
+          <tr>
+            <td><%= item["category"] %></td>
+            <td><%= item["item"] %></td>
+            <td style="text-align: right;"><%= number_to_currency(item["planned"]) %></td>
+            <td style="text-align: right;"><%= number_to_currency(item["spent"]) %></td>
+            <td style="text-align: right;" class="<%= item["rollover_amount"].to_f >= 0 ? 'positive' : 'negative' %>">
+              <%= item["rollover_amount"].to_f >= 0 ? "+" : "" %><%= number_to_currency(item["rollover_amount"]) %>
+            </td>
+            <td>
+              <span class="badge badge-<%= item["type"] == "surplus" ? "success" : "warning" %>">
+                <%= item["type"]&.capitalize %>
+              </span>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h2>Apply Rollover</h2></div>
+    <%= form_with url: rollover_budget_budget_path(@budget["id"]), method: :post, class: "form-container" do |f| %>
+      <div class="form-group">
+        <%= f.label :target_month, "Target Month" %>
+        <% next_month = Date.current.next_month %>
+        <%= f.select :target_month, (1..12).map { |m| [Date::MONTHNAMES[m], m] },
+            { selected: next_month.month }, class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :target_year, "Year" %>
+        <%= f.number_field :target_year, value: next_month.year, class: "form-control" %>
+      </div>
+      <p class="text-muted" style="font-size: 0.85rem;">
+        The target month's budget must already exist. Rollover will adjust matching item planned amounts.
+      </p>
+      <div class="form-actions">
+        <%= f.submit "Apply Rollover", class: "btn btn-primary" %>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No items to roll over. All budget items are fully spent (within $0.01).</p>
+  </div>
+<% end %>

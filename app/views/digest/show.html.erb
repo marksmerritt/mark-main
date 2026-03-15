@@ -1,0 +1,312 @@
+<div class="page-header">
+  <h1>Weekly Digest</h1>
+  <div class="page-actions">
+    <button class="btn" onclick="window.print()">
+      <span class="material-icons-outlined">print</span> Print
+    </button>
+  </div>
+</div>
+
+<div class="week-nav">
+  <% if @week_offset < 52 %>
+    <%= link_to digest_path(week: @week_offset + 1), class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">chevron_left</span> Previous
+    <% end %>
+  <% end %>
+  <h2 class="week-nav-title">
+    <%= @week_start.strftime("%b %d") %> &ndash; <%= @week_end.strftime("%b %d, %Y") %>
+  </h2>
+  <% if @week_offset > 0 %>
+    <%= link_to digest_path(week: @week_offset - 1), class: "btn btn-sm" do %>
+      Next <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">chevron_right</span>
+    <% end %>
+  <% else %>
+    <span class="btn btn-sm" style="opacity: 0.3; pointer-events: none;">Next</span>
+  <% end %>
+</div>
+
+<% if @highlights.any? %>
+  <div class="insights-banner">
+    <% @highlights.each do |h| %>
+      <div class="insight-item insight-<%= h[:type] %>">
+        <span class="material-icons-outlined"><%= h[:icon] %></span>
+        <span><%= h[:text] %></span>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# Cross-System Weekly Scorecard %>
+<%
+  sections = []
+  if @weekly_stats.present? && !@weekly_stats["error"]
+    trade_score = 0
+    trade_score += 25 if @weekly_stats["total_pnl"].to_f > 0
+    trade_score += 25 if @weekly_stats["win_rate"].to_f >= 50
+    trade_score += 25 if @week_trades.count >= 3
+    trade_score += 25 if @journal_entries.count >= @week_trades.select { |t| t["entry_time"] }.map { |t| t["entry_time"].to_s.slice(0,10) }.uniq.count
+    sections << { name: "Trading", score: trade_score, icon: "show_chart", detail: "#{@week_trades.count} trades, #{number_to_currency(@weekly_stats["total_pnl"])}" }
+  end
+  if @journal_entries.any?
+    trading_days = @week_trades.select { |t| t["entry_time"] }.map { |t| t["entry_time"].to_s.slice(0,10) }.uniq.count
+    journal_score = trading_days > 0 ? [(@journal_entries.count.to_f / trading_days * 100).round(0), 100].min : (@journal_entries.count > 0 ? 50 : 0)
+    sections << { name: "Journal", score: journal_score, icon: "auto_stories", detail: "#{@journal_entries.count} entries" }
+  end
+  if @week_notes.any?
+    note_score = [(@week_notes.count * 20), 100].min
+    sections << { name: "Notes", score: note_score, icon: "description", detail: "#{@week_notes.count} notes" }
+  end
+  if @budget_overview.is_a?(Hash) && !@budget_overview["error"]
+    budget_score = @budget_overview["savings_rate"].to_f.clamp(0, 100).round(0)
+    sections << { name: "Budget", score: budget_score, icon: "account_balance", detail: "#{@budget_overview["savings_rate"]}% savings rate" }
+  end
+%>
+<% if sections.count >= 2 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Weekly Scorecard</h2></div>
+    <div style="padding: 1rem 1.25rem; display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center;">
+      <% sections.each do |s| %>
+        <%
+          score_color = s[:score] >= 75 ? "var(--positive)" : s[:score] >= 50 ? "var(--primary)" : s[:score] >= 25 ? "#f9ab00" : "var(--negative)"
+        %>
+        <div style="text-align: center; min-width: 100px;">
+          <div style="position: relative; width: 64px; height: 64px; margin: 0 auto 0.5rem;">
+            <svg viewBox="0 0 36 36" style="transform: rotate(-90deg); width: 100%; height: 100%;">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" stroke-width="3" />
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="<%= score_color %>"
+                      stroke-width="3" stroke-dasharray="<%= s[:score] %> 100" stroke-linecap="round" />
+            </svg>
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+              <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= score_color %>;"><%= s[:icon] %></span>
+            </div>
+          </div>
+          <div style="font-size: 0.875rem; font-weight: 700;"><%= s[:name] %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= s[:detail] %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# ========== TRADING SECTION ========== %>
+<% if @weekly_stats.present? && !@weekly_stats["error"] %>
+  <h2 style="margin-top: 1.5rem;">
+    <span class="material-icons-outlined" style="vertical-align: -4px; margin-right: 0.25rem;">show_chart</span>
+    Trading
+  </h2>
+
+  <div class="card">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Week P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(@weekly_stats["total_pnl"]) %>"><%= number_to_currency(@weekly_stats["total_pnl"]) %></div>
+        <% if @prev_weekly["total_pnl"] %>
+          <% delta = @weekly_stats["total_pnl"].to_f - @prev_weekly["total_pnl"].to_f %>
+          <div style="font-size: 0.6875rem;" class="<%= pnl_class(delta) %>"><%= delta >= 0 ? "+" : "" %><%= number_to_currency(delta) %> vs prev</div>
+        <% end %>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @weekly_stats["total_trades"] || @week_trades.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= (@weekly_stats["win_rate"] || 0).to_f >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @weekly_stats["win_rate"] || 0 %>%</div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profit Factor</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @weekly_stats["profit_factor"] || "—" %></div>
+      </div>
+    </div>
+  </div>
+
+  <% daily_pnl = @weekly_stats["daily_pnl"] || {} %>
+  <% if daily_pnl.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Daily Breakdown</h2>
+      </div>
+      <div class="chart-container"
+           data-controller="chart"
+           data-chart-type-value="bar"
+           data-chart-points-value="<%= daily_pnl.map { |date, pnl| { x: date, y: pnl } }.to_json %>">
+      </div>
+    </div>
+  <% end %>
+
+  <% if @week_trades.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Trades</h2>
+        <span class="text-muted"><%= @week_trades.count %> closed</span>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Symbol</th>
+            <th>Side</th>
+            <th>P&L</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @week_trades.first(20).each do |trade| %>
+            <tr>
+              <td><%= link_to(Date.parse(trade["entry_time"]).strftime("%a %b %d"), trade_path(trade["id"])) rescue "—" %></td>
+              <td><strong><%= trade["symbol"] %></strong></td>
+              <td><%= trade["side"]&.capitalize %></td>
+              <td><%= pnl_display(trade["pnl"]) %></td>
+              <td><%= badge_for(trade["status"]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+<% elsif api_token.blank? %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="setup-notice">
+      <%= icon("link_off") %>
+      <p>Trading Journal not connected.</p>
+    </div>
+  </div>
+<% end %>
+
+<%# ========== JOURNAL SECTION ========== %>
+<% if @journal_entries.any? %>
+  <h2 style="margin-top: 2rem;">
+    <span class="material-icons-outlined" style="vertical-align: -4px; margin-right: 0.25rem;">auto_stories</span>
+    Journal (<%= @journal_entries.count %>)
+  </h2>
+
+  <div class="entries-list">
+    <% @journal_entries.each do |entry| %>
+      <div class="card entry-card">
+        <div class="entry-card-header">
+          <span class="entry-date">
+            <%= link_to entry["date"], journal_entry_path(entry["id"]) %>
+          </span>
+          <% if entry["mood"].present? %>
+            <%= mood_badge(entry["mood"]) %>
+          <% end %>
+        </div>
+        <% if entry["content"].present? %>
+          <p class="text-muted"><%= truncate(entry["content"], length: 200) %></p>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# ========== NOTES SECTION ========== %>
+<% if @week_notes.any? %>
+  <h2 style="margin-top: 2rem;">
+    <span class="material-icons-outlined" style="vertical-align: -4px; margin-right: 0.25rem;">description</span>
+    Notes (<%= @week_notes.count %>)
+  </h2>
+
+  <div class="entries-list">
+    <% @week_notes.each do |note| %>
+      <div class="card entry-card" <% if note["color"].present? %>style="border-left: 4px solid <%= note["color"] %>"<% end %>>
+        <div class="entry-card-header">
+          <span class="entry-date">
+            <%= link_to note["title"].presence || "Untitled", note_path(note["id"]) %>
+          </span>
+        </div>
+        <% if note.dig("notebook", "name").present? %>
+          <span class="text-muted" style="font-size: 0.8125rem;"><%= note.dig("notebook", "name") %></span>
+        <% end %>
+        <% if note["content_preview"].present? || note["content"].present? %>
+          <p class="text-muted"><%= truncate(note["content_preview"] || note["content"], length: 120) %></p>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# ========== BUDGET SECTION ========== %>
+<% if @budget_overview.is_a?(Hash) && !@budget_overview["error"] %>
+  <h2 style="margin-top: 2rem;">
+    <span class="material-icons-outlined" style="vertical-align: -4px; margin-right: 0.25rem;">account_balance</span>
+    Budget
+  </h2>
+
+  <% income = @budget_overview["actual_income"].to_f %>
+  <% expenses = @budget_overview["total_spent"].to_f %>
+  <% savings = income - expenses %>
+
+  <div class="card">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Month Income</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(income) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Expenses</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(expenses) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= savings >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(savings) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @budget_overview["savings_rate"] || 0 %>%</div>
+      </div>
+    </div>
+  </div>
+
+  <% if @week_transactions.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>This Week's Transactions</h2>
+        <span class="text-muted"><%= @week_transactions.count %> transactions</span>
+      </div>
+      <%
+        week_spent = @week_transactions.select { |t| t["transaction_type"] != "income" }.sum { |t| t["amount"].to_f }
+        week_income = @week_transactions.select { |t| t["transaction_type"] == "income" }.sum { |t| t["amount"].to_f }
+      %>
+      <div style="display: flex; gap: 2rem; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); font-size: 0.875rem;">
+        <span>Spent: <strong class="negative"><%= number_to_currency(week_spent) %></strong></span>
+        <% if week_income > 0 %>
+          <span>Income: <strong class="positive"><%= number_to_currency(week_income) %></strong></span>
+        <% end %>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Merchant</th>
+            <th style="text-align: right;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @week_transactions.first(15).each do |txn| %>
+            <tr>
+              <td><%= Date.parse(txn["transaction_date"]).strftime("%a %b %d") rescue txn["transaction_date"] %></td>
+              <td><%= link_to txn["description"].presence || "—", edit_budget_transaction_path(txn["id"]) %></td>
+              <td class="text-muted"><%= txn["merchant"] %></td>
+              <td style="text-align: right;" class="<%= txn["transaction_type"] == "income" ? "positive" : "" %>">
+                <%= txn["transaction_type"] == "income" ? "+" : "-" %><%= number_to_currency(txn["amount"]) %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+      <% if @week_transactions.count > 15 %>
+        <div style="padding: 0.5rem 1.25rem; text-align: center;">
+          <%= link_to "View all #{@week_transactions.count} transactions", budget_transactions_path(start_date: @week_start, end_date: @week_end), class: "text-muted" %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+<% end %>
+
+<%# ========== EMPTY STATE ========== %>
+<% if @week_trades.empty? && @journal_entries.empty? && @week_notes.empty? && @week_transactions.empty? %>
+  <div class="card empty-state" style="margin-top: 2rem;">
+    <p>No activity recorded for this week.</p>
+  </div>
+<% end %>

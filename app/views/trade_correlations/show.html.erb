@@ -1,0 +1,438 @@
+<% content_for(:title) { "Trade Correlations" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #7b1fa2;">bubble_chart</span>
+    Trading Correlation Matrix
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Reports", reports_index_path, class: "btn" %>
+    <%= link_to "Symbol Comparison", symbol_comparison_path, class: "btn" %>
+  </div>
+</div>
+
+<% if @symbols.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); display: block; margin-bottom: 1rem;">bubble_chart</span>
+    <h3>Not Enough Data</h3>
+    <p class="text-muted" style="margin: 0.5rem 0 1rem;">Need at least 2 symbols with 5+ closed trades each to compute correlations.</p>
+    <%= link_to "View Trades", trades_path, class: "btn btn-primary" %>
+  </div>
+<% else %>
+
+  <%# ===== Stats Strip ===== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Symbols Analyzed</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @symbol_count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Correlated Pairs</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= @correlated_pairs.any? ? '#f9ab00' : 'var(--positive)' %>;"><%= @correlated_pairs.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Hedge Pairs</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= @hedge_pairs.any? ? '#1a73e8' : 'var(--text)' %>;"><%= @hedge_pairs.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Diversification Score</div>
+        <%
+          div_color = if @diversification_score >= 70
+            "var(--positive)"
+          elsif @diversification_score >= 40
+            "#f9ab00"
+          else
+            "var(--negative)"
+          end
+        %>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= div_color %>;"><%= @diversification_score %>/100</div>
+      </div>
+    </div>
+  </div>
+
+  <%# ===== Correlation Heatmap ===== %>
+  <% if @symbols.count >= 2 %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #7b1fa2;">grid_on</span>
+          Correlation Heatmap
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">Pearson correlation of daily P&L</span>
+      </div>
+      <div style="padding: 1.25rem; overflow-x: auto;">
+        <%
+          cell_size = 56
+          label_offset = 80
+          n = @symbols.count
+          svg_w = label_offset + n * cell_size + 10
+          svg_h = label_offset + n * cell_size + 10
+        %>
+        <svg width="<%= svg_w %>" height="<%= svg_h %>" viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="font-family: Inter, sans-serif; display: block; margin: 0 auto; max-width: 100%;">
+          <%# Column labels %>
+          <% @symbols.each_with_index do |sym, i| %>
+            <text x="<%= label_offset + i * cell_size + cell_size / 2 %>" y="<%= label_offset - 8 %>"
+                  text-anchor="middle" font-size="11" font-weight="600" fill="var(--text, #333)">
+              <%= sym.length > 6 ? sym[0..5] : sym %>
+            </text>
+          <% end %>
+
+          <%# Row labels and cells %>
+          <% @symbols.each_with_index do |row_sym, ri| %>
+            <text x="<%= label_offset - 8 %>" y="<%= label_offset + ri * cell_size + cell_size / 2 + 4 %>"
+                  text-anchor="end" font-size="11" font-weight="600" fill="var(--text, #333)">
+              <%= row_sym.length > 6 ? row_sym[0..5] : row_sym %>
+            </text>
+
+            <% @symbols.each_with_index do |col_sym, ci| %>
+              <%
+                corr = @correlation_matrix[row_sym][col_sym]
+                corr_val = corr || 0
+
+                # Color: green for positive, red for negative, intensity by magnitude
+                if corr_val >= 0
+                  intensity = (corr_val.abs * 200).to_i.clamp(0, 200)
+                  fill_color = "rgb(#{200 - intensity}, #{200 + (55 * corr_val.abs).to_i.clamp(0, 55)}, #{200 - intensity})"
+                else
+                  intensity = (corr_val.abs * 200).to_i.clamp(0, 200)
+                  fill_color = "rgb(#{200 + (55 * corr_val.abs).to_i.clamp(0, 55)}, #{200 - intensity}, #{200 - intensity})"
+                end
+
+                # Diagonal
+                if row_sym == col_sym
+                  fill_color = "rgb(0, 180, 0)"
+                end
+
+                text_color = corr_val.abs > 0.6 || row_sym == col_sym ? "#fff" : "var(--text, #333)"
+              %>
+              <rect x="<%= label_offset + ci * cell_size %>" y="<%= label_offset + ri * cell_size %>"
+                    width="<%= cell_size - 2 %>" height="<%= cell_size - 2 %>" rx="4"
+                    fill="<%= fill_color %>" stroke="var(--border, #e0e0e0)" stroke-width="0.5"/>
+              <text x="<%= label_offset + ci * cell_size + cell_size / 2 - 1 %>"
+                    y="<%= label_offset + ri * cell_size + cell_size / 2 + 4 %>"
+                    text-anchor="middle" font-size="11" font-weight="<%= corr_val.abs > 0.5 ? '700' : '500' %>"
+                    fill="<%= text_color %>">
+                <% if corr %>
+                  <%= corr_val == 1.0 ? "1.00" : ("%.2f" % corr_val) %>
+                <% else %>
+                  --
+                <% end %>
+              </text>
+            <% end %>
+          <% end %>
+
+          <%# Legend %>
+          <% legend_y = label_offset + n * cell_size + 4 %>
+        </svg>
+
+        <%# Legend bar below SVG %>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-top: 1rem; font-size: 0.75rem; color: var(--text-secondary);">
+          <span style="display: inline-flex; align-items: center; gap: 0.25rem;">
+            <span style="width: 14px; height: 14px; border-radius: 3px; background: rgb(255, 120, 120);"></span>
+            Negative
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 0.25rem;">
+            <span style="width: 14px; height: 14px; border-radius: 3px; background: rgb(200, 200, 200);"></span>
+            None
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 0.25rem;">
+            <span style="width: 14px; height: 14px; border-radius: 3px; background: rgb(100, 220, 100);"></span>
+            Positive
+          </span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+    <%# ===== High Correlation Alerts ===== %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #f9ab00;">warning</span>
+          High Correlation Alerts
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @correlated_pairs.count %> pair<%= @correlated_pairs.count == 1 ? "" : "s" %></span>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <% if @correlated_pairs.any? %>
+          <div style="display: grid; gap: 0.75rem;">
+            <% @correlated_pairs.first(8).each do |pair| %>
+              <%
+                s1, s2 = pair[:pair]
+                corr = pair[:correlation]
+                severity = corr > 0.7 ? "danger" : "warning"
+                bg = severity == "danger" ? "rgba(234,67,53,0.05)" : "rgba(249,171,0,0.05)"
+                border = severity == "danger" ? "var(--negative)" : "#f9ab00"
+              %>
+              <div style="display: flex; gap: 0.75rem; padding: 0.75rem; background: <%= bg %>; border-radius: var(--radius); border-left: 3px solid <%= border %>;">
+                <span class="material-icons-outlined" style="color: <%= border %>; margin-top: 2px; flex-shrink: 0;">link</span>
+                <div style="flex: 1;">
+                  <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.875rem; font-weight: 600;"><%= s1 %> & <%= s2 %></span>
+                    <span style="font-size: 0.8125rem; font-weight: 700; color: <%= border %>;"><%= corr %></span>
+                  </div>
+                  <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                    <% if corr > 0.7 %>
+                      Strongly correlated. These symbols move together &mdash; consider reducing exposure in one.
+                    <% else %>
+                      Moderately correlated. Monitor for concentration risk.
+                    <% end %>
+                  </div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
+            <span class="material-icons-outlined" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; color: var(--positive);">check_circle</span>
+            <div style="font-size: 0.875rem;">No highly correlated pairs found. Good diversification!</div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# ===== Best Hedge Pairs ===== %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #1a73e8;">security</span>
+          Best Hedge Pairs
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">Inversely correlated symbols</span>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <% if @hedge_pairs.any? %>
+          <div style="display: grid; gap: 0.75rem;">
+            <% @hedge_pairs.first(6).each do |pair| %>
+              <%
+                s1, s2 = pair[:pair]
+                corr = pair[:correlation]
+              %>
+              <div style="padding: 0.75rem; background: rgba(26,115,232,0.05); border-radius: var(--radius); border-left: 3px solid #1a73e8;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.375rem;">
+                  <span style="font-size: 0.875rem; font-weight: 600;"><%= s1 %> & <%= s2 %></span>
+                  <span style="font-size: 0.8125rem; font-weight: 700; color: #1a73e8;"><%= corr %></span>
+                </div>
+                <div style="display: flex; gap: 1rem; font-size: 0.75rem; color: var(--text-secondary);">
+                  <span><%= s1 %> P&L: <span style="color: <%= pair[:pnl1] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= number_to_currency(pair[:pnl1]) %></span></span>
+                  <span><%= s2 %> P&L: <span style="color: <%= pair[:pnl2] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= number_to_currency(pair[:pnl2]) %></span></span>
+                </div>
+                <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.375rem;">
+                  These symbols tend to move in opposite directions &mdash; good for hedging risk.
+                </div>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
+            <span class="material-icons-outlined" style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">trending_flat</span>
+            <div style="font-size: 0.875rem;">No inversely correlated pairs found. Consider diversifying with negatively-correlated assets.</div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+    <%# ===== Symbol Clusters ===== %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #7b1fa2;">hub</span>
+          Symbol Clusters
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">Grouped by similar performance</span>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <% if @clusters.any? %>
+          <div style="display: grid; gap: 0.75rem;">
+            <% @clusters.each_with_index do |cluster, ci| %>
+              <%
+                cluster_colors = ["#7b1fa2", "#1a73e8", "#0d904f", "#f9ab00", "#e91e63", "#00bcd4"]
+                color = cluster_colors[ci % cluster_colors.length]
+              %>
+              <div style="padding: 0.75rem; border-radius: var(--radius); border: 1px solid var(--border); border-left: 3px solid <%= color %>;">
+                <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.375rem;">
+                  <% if cluster.count >= 2 %>
+                    Cluster <%= ci + 1 %> &mdash; <%= cluster.count %> symbols
+                  <% else %>
+                    Independent
+                  <% end %>
+                </div>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
+                  <% cluster.each do |sym| %>
+                    <%
+                      stats = @symbol_stats[sym] || {}
+                      pnl = stats[:total_pnl] || 0
+                    %>
+                    <span style="display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.25rem 0.625rem; background: var(--bg); border-radius: 999px; font-size: 0.8125rem; font-weight: 600; border: 1px solid var(--border);">
+                      <%= sym %>
+                      <span style="font-size: 0.6875rem; font-weight: 500; color: <%= pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                        <%= number_to_currency(pnl) %>
+                      </span>
+                    </span>
+                  <% end %>
+                </div>
+                <% if cluster.count >= 2 %>
+                  <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.375rem;">
+                    <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">info</span>
+                    These symbols show correlated P&L patterns. Reducing exposure in one lowers overall risk.
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary);">
+            <div style="font-size: 0.875rem;">No clear symbol clusters found.</div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# ===== Diversification Score Card ===== %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #0d904f;">diversity_3</span>
+          Diversification Score
+        </h2>
+      </div>
+      <div style="padding: 1.5rem 1.25rem; text-align: center;">
+        <%# Gauge %>
+        <%
+          gauge_angle = @diversification_score * 1.8  # 0-180 degrees
+          gauge_color = if @diversification_score >= 70
+            "#0d904f"
+          elsif @diversification_score >= 40
+            "#f9ab00"
+          else
+            "#ea4335"
+          end
+        %>
+        <svg width="200" height="120" viewBox="0 0 200 120" style="display: block; margin: 0 auto;">
+          <%# Background arc %>
+          <path d="M 20 110 A 80 80 0 0 1 180 110" fill="none" stroke="var(--border, #e0e0e0)" stroke-width="12" stroke-linecap="round"/>
+          <%# Score arc %>
+          <% if @diversification_score > 0 %>
+            <%
+              # Convert angle to radians for endpoint calculation
+              rad = (180 - gauge_angle) * Math::PI / 180
+              end_x = 100 - 80 * Math.cos(rad)
+              end_y = 110 - 80 * Math.sin(rad)
+              large_arc = gauge_angle > 180 ? 1 : 0
+            %>
+            <path d="M 20 110 A 80 80 0 <%= large_arc %> 1 <%= end_x.round(1) %> <%= end_y.round(1) %>"
+                  fill="none" stroke="<%= gauge_color %>" stroke-width="12" stroke-linecap="round"/>
+          <% end %>
+          <text x="100" y="95" text-anchor="middle" font-size="32" font-weight="700" fill="<%= gauge_color %>"><%= @diversification_score %></text>
+          <text x="100" y="112" text-anchor="middle" font-size="11" fill="var(--text-secondary, #666)">out of 100</text>
+        </svg>
+
+        <div style="margin-top: 1rem; font-size: 0.875rem; color: var(--text-secondary);">
+          Avg Pairwise Correlation: <strong style="color: var(--text);"><%= @avg_correlation %></strong>
+        </div>
+
+        <div style="margin-top: 1rem; padding: 0.75rem; border-radius: var(--radius); background: var(--bg); text-align: left;">
+          <% if @diversification_score >= 70 %>
+            <div style="font-size: 0.875rem; font-weight: 600; color: #0d904f; margin-bottom: 0.25rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">check_circle</span>
+              Well Diversified
+            </div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+              Your symbols show low correlation, meaning losses in one area are less likely to compound across your portfolio. Keep up the good work.
+            </div>
+          <% elsif @diversification_score >= 40 %>
+            <div style="font-size: 0.875rem; font-weight: 600; color: #f9ab00; margin-bottom: 0.25rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">info</span>
+              Moderate Diversification
+            </div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+              Some symbols move together. Consider adding uncorrelated assets or reducing overlapping positions to improve risk distribution.
+            </div>
+          <% else %>
+            <div style="font-size: 0.875rem; font-weight: 600; color: #ea4335; margin-bottom: 0.25rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">error</span>
+              Poor Diversification
+            </div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+              High correlation across your symbols means risk is concentrated. A downturn in one area is likely to affect many positions. Strongly consider diversifying.
+            </div>
+          <% end %>
+        </div>
+
+        <%# Concentration risk callout %>
+        <% if @concentration_risk.any? %>
+          <div style="margin-top: 1rem; padding: 0.75rem; border-radius: var(--radius); background: rgba(249,171,0,0.05); border: 1px solid rgba(249,171,0,0.2); text-align: left;">
+            <div style="font-size: 0.8125rem; font-weight: 600; color: #f9ab00; margin-bottom: 0.375rem;">
+              <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">warning</span>
+              Concentration Risk
+            </div>
+            <% @concentration_risk.first(5).each do |sym, count| %>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.125rem;">
+                <strong><%= sym %></strong> correlates with <strong><%= count %></strong> other symbol<%= count == 1 ? "" : "s" %>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# ===== Symbol Summary Table ===== %>
+  <% if @symbol_stats.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">list_alt</span>
+          Symbol Summary
+        </h2>
+      </div>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+              <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary);">Symbol</th>
+              <th style="padding: 0.75rem 1rem; text-align: right; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary);">Trades</th>
+              <th style="padding: 0.75rem 1rem; text-align: right; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary);">Win Rate</th>
+              <th style="padding: 0.75rem 1rem; text-align: right; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary);">Total P&L</th>
+              <th style="padding: 0.75rem 1rem; text-align: right; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary);">Correlated With</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @symbol_stats.sort_by { |_, s| -s[:total_pnl] }.each do |sym, stats| %>
+              <%
+                corr_count = @concentration_risk[sym] || 0
+              %>
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 0.625rem 1rem; font-weight: 600;"><%= sym %></td>
+                <td style="padding: 0.625rem 1rem; text-align: right;"><%= stats[:count] %></td>
+                <td style="padding: 0.625rem 1rem; text-align: right; color: <%= stats[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= stats[:win_rate] %>%</td>
+                <td style="padding: 0.625rem 1rem; text-align: right; font-weight: 600; color: <%= stats[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(stats[:total_pnl]) %></td>
+                <td style="padding: 0.625rem 1rem; text-align: right;">
+                  <% if corr_count > 0 %>
+                    <span style="color: #f9ab00; font-weight: 600;"><%= corr_count %></span>
+                  <% else %>
+                    <span style="color: var(--text-secondary);">0</span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ===== Bottom Nav ===== %>
+  <div style="display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap;">
+    <%= link_to "Reports", reports_index_path, class: "btn" %>
+    <%= link_to "Symbol Comparison", symbol_comparison_path, class: "btn" %>
+    <%= link_to "Position Risk", position_risk_path, class: "btn" %>
+  </div>
+
+<% end %>

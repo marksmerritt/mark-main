@@ -1,0 +1,225 @@
+<% content_for(:title) { "Cash Flow — Budget Reports" } %>
+
+<div class="page-header">
+  <h1>Cash Flow Analysis</h1>
+  <div class="page-actions">
+    <%= link_to "Dashboard", budget_dashboard_path, class: "btn" %>
+  </div>
+</div>
+
+<%= form_with url: budget_reports_cash_flow_path, method: :get, class: "filter-form", style: "margin-bottom: 1rem;" do |f| %>
+  <div class="filter-row">
+    <div class="form-group">
+      <%= f.label :months, "Period" %>
+      <%= f.select :months,
+            options_for_select([["3 months", 3], ["6 months", 6], ["12 months", 12]], @months),
+            {},
+            { class: "form-control" } %>
+    </div>
+    <div class="form-group form-actions-inline">
+      <%= f.submit "Update", class: "btn btn-primary" %>
+    </div>
+  </div>
+<% end %>
+
+<% if @data.is_a?(Hash) && !@data["error"] %>
+  <%
+    months_data = @data["months"] || @data["monthly_data"] || @data["cash_flow"] || []
+    months_data = months_data.is_a?(Array) ? months_data : []
+
+    total_inflow = months_data.sum { |m| m["income"].to_f }
+    total_outflow = months_data.sum { |m| m["expenses"].to_f }
+    total_net = total_inflow - total_outflow
+    avg_inflow = months_data.any? ? total_inflow / months_data.count : 0
+    avg_outflow = months_data.any? ? total_outflow / months_data.count : 0
+    avg_net = avg_inflow - avg_outflow
+    positive_months = months_data.count { |m| m["income"].to_f - m["expenses"].to_f > 0 }
+  %>
+
+  <%# Summary strip %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Inflow</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(total_inflow) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Outflow</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(total_outflow) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net Cash Flow</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= total_net >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(total_net) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Monthly Net</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= avg_net >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(avg_net) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Positive Months</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= positive_months == months_data.count ? 'var(--positive)' : positive_months > 0 ? 'var(--primary)' : 'var(--negative)' %>;"><%= positive_months %>/<%= months_data.count %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Cash flow waterfall chart %>
+  <% if months_data.count >= 2 %>
+    <%
+      max_val = months_data.map { |m| [m["income"].to_f, m["expenses"].to_f] }.flatten.max
+      max_val = 1 if max_val.to_f == 0
+      chart_h = 200
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Monthly Cash Flow</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <svg viewBox="0 0 <%= months_data.count * 80 + 40 %> <%= chart_h + 40 %>" style="width: 100%; height: auto; max-height: 280px;">
+          <%# Bars for each month %>
+          <% months_data.each_with_index do |m, i| %>
+            <%
+              income = m["income"].to_f
+              expenses = m["expenses"].to_f
+              net = income - expenses
+              income_h = (income / max_val * chart_h * 0.8).round(1)
+              expense_h = (expenses / max_val * chart_h * 0.8).round(1)
+              x = i * 80 + 30
+              bar_w = 28
+              label = m["month"] || m["period"] || "M#{i+1}"
+            %>
+            <%# Income bar %>
+            <rect x="<%= x %>" y="<%= chart_h - income_h %>" width="<%= bar_w %>" height="<%= income_h %>"
+                  fill="var(--positive)" opacity="0.6" rx="3" />
+            <%# Expense bar %>
+            <rect x="<%= x + bar_w + 4 %>" y="<%= chart_h - expense_h %>" width="<%= bar_w %>" height="<%= expense_h %>"
+                  fill="var(--negative)" opacity="0.6" rx="3" />
+            <%# Net indicator %>
+            <circle cx="<%= x + bar_w + 2 %>" cy="<%= chart_h + 20 %>" r="4"
+                    fill="<%= net >= 0 ? 'var(--positive)' : 'var(--negative)' %>" />
+            <%# Month label %>
+            <text x="<%= x + bar_w + 2 %>" y="<%= chart_h + 35 %>" text-anchor="middle"
+                  font-size="8" fill="var(--text-secondary)"><%= label.to_s.gsub(/^\d{4}-/, '') %></text>
+          <% end %>
+          <%# Baseline %>
+          <line x1="20" y1="<%= chart_h %>" x2="<%= months_data.count * 80 + 30 %>" y2="<%= chart_h %>"
+                stroke="var(--border)" stroke-width="1" />
+        </svg>
+        <div style="display: flex; gap: 1.5rem; justify-content: center; margin-top: 0.5rem; font-size: 0.75rem;">
+          <span style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 10px; height: 10px; border-radius: 2px; background: var(--positive); opacity: 0.6;"></span> Income
+          </span>
+          <span style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 10px; height: 10px; border-radius: 2px; background: var(--negative); opacity: 0.6;"></span> Expenses
+          </span>
+          <span style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--positive);"></span> Net positive
+          </span>
+          <span style="display: flex; align-items: center; gap: 4px;">
+            <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--negative);"></span> Net negative
+          </span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Monthly breakdown table %>
+  <% if months_data.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Monthly Breakdown</h2></div>
+      <table class="table" style="margin: 0;">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th style="text-align: right;">Income</th>
+            <th style="text-align: right;">Expenses</th>
+            <th style="text-align: right;">Net</th>
+            <th style="text-align: right;">Savings Rate</th>
+            <th>Flow</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% months_data.each do |m| %>
+            <%
+              income = m["income"].to_f
+              expenses = m["expenses"].to_f
+              net = income - expenses
+              savings_rate = income > 0 ? (net / income * 100).round(1) : 0
+              flow_pct = avg_inflow > 0 ? (income / avg_inflow * 100).round(0) : 100
+            %>
+            <tr>
+              <td><strong><%= m["month"] || m["period"] %></strong></td>
+              <td style="text-align: right; color: var(--positive);"><%= number_to_currency(income) %></td>
+              <td style="text-align: right; color: var(--negative);"><%= number_to_currency(expenses) %></td>
+              <td style="text-align: right;" class="<%= net >= 0 ? 'positive' : 'negative' %>">
+                <strong><%= number_to_currency(net) %></strong>
+              </td>
+              <td style="text-align: right;">
+                <span style="color: <%= savings_rate >= 20 ? 'var(--positive)' : savings_rate >= 0 ? 'var(--primary)' : 'var(--negative)' %>;">
+                  <%= savings_rate %>%
+                </span>
+              </td>
+              <td>
+                <div style="width: 60px; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                  <div style="height: 100%; width: <%= [flow_pct, 150].min.clamp(0, 100) %>%; background: <%= net >= 0 ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.6; border-radius: 3px;"></div>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+        <tfoot>
+          <tr style="font-weight: 700; border-top: 2px solid var(--border);">
+            <td>Total</td>
+            <td style="text-align: right; color: var(--positive);"><%= number_to_currency(total_inflow) %></td>
+            <td style="text-align: right; color: var(--negative);"><%= number_to_currency(total_outflow) %></td>
+            <td style="text-align: right;" class="<%= total_net >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(total_net) %></td>
+            <td style="text-align: right;">
+              <% total_rate = total_inflow > 0 ? (total_net / total_inflow * 100).round(1) : 0 %>
+              <%= total_rate %>%
+            </td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  <% end %>
+
+  <%# Cash flow insights %>
+  <%
+    insights = []
+    if months_data.count >= 3
+      nets = months_data.map { |m| m["income"].to_f - m["expenses"].to_f }
+      trend = nets.last(3).sum > nets.first(3).sum
+      if trend
+        insights << { icon: "trending_up", text: "Cash flow is trending upward over the period.", type: "positive" }
+      else
+        insights << { icon: "trending_down", text: "Cash flow is trending downward — review spending categories.", type: "negative" }
+      end
+
+      if positive_months == months_data.count
+        insights << { icon: "verified", text: "Every month was cash flow positive. Excellent financial discipline!", type: "positive" }
+      elsif positive_months == 0
+        insights << { icon: "warning", text: "No positive cash flow months. Income needs to increase or spending must decrease.", type: "negative" }
+      end
+
+      if avg_net > 0
+        annual_projection = avg_net * 12
+        insights << { icon: "savings", text: "At current pace, you'll save #{number_to_currency(annual_projection)} this year.", type: "info" }
+      end
+    end
+  %>
+  <% if insights.any? %>
+    <div class="card">
+      <div class="card-header"><h2>Insights</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <% insights.each do |insight| %>
+          <div style="display: flex; gap: 0.5rem; align-items: flex-start; margin-bottom: 0.75rem; font-size: 0.875rem;">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; flex-shrink: 0; margin-top: 1px; color: <%= insight[:type] == 'positive' ? 'var(--positive)' : insight[:type] == 'negative' ? 'var(--negative)' : 'var(--primary)' %>;"><%= insight[:icon] %></span>
+            <span><%= insight[:text] %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p><%= @data.is_a?(Hash) ? (@data["message"] || "Could not load cash flow data.") : "No cash flow data available." %></p>
+  </div>
+<% end %>

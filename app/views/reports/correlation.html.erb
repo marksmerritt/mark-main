@@ -1,0 +1,307 @@
+<div class="page-header">
+  <h1>Correlation Analysis</h1>
+  <div class="page-actions">
+    <button class="btn" onclick="window.print()">
+      <span class="material-icons-outlined">print</span> Print
+    </button>
+  </div>
+</div>
+
+<div class="card">
+  <%= form_with url: reports_correlation_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :start_date, "Start Date" %>
+        <%= f.date_field :start_date, value: params[:start_date], class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :end_date, "End Date" %>
+        <%= f.date_field :end_date, value: params[:end_date], class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+        <%= link_to "Clear", reports_correlation_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @symbols.present? && @symbols.length >= 2 %>
+  <div class="card">
+    <div class="card-header">
+      <h2>Correlation Matrix</h2>
+      <span class="text-muted"><%= @symbols.count %> symbols with 3+ trading days</span>
+    </div>
+    <div style="overflow-x: auto;">
+      <table class="table correlation-matrix">
+        <thead>
+          <tr>
+            <th></th>
+            <% @symbols.each do |sym| %>
+              <th class="correlation-header"><%= sym %></th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody>
+          <% @symbols.each do |sym_a| %>
+            <tr>
+              <td><strong><%= sym_a %></strong></td>
+              <% @symbols.each do |sym_b| %>
+                <% corr = @correlations.dig(sym_a, sym_b) %>
+                <% if corr.nil? %>
+                  <td class="correlation-cell" style="background: var(--bg);">
+                    <span class="text-muted">&mdash;</span>
+                  </td>
+                <% else %>
+                  <%
+                    # Color: green for positive, red for negative, intensity by magnitude
+                    intensity = (corr.abs * 100).round
+                    if corr >= 0
+                      bg = "rgba(13, 144, 79, #{[corr.abs * 0.4, 0.4].min})"
+                    else
+                      bg = "rgba(217, 48, 37, #{[corr.abs * 0.4, 0.4].min})"
+                    end
+                    bg = "var(--primary); color: white" if sym_a == sym_b
+                  %>
+                  <td class="correlation-cell" style="background: <%= bg %>;">
+                    <% if sym_a == sym_b %>
+                      <span style="color: white; font-weight: 600;">1.00</span>
+                    <% else %>
+                      <span class="<%= corr >= 0 ? '' : 'negative' %>"><%= "%.2f" % corr %></span>
+                    <% end %>
+                  </td>
+                <% end %>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Interpretation Guide</h2>
+    </div>
+    <div class="text-content" style="padding: 1rem 1.25rem;">
+      <div class="correlation-legend">
+        <div class="correlation-legend-item">
+          <span class="correlation-swatch" style="background: rgba(13, 144, 79, 0.4);"></span>
+          <span><strong>+0.7 to +1.0:</strong> Strong positive correlation &mdash; these symbols tend to profit/lose together</span>
+        </div>
+        <div class="correlation-legend-item">
+          <span class="correlation-swatch" style="background: rgba(13, 144, 79, 0.15);"></span>
+          <span><strong>+0.3 to +0.7:</strong> Moderate positive correlation</span>
+        </div>
+        <div class="correlation-legend-item">
+          <span class="correlation-swatch" style="background: var(--bg);"></span>
+          <span><strong>-0.3 to +0.3:</strong> Weak or no correlation &mdash; good for diversification</span>
+        </div>
+        <div class="correlation-legend-item">
+          <span class="correlation-swatch" style="background: rgba(217, 48, 37, 0.15);"></span>
+          <span><strong>-0.3 to -0.7:</strong> Moderate negative correlation</span>
+        </div>
+        <div class="correlation-legend-item">
+          <span class="correlation-swatch" style="background: rgba(217, 48, 37, 0.4);"></span>
+          <span><strong>-0.7 to -1.0:</strong> Strong negative correlation &mdash; natural hedge</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%
+    # Find notable correlations
+    notable_positive = []
+    notable_negative = []
+    @symbols.each_with_index do |sym_a, i|
+      @symbols[(i+1)..].each do |sym_b|
+        corr = @correlations.dig(sym_a, sym_b)
+        next unless corr
+        if corr >= 0.5
+          notable_positive << { pair: "#{sym_a} / #{sym_b}", corr: corr }
+        elsif corr <= -0.3
+          notable_negative << { pair: "#{sym_a} / #{sym_b}", corr: corr }
+        end
+      end
+    end
+    notable_positive.sort_by! { |n| -n[:corr] }
+    notable_negative.sort_by! { |n| n[:corr] }
+  %>
+
+  <% if notable_positive.any? || notable_negative.any? %>
+    <div class="content-grid">
+      <% if notable_positive.any? %>
+        <div class="card">
+          <div class="card-header">
+            <h2>Highly Correlated Pairs</h2>
+          </div>
+          <div class="text-content" style="padding: 1rem 1.25rem;">
+            <p class="text-muted" style="margin-bottom: 0.75rem;">These pairs tend to move in the same direction. Consider position sizing carefully when trading both.</p>
+            <% notable_positive.first(8).each do |pair| %>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.375rem 0; border-bottom: 1px solid var(--border);">
+                <strong><%= pair[:pair] %></strong>
+                <span class="positive"><%= "%.2f" % pair[:corr] %></span>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+
+      <% if notable_negative.any? %>
+        <div class="card">
+          <div class="card-header">
+            <h2>Negatively Correlated Pairs</h2>
+          </div>
+          <div class="text-content" style="padding: 1rem 1.25rem;">
+            <p class="text-muted" style="margin-bottom: 0.75rem;">These pairs tend to move in opposite directions. They can serve as natural hedges in your portfolio.</p>
+            <% notable_negative.first(8).each do |pair| %>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.375rem 0; border-bottom: 1px solid var(--border);">
+                <strong><%= pair[:pair] %></strong>
+                <span class="negative"><%= "%.2f" % pair[:corr] %></span>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# Diversification Score (HHI-based) %>
+  <% if @symbol_stats.present? && @symbol_stats.length >= 2 %>
+    <%
+      total_trades = @symbol_stats.values.sum { |d| d[:trades] }
+      if total_trades > 0
+        shares = @symbol_stats.values.map { |d| d[:trades].to_f / total_trades }
+        hhi = (shares.map { |s| (s * 100) ** 2 }.sum).round(0)
+        max_hhi = 10000
+        min_hhi = (10000.0 / @symbol_stats.length).round(0)
+        diversification = max_hhi > min_hhi ? ((max_hhi - hhi).to_f / (max_hhi - min_hhi) * 100).clamp(0, 100).round(0) : 100
+        div_color = diversification >= 70 ? "var(--positive)" : diversification >= 40 ? "#f9ab00" : "var(--negative)"
+        div_label = diversification >= 70 ? "Well Diversified" : diversification >= 40 ? "Moderately Concentrated" : "Highly Concentrated"
+      end
+    %>
+    <% if total_trades > 0 %>
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-header"><h2>Portfolio Diversification</h2></div>
+        <div style="padding: 1rem 1.25rem;">
+          <div style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+            <div style="flex-shrink: 0;">
+              <svg viewBox="0 0 140 85" style="width: 120px;">
+                <%
+                  d_pct = diversification / 100.0
+                  d_arc_angle = d_pct * 180
+                  d_end_rad = (180 - d_arc_angle) * Math::PI / 180
+                  d_end_x = (70 + 55 * Math.cos(d_end_rad)).round(1)
+                  d_end_y = (75 - 55 * Math.sin(d_end_rad)).round(1)
+                %>
+                <path d="M 15 75 A 55 55 0 0 1 125 75" fill="none" stroke="var(--border)" stroke-width="8" stroke-linecap="round" />
+                <% if d_arc_angle > 0 %>
+                  <path d="M 15 75 A 55 55 0 <%= d_arc_angle > 180 ? 1 : 0 %> 1 <%= d_end_x %> <%= d_end_y %>"
+                        fill="none" stroke="<%= div_color %>" stroke-width="8" stroke-linecap="round" />
+                <% end %>
+                <text x="70" y="68" text-anchor="middle" fill="<%= div_color %>" font-size="20" font-weight="700"><%= diversification %></text>
+                <text x="70" y="82" text-anchor="middle" fill="var(--text-secondary)" font-size="8">/ 100</text>
+              </svg>
+            </div>
+            <div>
+              <h3 style="margin-bottom: 0.25rem;"><span style="color: <%= div_color %>;"><%= div_label %></span></h3>
+              <p class="text-muted" style="font-size: 0.8125rem;">
+                HHI: <%= hhi %> across <%= @symbol_stats.length %> symbols.
+                <% if diversification < 40 %>
+                  Consider spreading trades across more instruments to reduce concentration risk.
+                <% elsif diversification < 70 %>
+                  Reasonable spread, but a few symbols dominate your activity.
+                <% else %>
+                  Good balance across your traded instruments.
+                <% end %>
+              </p>
+            </div>
+          </div>
+
+          <%# Symbol allocation bars %>
+          <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+            <% sym_colors = ["var(--primary)", "#0d904f", "#d93025", "#f9ab00", "#7b1fa2", "#00796b", "#c62828", "#1565c0"] %>
+            <% @symbol_stats.each_with_index do |(symbol, data), idx| %>
+              <% share_pct = (data[:trades].to_f / total_trades * 100).round(1) %>
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem;">
+                <span style="width: 55px; font-size: 0.75rem; font-weight: 600;"><%= symbol %></span>
+                <div style="flex: 1; height: 12px; background: var(--bg); border-radius: 6px; overflow: hidden;">
+                  <div style="height: 100%; width: <%= share_pct %>%; background: <%= sym_colors[idx % sym_colors.length] %>; opacity: 0.6; border-radius: 6px;"></div>
+                </div>
+                <span style="width: 45px; text-align: right; font-size: 0.75rem; font-weight: 600;"><%= share_pct %>%</span>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <% if @symbol_stats.present? %>
+    <%
+      max_sym_pnl = @symbol_stats.values.map { |d| d[:total_pnl].abs }.max.to_f
+      max_sym_pnl = 1 if max_sym_pnl == 0
+    %>
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <h2>Symbol Performance Summary</h2>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Trades</th>
+            <th>Win Rate</th>
+            <th>Total P&L</th>
+            <th>P&L Bar</th>
+            <th>Avg P&L</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @symbol_stats.each do |symbol, data| %>
+            <tr>
+              <td><strong><%= symbol %></strong></td>
+              <td><%= data[:trades] %></td>
+              <td>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <div style="width: 50px; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden;">
+                    <div style="height: 100%; width: <%= data[:win_rate] %>%; background: <%= data[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>; border-radius: 4px;"></div>
+                  </div>
+                  <span><%= data[:win_rate] %>%</span>
+                </div>
+              </td>
+              <td class="<%= pnl_class(data[:total_pnl]) %>"><%= number_to_currency(data[:total_pnl]) %></td>
+              <td style="min-width: 80px;">
+                <% bar_pct = (data[:total_pnl].abs / max_sym_pnl * 100).round(1) %>
+                <% if data[:total_pnl] >= 0 %>
+                  <div style="display: flex; align-items: center;">
+                    <div style="width: 50%; height: 10px;"></div>
+                    <div style="width: 50%; height: 10px; position: relative;">
+                      <div style="position: absolute; left: 0; top: 0; height: 100%; width: <%= bar_pct %>%; background: var(--positive); opacity: 0.5; border-radius: 0 3px 3px 0;"></div>
+                    </div>
+                  </div>
+                <% else %>
+                  <div style="display: flex; align-items: center;">
+                    <div style="width: 50%; height: 10px; position: relative;">
+                      <div style="position: absolute; right: 0; top: 0; height: 100%; width: <%= bar_pct %>%; background: var(--negative); opacity: 0.5; border-radius: 3px 0 0 3px;"></div>
+                    </div>
+                    <div style="width: 50%; height: 10px;"></div>
+                  </div>
+                <% end %>
+              </td>
+              <td class="<%= pnl_class(data[:avg_pnl]) %>"><%= number_to_currency(data[:avg_pnl]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+<% elsif @symbols.present? && @symbols.length < 2 %>
+  <div class="card empty-state" style="padding: 3rem; text-align: center;">
+    <p>Need at least 2 symbols with 3+ trading days to compute correlations.</p>
+  </div>
+<% else %>
+  <div class="card empty-state" style="padding: 3rem; text-align: center;">
+    <p>No closed trades found.</p>
+  </div>
+<% end %>

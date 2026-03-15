@@ -1,0 +1,139 @@
+<%
+  total_tags = @tags.count
+  colored_tags = @tags.count { |t| t["color"].present? }
+  total_txn_count = @tags.sum { |t| t["transaction_count"].to_i }
+  top_tag = @tags.max_by { |t| t["transaction_count"].to_i }
+%>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">label</span>
+    Transaction Tags
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Dashboard", budget_dashboard_path, class: "btn btn-sm" %>
+    <%= link_to "Transactions", budget_transactions_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Tags</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= total_tags %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">With Color</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= colored_tags %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Tagged Transactions</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= total_txn_count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Most Used</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= top_tag ? top_tag["name"] : "—" %></div>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2>Create Tag</h2>
+  </div>
+  <div style="padding: 1rem 1.25rem;">
+    <%= form_with url: budget_tags_path, method: :post do |f| %>
+      <div style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;">
+        <div style="flex: 2; min-width: 150px;">
+          <label style="font-size: 0.75rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Name</label>
+          <%= f.text_field "tag[name]", placeholder: "e.g. groceries, subscription", class: "form-control", required: true %>
+        </div>
+        <div style="flex: 1; min-width: 100px;">
+          <label style="font-size: 0.75rem; font-weight: 600; display: block; margin-bottom: 0.25rem;">Color</label>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <%= f.color_field "tag[color]", value: "#6366f1", style: "width: 3rem; height: 2.25rem; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; padding: 2px;" %>
+            <%= f.text_field "tag[color]", value: "#6366f1", class: "form-control", style: "font-family: monospace; font-size: 0.8125rem;", pattern: "#[0-9a-fA-F]{6}", id: "tag_color_text" %>
+          </div>
+        </div>
+        <%= f.submit "Create Tag", class: "btn btn-primary" %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<% if @tags.any? %>
+  <div class="card">
+    <div class="card-header">
+      <h2>All Tags (<%= total_tags %>)</h2>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Color</th>
+          <th>Name</th>
+          <th style="text-align: right;">Transactions</th>
+          <th style="text-align: right;">Total Amount</th>
+          <th style="text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @tags.each do |tag| %>
+          <tr id="tag-row-<%= tag["id"] %>">
+            <td>
+              <% if tag["color"].present? %>
+                <span style="display: inline-block; width: 1.25rem; height: 1.25rem; border-radius: 4px; background: <%= tag["color"] %>; border: 1px solid rgba(0,0,0,0.1);"></span>
+              <% else %>
+                <span style="display: inline-block; width: 1.25rem; height: 1.25rem; border-radius: 4px; background: var(--bg); border: 1px dashed var(--border);"></span>
+              <% end %>
+            </td>
+            <td>
+              <span style="font-weight: 600;"><%= tag["name"] %></span>
+            </td>
+            <td style="text-align: right;"><%= tag["transaction_count"].to_i %></td>
+            <td style="text-align: right;">
+              <% amt = tag["total_amount"].to_f %>
+              <span class="<%= amt >= 0 ? '' : 'negative' %>"><%= number_to_currency(amt.abs) %></span>
+            </td>
+            <td style="text-align: right;">
+              <div style="display: flex; gap: 0.25rem; justify-content: flex-end;">
+                <%= link_to budget_transactions_path(tag: tag["name"]), class: "btn btn-sm", title: "View transactions" do %>
+                  <span class="material-icons-outlined" style="font-size: 0.875rem;">visibility</span>
+                <% end %>
+                <button class="btn btn-sm" onclick="document.getElementById('edit-tag-<%= tag["id"] %>').style.display = document.getElementById('edit-tag-<%= tag["id"] %>').style.display === 'none' ? 'table-row' : 'none'" title="Edit">
+                  <span class="material-icons-outlined" style="font-size: 0.875rem;">edit</span>
+                </button>
+                <%= link_to budget_tag_path(tag["id"]), data: { turbo_method: :delete, turbo_confirm: "Delete tag '#{tag["name"]}'?" }, class: "btn btn-sm btn-danger", title: "Delete" do %>
+                  <span class="material-icons-outlined" style="font-size: 0.875rem;">delete</span>
+                <% end %>
+              </div>
+            </td>
+          </tr>
+          <tr id="edit-tag-<%= tag["id"] %>" style="display: none;">
+            <td colspan="5" style="background: var(--bg);">
+              <%= form_with url: budget_tag_path(tag["id"]), method: :patch do |f| %>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                  <div style="flex: 0 0 auto;">
+                    <%= f.color_field "tag[color]", value: tag["color"] || "#6366f1", style: "width: 2.5rem; height: 2rem; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; padding: 2px;" %>
+                  </div>
+                  <div style="flex: 2;">
+                    <%= f.text_field "tag[name]", value: tag["name"], class: "form-control", required: true %>
+                  </div>
+                  <div style="flex: 1;">
+                    <%= f.text_field "tag[color]", value: tag["color"], class: "form-control", placeholder: "#6366f1", style: "font-family: monospace; font-size: 0.8125rem;" %>
+                  </div>
+                  <%= f.submit "Save", class: "btn btn-sm btn-primary" %>
+                  <button type="button" class="btn btn-sm" onclick="document.getElementById('edit-tag-<%= tag["id"] %>').style.display = 'none'">Cancel</button>
+                </div>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <div class="card empty-state" style="padding: 2rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 2.5rem; color: var(--text-secondary);">label_off</span>
+    <p style="margin: 0.5rem 0 0; color: var(--text-secondary);">No tags yet. Create one above to start categorizing transactions.</p>
+  </div>
+<% end %>

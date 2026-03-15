@@ -1,0 +1,267 @@
+<% content_for(:title) { "Pre-Market" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #f9ab00;">wb_sunny</span>
+    Pre-Market Prep
+  </h1>
+  <div class="page-actions">
+    <span style="font-size: 0.875rem; color: var(--text-secondary);"><%= @date.strftime("%A, %B %d, %Y") %></span>
+  </div>
+</div>
+
+<%# Readiness Score %>
+<%
+  completed = @checklist.count { |c| c[:done] }
+  total = @checklist.count
+  readiness_pct = total > 0 ? (completed.to_f / total * 100).round(0) : 0
+  readiness_color = readiness_pct >= 80 ? "var(--positive)" : readiness_pct >= 50 ? "#f9ab00" : "var(--negative)"
+%>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; display: flex; align-items: center; gap: 2rem; flex-wrap: wrap;">
+  <div style="text-align: center; flex-shrink: 0;">
+    <div style="width: 80px; height: 80px; position: relative; margin: 0 auto;">
+      <svg viewBox="0 0 80 80" style="transform: rotate(-90deg);">
+        <circle cx="40" cy="40" r="34" fill="none" stroke="var(--border)" stroke-width="6"/>
+        <circle cx="40" cy="40" r="34" fill="none" stroke="<%= readiness_color %>" stroke-width="6"
+                stroke-dasharray="<%= (213.6 * readiness_pct / 100.0).round(1) %> 213.6"
+                stroke-linecap="round"/>
+      </svg>
+      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= readiness_color %>;"><%= readiness_pct %>%</div>
+      </div>
+    </div>
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">Readiness</div>
+  </div>
+
+  <div style="flex: 1; min-width: 200px;">
+    <div style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Morning Checklist</div>
+    <% @checklist.each do |item| %>
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem; font-size: 0.8125rem;">
+        <span class="material-icons-outlined" style="font-size: 1rem; color: <%= item[:done] ? 'var(--positive)' : 'var(--text-secondary)' %>;">
+          <%= item[:done] ? 'check_circle' : 'radio_button_unchecked' %>
+        </span>
+        <span style="<%= item[:done] ? 'text-decoration: line-through; color: var(--text-secondary);' : '' %>"><%= item[:label] %></span>
+        <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: auto;"><%= item[:hint] %></span>
+        <% if item[:action_path] && !item[:done] %>
+          <%= link_to item[:action_path], style: "font-size: 0.6875rem; color: var(--primary); text-decoration: none;" do %>Go<% end %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Quick Stats %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Open Positions</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @open_trades.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Unrealized P&L</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @unrealized_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@unrealized_pnl) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">5-Day P&L</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @recent_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@recent_pnl) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">5-Day Win Rate</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @recent_win_rate >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @recent_win_rate %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Streak</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @streak_type == 'win' ? 'var(--positive)' : @streak_type == 'loss' ? 'var(--negative)' : 'var(--text)' %>;">
+        <% if @current_streak != 0 %>
+          <%= @current_streak > 0 ? "+#{@current_streak}" : @current_streak %>
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">
+            <%= @streak_type == 'win' ? 'local_fire_department' : 'ac_unit' %>
+          </span>
+        <% else %>
+          —
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Yesterday's Recap %>
+  <div class="card" style="padding: 1.25rem;">
+    <h3 style="font-size: 0.875rem; margin-bottom: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">history</span>
+      Yesterday's Recap
+    </h3>
+    <% if @yesterday_count > 0 %>
+      <div style="text-align: center; margin-bottom: 1rem;">
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">P&L</div>
+        <div style="font-size: 1.75rem; font-weight: 700; color: <%= @yesterday_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @yesterday_pnl >= 0 ? '+' : '' %><%= number_to_currency(@yesterday_pnl) %>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @yesterday_count %> trades</div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <% if @yesterday_best %>
+          <div style="padding: 0.5rem; background: rgba(13,144,79,0.06); border-radius: 6px; text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Best</div>
+            <div style="font-weight: 600;"><%= @yesterday_best["symbol"] %></div>
+            <div style="font-size: 0.875rem; color: var(--positive);"><%= number_to_currency(@yesterday_best["pnl"]) %></div>
+          </div>
+        <% end %>
+        <% if @yesterday_worst && @yesterday_worst != @yesterday_best %>
+          <div style="padding: 0.5rem; background: rgba(217,48,37,0.06); border-radius: 6px; text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Worst</div>
+            <div style="font-weight: 600;"><%= @yesterday_worst["symbol"] %></div>
+            <div style="font-size: 0.875rem; color: var(--negative);"><%= number_to_currency(@yesterday_worst["pnl"]) %></div>
+          </div>
+        <% end %>
+      </div>
+    <% else %>
+      <div style="text-align: center; color: var(--text-secondary); font-size: 0.875rem; padding: 1rem 0;">
+        No trades yesterday
+      </div>
+    <% end %>
+  </div>
+
+  <%# Active Trade Plans %>
+  <div class="card" style="padding: 1.25rem;">
+    <h3 style="font-size: 0.875rem; margin-bottom: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">assignment</span>
+      Active Trade Plans
+    </h3>
+    <% if @active_plans.any? %>
+      <% @active_plans.first(5).each do |plan| %>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+          <div>
+            <div style="font-weight: 600; font-size: 0.875rem;">
+              <%= link_to plan["symbol"] || plan["name"], trade_plan_path(plan["id"]) %>
+            </div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+              <%= plan["side"]&.capitalize %> · Entry: <%= number_to_currency(plan["entry_price"]) rescue "—" %>
+            </div>
+          </div>
+          <% if plan["risk_reward"].present? %>
+            <span style="font-size: 0.75rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--bg); color: var(--text-secondary);">
+              R:R <%= plan["risk_reward"] %>
+            </span>
+          <% end %>
+        </div>
+      <% end %>
+      <% if @active_plans.count > 5 %>
+        <div style="text-align: center; padding-top: 0.5rem;">
+          <%= link_to "+#{@active_plans.count - 5} more", trade_plans_path, style: "font-size: 0.75rem; color: var(--primary);" %>
+        </div>
+      <% end %>
+    <% else %>
+      <div style="text-align: center; padding: 1rem 0;">
+        <span style="color: var(--text-secondary); font-size: 0.875rem;">No active plans</span>
+        <div style="margin-top: 0.5rem;">
+          <%= link_to "Create Plan", new_trade_plan_path, class: "btn btn-sm btn-primary" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Open Positions %>
+  <% if @open_trades.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">swap_vert</span>
+          Open Positions
+        </h2>
+        <span style="font-size: 0.8125rem; color: var(--text-secondary);">Risk: <%= number_to_currency(@total_open_risk) %></span>
+      </div>
+      <% @open_trades.each do |trade| %>
+        <% pnl = trade["pnl"].to_f %>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <div>
+            <strong><%= link_to trade["symbol"], trade_path(trade["id"]) %></strong>
+            <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= trade["side"]&.capitalize %></span>
+            <% unless trade["stop_loss"].to_f > 0 %>
+              <span style="font-size: 0.625rem; color: var(--negative); font-weight: 600;">NO STOP</span>
+            <% end %>
+          </div>
+          <span style="font-weight: 600; color: <%= pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= pnl >= 0 ? '+' : '' %><%= number_to_currency(pnl) %>
+          </span>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# Watchlists %>
+  <% if @watchlists.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">visibility</span>
+          Watchlists
+        </h2>
+      </div>
+      <% @watchlists.first(3).each do |wl| %>
+        <div style="padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <div style="font-weight: 600; font-size: 0.875rem; margin-bottom: 0.25rem;">
+            <%= link_to wl["name"], watchlist_path(wl["id"]) %>
+          </div>
+          <% symbols = wl["symbols"] || wl["items"] || [] %>
+          <% if symbols.is_a?(Array) && symbols.any? %>
+            <div style="display: flex; gap: 0.375rem; flex-wrap: wrap;">
+              <% symbols.first(8).each do |sym| %>
+                <span style="font-size: 0.6875rem; padding: 0.125rem 0.375rem; border-radius: 3px; background: var(--bg); font-weight: 500;">
+                  <%= sym.is_a?(Hash) ? sym["symbol"] : sym %>
+                </span>
+              <% end %>
+              <% if symbols.count > 8 %>
+                <span style="font-size: 0.6875rem; color: var(--text-secondary);">+<%= symbols.count - 8 %></span>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+
+<%# Quick Actions %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+  <h3 style="font-size: 0.875rem; margin-bottom: 0.75rem;">Quick Actions</h3>
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+    <%= link_to new_trade_path, class: "btn btn-sm btn-primary" do %>
+      <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">add</span> New Trade
+    <% end %>
+    <%= link_to new_journal_entry_path, class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">auto_stories</span> Journal
+    <% end %>
+    <%= link_to new_trade_plan_path, class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">assignment</span> Plan
+    <% end %>
+    <%= link_to exposure_path, class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">pie_chart</span> Exposure
+    <% end %>
+    <%= link_to risk_dashboard_path, class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">shield</span> Risk
+    <% end %>
+    <%= link_to position_calculator_path, class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">calculate</span> Calculator
+    <% end %>
+  </div>
+</div>
+
+<%# Journal Streak %>
+<% if @journal_streak > 0 %>
+  <div class="card" style="padding: 0.75rem 1.25rem; display: flex; align-items: center; gap: 0.75rem; background: rgba(249,171,0,0.06); border-left: 3px solid #f9ab00;">
+    <span class="material-icons-outlined" style="font-size: 1.25rem; color: #f9ab00;">local_fire_department</span>
+    <span style="font-size: 0.875rem;">
+      <strong><%= @journal_streak %>-day journal streak!</strong>
+      <span style="color: var(--text-secondary);">Keep it going — write today's entry.</span>
+    </span>
+    <% unless @journal_today %>
+      <%= link_to "Write Now", new_journal_entry_path, class: "btn btn-sm", style: "margin-left: auto;" %>
+    <% end %>
+  </div>
+<% end %>

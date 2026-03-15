@@ -1,0 +1,70 @@
+<%= render "shared/errors", errors: local_assigns[:errors] || @errors %>
+
+<%= form_with url: form_url, method: form_method, class: "watchlist-form" do %>
+  <fieldset>
+    <legend>Symbol Info</legend>
+
+    <div class="form-row">
+      <div class="form-group">
+        <%= label_tag "watchlist[symbol]", "Symbol" %>
+        <%= text_field_tag "watchlist[symbol]", watchlist["symbol"], class: "form-control", placeholder: "e.g. AAPL", autofocus: true %>
+      </div>
+
+      <div class="form-group">
+        <%= label_tag "watchlist[asset_class]", "Asset Class" %>
+        <%= select_tag "watchlist[asset_class]",
+              options_for_select([["Stocks", "stocks"], ["Options", "options"], ["Futures", "futures"], ["Forex", "forex"], ["Crypto", "crypto"]], watchlist["asset_class"]),
+              include_blank: "Select asset class", class: "form-control" %>
+      </div>
+
+      <div class="form-group">
+        <%= label_tag "watchlist[priority]", "Priority" %>
+        <%= select_tag "watchlist[priority]",
+              options_for_select([["High", "high"], ["Medium", "medium"], ["Low", "low"]], watchlist["priority"]),
+              include_blank: "Select priority", class: "form-control" %>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Price Targets &amp; Alerts</legend>
+
+    <div class="form-row">
+      <div class="form-group">
+        <%= label_tag "watchlist[target_entry]", "Target Entry" %>
+        <%= number_field_tag "watchlist[target_entry]", watchlist["target_entry"], class: "form-control", step: "any", min: 0 %>
+      </div>
+
+      <div class="form-group">
+        <%= label_tag "watchlist[alert_above]", "Alert Above" %>
+        <%= number_field_tag "watchlist[alert_above]", watchlist["alert_above"], class: "form-control", step: "any", min: 0 %>
+      </div>
+
+      <div class="form-group">
+        <%= label_tag "watchlist[alert_below]", "Alert Below" %>
+        <%= number_field_tag "watchlist[alert_below]", watchlist["alert_below"], class: "form-control", step: "any", min: 0 %>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Notes &amp; Status</legend>
+
+    <div class="form-group">
+      <%= label_tag "watchlist[notes]", "Notes" %>
+      <%= text_area_tag "watchlist[notes]", watchlist["notes"], class: "form-control", rows: 4, placeholder: "Notes about this symbol..." %>
+    </div>
+
+    <div class="form-group">
+      <label class="checkbox-label">
+        <%= check_box_tag "watchlist[active]", "1", watchlist["active"] != false %>
+        Active
+      </label>
+    </div>
+  </fieldset>
+
+  <div class="form-actions">
+    <%= submit_tag submit_label, class: "btn btn-primary" %>
+    <%= link_to "Cancel", cancel_path, class: "btn" %>
+  </div>
+<% end %>

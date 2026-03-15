@@ -1,0 +1,9 @@
+<div class="page-header">
+  <h1>Edit Trade Plan</h1>
+</div>
+
+<div class="card">
+  <%= render "form", trade_plan: @trade_plan,
+             form_url: trade_plan_path(@trade_plan["id"]), form_method: :patch,
+             submit_label: "Update Plan", cancel_path: trade_plan_path(@trade_plan["id"]) %>
+</div>

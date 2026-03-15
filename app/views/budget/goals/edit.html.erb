@@ -1,0 +1,13 @@
+<div class="page-header">
+  <h1>Edit Goal</h1>
+  <div class="page-actions"><%= link_to "Back", budget_goal_path(@goal["id"]), class: "btn" %></div>
+</div>
+
+<div class="card">
+  <%= form_with url: budget_goal_path(@goal["id"]), method: :patch, class: "form-container" do |f| %>
+    <%= render "form", f: f, goal: @goal %>
+    <div class="form-actions">
+      <%= f.submit "Update Goal", class: "btn btn-primary" %>
+    </div>
+  <% end %>
+</div>

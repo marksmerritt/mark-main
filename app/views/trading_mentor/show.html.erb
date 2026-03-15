@@ -1,0 +1,397 @@
+<% content_for(:title) { "Trading Mentor" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #e64a19;">psychology</span>
+    Trading Mentor
+  </h1>
+</div>
+
+<% if @trades.blank? || @trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem; color: #e64a19;">psychology</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Not enough trading data</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades to receive personalized coaching insights.</div>
+  </div>
+<% else %>
+
+  <%# ── Overall Assessment Card ── %>
+  <%
+    grade_color = case @overall_grade
+                  when "A" then "var(--positive)"
+                  when "B" then "var(--primary)"
+                  when "C" then "#fbbc04"
+                  when "D" then "#ff5722"
+                  else "var(--negative)"
+                  end
+    dash = (326.7 * @overall_score / 100.0).round(1)
+  %>
+  <div class="card" style="margin-bottom: 1.5rem; text-align: center; padding: 2rem; border-top: 4px solid #e64a19;">
+    <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); margin-bottom: 0.75rem;">Trading Health Check</div>
+    <div style="position: relative; display: inline-block;">
+      <svg viewBox="0 0 120 120" style="width: 7rem; height: 7rem;">
+        <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" stroke-width="8"/>
+        <circle cx="60" cy="60" r="52" fill="none" stroke="<%= grade_color %>" stroke-width="8"
+                stroke-dasharray="<%= dash %> 326.7" stroke-linecap="round" transform="rotate(-90 60 60)"/>
+      </svg>
+      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+        <div style="font-size: 2.25rem; font-weight: 700; color: <%= grade_color %>; line-height: 1;"><%= @overall_grade %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @overall_score %>/100</div>
+      </div>
+    </div>
+    <div style="margin-top: 0.75rem; font-size: 0.9375rem; font-weight: 500;"><%= @overall_summary %></div>
+  </div>
+
+  <%# ── Stats Strip ── %>
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);"><%= @trades.count %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Trades Analyzed</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @strengths.count %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Strengths Found</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #ff9800;"><%= @weaknesses.count %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Areas to Improve</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @tilt_color %>;"><%= @tilt_level %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Tilt Risk</div>
+    </div>
+  </div>
+
+  <%# ── Strengths Section ── %>
+  <% if @strengths.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">thumb_up</span>
+          What You Do Well
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+          <% @strengths.each do |s| %>
+            <div style="border: 1px solid var(--positive); border-radius: 8px; padding: 1.25rem; background: var(--surface);">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <span class="material-icons-outlined" style="font-size: 1.25rem; color: var(--positive);"><%= s[:icon] %></span>
+                <span style="font-weight: 700; font-size: 0.9375rem;"><%= s[:title] %></span>
+              </div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5;">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px; color: var(--positive);">check</span>
+                <%= s[:detail] %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Weaknesses Section ── %>
+  <% if @weaknesses.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff9800;">warning</span>
+          Areas to Improve
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+          <% @weaknesses.each do |w| %>
+            <div style="border: 1px solid #ff9800; border-radius: 8px; padding: 1.25rem; background: var(--surface);">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <span class="material-icons-outlined" style="font-size: 1.25rem; color: #ff9800;"><%= w[:icon] %></span>
+                <span style="font-weight: 700; font-size: 0.9375rem;"><%= w[:title] %></span>
+              </div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5;">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px; color: #ff9800;">warning</span>
+                <%= w[:detail] %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Behavioral Patterns Section ── %>
+  <% if @patterns.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e64a19;">psychology</span>
+          Behavioral Patterns Detected
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; grid-template-columns: 1fr; gap: 1rem;">
+          <% @patterns.each do |p| %>
+            <%
+              severity_bg = case p[:severity]
+                            when "high" then "#e53935"
+                            when "medium" then "#ff9800"
+                            else "#43a047"
+                            end
+            %>
+            <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; background: var(--surface); border-left: 4px solid <%= p[:color] %>;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= p[:color] %>;"><%= p[:icon] %></span>
+                  <span style="font-weight: 700; font-size: 0.9375rem;"><%= p[:name] %></span>
+                </div>
+                <span style="font-size: 0.625rem; font-weight: 600; text-transform: uppercase; padding: 0.2rem 0.5rem; border-radius: 9999px; background: <%= severity_bg %>; color: #fff; letter-spacing: 0.03em;"><%= p[:severity] %></span>
+              </div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.5;">
+                <strong>Evidence:</strong> <%= p[:evidence] %>
+              </div>
+              <div style="font-size: 0.8125rem; padding: 0.75rem; background: var(--bg); border-radius: 6px; line-height: 1.5;">
+                <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--primary);">lightbulb</span>
+                <strong>Recommendation:</strong> <%= p[:recommendation] %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Progress Report (30d vs prior 30d) ── %>
+  <% if @progress.present? && (@last_30_trades.any? || @prior_30_trades.any?) %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);">compare_arrows</span>
+          30-Day Progress Report
+        </h2>
+      </div>
+      <div style="padding: 1.25rem; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.875rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+              <th style="text-align: left; padding: 0.5rem 0.75rem; font-weight: 600; color: var(--text-secondary);">Metric</th>
+              <th style="text-align: right; padding: 0.5rem 0.75rem; font-weight: 600; color: var(--text-secondary);">Last 30 Days</th>
+              <th style="text-align: right; padding: 0.5rem 0.75rem; font-weight: 600; color: var(--text-secondary);">Prior 30 Days</th>
+              <th style="text-align: right; padding: 0.5rem 0.75rem; font-weight: 600; color: var(--text-secondary);">Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @progress.each_with_index do |m, idx| %>
+              <%
+                arrow_icon = case m[:direction]
+                             when "up" then "arrow_upward"
+                             when "down" then "arrow_downward"
+                             else "remove"
+                             end
+                # For most metrics, up is good. For some it depends.
+                change_color = case m[:direction]
+                               when "up" then "var(--positive)"
+                               when "down" then "var(--negative)"
+                               else "var(--text-secondary)"
+                               end
+                current_display = m[:is_currency] ? number_to_currency(m[:current]) : "#{m[:current]}#{m[:unit]}"
+                previous_display = m[:is_currency] ? number_to_currency(m[:previous]) : "#{m[:previous]}#{m[:unit]}"
+                change_display = m[:is_currency] ? number_to_currency(m[:change].abs) : "#{m[:change].abs}#{m[:unit]}"
+              %>
+              <tr style="border-bottom: 1px solid var(--border); <%= idx % 2 == 1 ? 'background: var(--bg);' : '' %>">
+                <td style="padding: 0.625rem 0.75rem; font-weight: 500;"><%= m[:name] %></td>
+                <td style="padding: 0.625rem 0.75rem; text-align: right; font-weight: 600;"><%= current_display %></td>
+                <td style="padding: 0.625rem 0.75rem; text-align: right; color: var(--text-secondary);"><%= previous_display %></td>
+                <td style="padding: 0.625rem 0.75rem; text-align: right; color: <%= change_color %>; font-weight: 600;">
+                  <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;"><%= arrow_icon %></span>
+                  <%= change_display %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Focus Areas ── %>
+  <% if @focus_areas.present? && @focus_areas.any? %>
+    <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #e64a19;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e64a19;">center_focus_strong</span>
+          Focus Areas This Week
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% @focus_areas.each_with_index do |fa, idx| %>
+          <div style="display: flex; gap: 1rem; padding: 1rem 0; <%= idx < @focus_areas.length - 1 ? 'border-bottom: 1px solid var(--border);' : '' %>">
+            <div style="flex-shrink: 0; width: 2rem; height: 2rem; border-radius: 50%; background: #e64a19; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.875rem;">
+              <%= idx + 1 %>
+            </div>
+            <div>
+              <div style="font-weight: 700; font-size: 0.9375rem; margin-bottom: 0.25rem;"><%= fa[:title] %></div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5;"><%= fa[:detail] %></div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.375rem; font-style: italic;"><%= fa[:action] %></div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Actionable Recommendations ── %>
+  <% if @recommendations.present? && @recommendations.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);">tips_and_updates</span>
+          Actionable Recommendations
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+          <% @recommendations.each_with_index do |rec, idx| %>
+            <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem; background: var(--surface);">
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div style="flex-shrink: 0; width: 1.5rem; height: 1.5rem; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.6875rem;"><%= idx + 1 %></div>
+                <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--primary);"><%= rec[:icon] %></span>
+                <span style="font-weight: 700; font-size: 0.875rem;"><%= rec[:title] %></span>
+              </div>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5; padding-left: 2rem;">
+                <%= rec[:detail] %>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Trading Rules Audit ── %>
+  <% if @rules_audit.present? && @rules_audit.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7b1fa2;">fact_check</span>
+          Trading Rules Audit
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Rules inferred from your top 10 winning trades vs overall behavior.
+        </div>
+        <% @rules_audit.each_with_index do |rule, idx| %>
+          <%
+            gap_color = rule[:gap] > 20 ? "var(--negative)" : rule[:gap] > 0 ? "#ff9800" : "var(--positive)"
+            best_bar_color = rule[:best_trades_compliance] >= 70 ? "var(--positive)" : "#ff9800"
+            all_bar_color = rule[:overall_compliance] >= 70 ? "var(--positive)" : rule[:overall_compliance] >= 40 ? "#ff9800" : "var(--negative)"
+          %>
+          <div style="padding: 0.875rem 0; <%= idx < @rules_audit.length - 1 ? 'border-bottom: 1px solid var(--border);' : '' %>">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.625rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; color: #7b1fa2;"><%= rule[:icon] %></span>
+              <span style="font-weight: 600; font-size: 0.875rem;"><%= rule[:rule] %></span>
+              <% if rule[:gap] > 15 %>
+                <span style="font-size: 0.625rem; padding: 0.125rem 0.375rem; border-radius: 9999px; background: var(--negative); color: #fff; font-weight: 600;">GAP</span>
+              <% end %>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+              <div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Best Trades: <%= rule[:best_trades_compliance] %>%</div>
+                <div style="height: 0.375rem; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                  <div style="height: 100%; width: <%= rule[:best_trades_compliance] %>%; background: <%= best_bar_color %>; border-radius: 3px;"></div>
+                </div>
+              </div>
+              <div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-bottom: 0.25rem;">All Trades: <%= rule[:overall_compliance] %>%</div>
+                <div style="height: 0.375rem; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                  <div style="height: 100%; width: <%= rule[:overall_compliance] %>%; background: <%= all_bar_color %>; border-radius: 3px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Tilt Risk Meter ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: <%= @tilt_color %>;">speed</span>
+        Tilt Risk Meter
+      </h2>
+    </div>
+    <div style="padding: 1.5rem; text-align: center;">
+      <%# SVG Gauge %>
+      <div style="position: relative; display: inline-block; margin-bottom: 1rem;">
+        <svg viewBox="0 0 200 120" style="width: 14rem; height: 8.5rem;">
+          <%# Background arc %>
+          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="var(--border)" stroke-width="12" stroke-linecap="round"/>
+          <%# Colored segments %>
+          <path d="M 20 100 A 80 80 0 0 1 60 32" fill="none" stroke="var(--positive)" stroke-width="12" stroke-linecap="round" opacity="0.3"/>
+          <path d="M 60 32 A 80 80 0 0 1 100 20" fill="none" stroke="#fbbc04" stroke-width="12" opacity="0.3"/>
+          <path d="M 100 20 A 80 80 0 0 1 140 32" fill="none" stroke="#ff9800" stroke-width="12" opacity="0.3"/>
+          <path d="M 140 32 A 80 80 0 0 1 180 100" fill="none" stroke="#e53935" stroke-width="12" stroke-linecap="round" opacity="0.3"/>
+          <%# Needle %>
+          <%
+            # Map 0-100 to angle -180 to 0 (left to right semicircle)
+            angle = -180 + (@tilt_score * 1.8)
+            rad = angle * Math::PI / 180
+            nx = 100 + 60 * Math.cos(rad)
+            ny = 100 + 60 * Math.sin(rad)
+          %>
+          <line x1="100" y1="100" x2="<%= nx.round(1) %>" y2="<%= ny.round(1) %>" stroke="<%= @tilt_color %>" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="100" cy="100" r="5" fill="<%= @tilt_color %>"/>
+          <%# Labels %>
+          <text x="20" y="115" fill="var(--text-secondary)" font-size="8" text-anchor="middle">Low</text>
+          <text x="100" y="14" fill="var(--text-secondary)" font-size="8" text-anchor="middle">Moderate</text>
+          <text x="180" y="115" fill="var(--text-secondary)" font-size="8" text-anchor="middle">High</text>
+        </svg>
+      </div>
+
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @tilt_color %>; margin-bottom: 0.25rem;">
+        <%= @tilt_level %> Risk
+      </div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Score: <%= @tilt_score %>/100
+      </div>
+
+      <% if @tilt_factors.any? %>
+        <div style="text-align: left; max-width: 28rem; margin: 0 auto;">
+          <% @tilt_factors.each do |factor| %>
+            <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.375rem 0; font-size: 0.8125rem; color: var(--text-secondary);">
+              <span class="material-icons-outlined" style="font-size: 0.875rem; color: <%= @tilt_color %>;">warning</span>
+              <%= factor %>
+            </div>
+          <% end %>
+        </div>
+      <% else %>
+        <div style="font-size: 0.8125rem; color: var(--positive);">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">check_circle</span>
+          No tilt risk factors detected. You're in a good headspace.
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+<% end %>
+
+<%# ── Bottom Navigation ── %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Report Card", trading_grades_path, class: "btn" %>
+  <%= link_to "Challenges", trading_challenges_path, class: "btn" %>
+  <%= link_to "Checklist", trade_checklist_path, class: "btn" %>
+</div>
+
+<style>
+  @media (max-width: 640px) {
+    div[style*="grid-template-columns: repeat(4"] {
+      grid-template-columns: repeat(2, 1fr) !important;
+    }
+  }
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>

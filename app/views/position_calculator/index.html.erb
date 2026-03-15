@@ -1,0 +1,223 @@
+<% content_for(:title) { "Position Calculator" } %>
+
+<div class="page-header">
+  <h1><%= icon "calculate" %> Position Calculator</h1>
+</div>
+
+<% if @errors.present? %>
+  <div class="form-errors">
+    <h3>Could not calculate position</h3>
+    <ul>
+      <% @errors.each do |error| %>
+        <li><%= error %></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<div class="content-grid" data-controller="calculator">
+  <div class="card">
+    <div class="card-header">
+      <h2>Parameters</h2>
+    </div>
+
+    <%= form_with url: position_calculator_path, method: :post, local: true do |f| %>
+      <div class="form-row">
+        <div class="form-group">
+          <%= f.label :account_size, "Account Size ($)" %>
+          <%= f.text_field :account_size,
+                value: params[:account_size],
+                class: "form-control",
+                placeholder: "100000",
+                data: { calculator_target: "accountSize", action: "input->calculator#preview" } %>
+        </div>
+        <div class="form-group">
+          <%= f.label :risk_percent, "Risk %" %>
+          <%= f.text_field :risk_percent,
+                value: params[:risk_percent] || "1",
+                class: "form-control",
+                placeholder: "1",
+                data: { calculator_target: "riskPercent", action: "input->calculator#preview" } %>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <%= f.label :entry_price, "Entry Price ($)" %>
+          <%= f.text_field :entry_price,
+                value: params[:entry_price],
+                class: "form-control",
+                placeholder: "150.00",
+                data: { calculator_target: "entryPrice", action: "input->calculator#preview" } %>
+        </div>
+        <div class="form-group">
+          <%= f.label :stop_loss, "Stop Loss ($)" %>
+          <%= f.text_field :stop_loss,
+                value: params[:stop_loss],
+                class: "form-control",
+                placeholder: "145.00",
+                data: { calculator_target: "stopLoss", action: "input->calculator#preview" } %>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <%= f.label :take_profit, "Take Profit ($)" %>
+          <%= f.text_field :take_profit,
+                value: params[:take_profit],
+                class: "form-control",
+                placeholder: "160.00 (optional)",
+                data: { calculator_target: "takeProfit", action: "input->calculator#preview" } %>
+        </div>
+        <div class="form-group">
+          <%= f.label :commission_per_share, "Commission / Share ($)" %>
+          <%= f.text_field :commission_per_share,
+                value: params[:commission_per_share] || "0",
+                class: "form-control",
+                placeholder: "0",
+                data: { calculator_target: "commission", action: "input->calculator#preview" } %>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <%= f.submit "Calculate", class: "btn btn-primary" %>
+      </div>
+    <% end %>
+  </div>
+
+  <div>
+    <%# Client-side preview %>
+    <div class="card" data-calculator-target="preview" style="<%= 'display:none;' unless @result %>">
+      <div class="card-header">
+        <h2><%= icon "preview" %> Preview</h2>
+      </div>
+
+      <div class="detail-grid" data-calculator-target="previewBody" style="<%= 'display:none;' if @result %>">
+        <div class="detail-item">
+          <span class="detail-label">Position Size</span>
+          <span class="detail-value" data-calculator-target="previewShares">&mdash;</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Risk Amount</span>
+          <span class="detail-value" data-calculator-target="previewRisk">&mdash;</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">R/R Ratio</span>
+          <span class="detail-value" data-calculator-target="previewRatio">&mdash;</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Total Cost</span>
+          <span class="detail-value" data-calculator-target="previewCost">&mdash;</span>
+        </div>
+      </div>
+
+      <% if @result %>
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Position Size</span>
+            <span class="detail-value"><%= @result["position_size"] %> shares</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Risk Amount</span>
+            <span class="detail-value negative"><%= number_to_currency(@result["risk_amount"]) %></span>
+          </div>
+          <% if @result["reward_amount"] %>
+            <div class="detail-item">
+              <span class="detail-label">Reward Amount</span>
+              <span class="detail-value positive"><%= number_to_currency(@result["reward_amount"]) %></span>
+            </div>
+          <% end %>
+          <% if @result["risk_reward_ratio"] %>
+            <div class="detail-item">
+              <span class="detail-label">R/R Ratio</span>
+              <span class="detail-value">1 : <%= @result["risk_reward_ratio"] %></span>
+            </div>
+          <% end %>
+          <% if @result["break_even_price"] %>
+            <div class="detail-item">
+              <span class="detail-label">Break-Even Price</span>
+              <span class="detail-value"><%= number_to_currency(@result["break_even_price"]) %></span>
+            </div>
+          <% end %>
+          <div class="detail-item">
+            <span class="detail-label">Total Cost</span>
+            <span class="detail-value"><%= number_to_currency(@result["total_cost"]) %></span>
+          </div>
+        </div>
+
+        <% if @result["risk_reward_ratio"].to_f > 0 && @result["risk_reward_ratio"].to_f < 1.5 %>
+          <div class="insight-item insight-warning" style="margin: 1rem 1.25rem;">
+            <span class="material-icons-outlined">warning</span>
+            <span>R/R ratio of 1:<%= @result["risk_reward_ratio"] %> is below 1:1.5. Consider widening your take profit or tightening your stop.</span>
+          </div>
+        <% elsif @result["risk_reward_ratio"].to_f >= 3 %>
+          <div class="insight-item insight-positive" style="margin: 1rem 1.25rem;">
+            <span class="material-icons-outlined">thumb_up</span>
+            <span>Excellent R/R ratio of 1:<%= @result["risk_reward_ratio"] %>. This trade has strong potential.</span>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<% if @risk_profile.present? && @stats.present? && !@risk_profile["error"] && !@stats["error"] %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+      <h2><%= icon("insights") %> Risk Profile (Based on Your History)</h2>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <span class="detail-label">Avg Win</span>
+        <span class="detail-value positive"><%= number_to_currency(@stats["avg_win"]) %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Avg Loss</span>
+        <span class="detail-value negative"><%= number_to_currency(@stats["avg_loss"]) %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Win Rate</span>
+        <span class="detail-value"><%= @stats["win_rate"] %>%</span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Profit Factor</span>
+        <span class="detail-value"><%= @stats["profit_factor"] %></span>
+      </div>
+      <% if @risk_profile["max_drawdown"] %>
+        <div class="detail-item">
+          <span class="detail-label">Max Drawdown</span>
+          <span class="detail-value negative"><%= number_to_currency(@risk_profile["max_drawdown"]) %></span>
+        </div>
+      <% end %>
+      <% if @risk_profile["sharpe_ratio"] %>
+        <div class="detail-item">
+          <span class="detail-label">Sharpe Ratio</span>
+          <span class="detail-value"><%= @risk_profile["sharpe_ratio"] %></span>
+        </div>
+      <% end %>
+    </div>
+
+    <%
+      win_rate = @stats["win_rate"].to_f
+      avg_loss = @stats["avg_loss"].to_f.abs
+      pf = @stats["profit_factor"].to_f
+    %>
+    <div class="text-content" style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border);">
+      <p style="font-size: 0.875rem; margin-bottom: 0.5rem;"><strong>Recommendations:</strong></p>
+      <ul style="font-size: 0.875rem; padding-left: 1.25rem; color: var(--text-secondary);">
+        <% if win_rate < 50 %>
+          <li>With a <%= win_rate %>% win rate, consider using tighter risk (0.5-1%) and wider R:R targets (2:1+)</li>
+        <% elsif win_rate >= 60 %>
+          <li>Your <%= win_rate %>% win rate supports standard 1-2% risk per trade</li>
+        <% end %>
+        <% if pf > 0 && pf < 1.5 %>
+          <li>Profit factor of <%= pf %> is thin. Focus on cutting losses faster or letting winners run longer</li>
+        <% end %>
+        <% if avg_loss > 0 %>
+          <li>Your average loss is <%= number_to_currency(avg_loss) %>. Keep individual trade risk below this level</li>
+        <% end %>
+        <li>The Kelly Criterion suggests risking ~<%= win_rate > 0 ? [((win_rate / 100.0 - (1 - win_rate / 100.0) / [pf, 0.01].max) * 100).round(1), 0].max : 0 %>% per trade (use half-Kelly for safety)</li>
+      </ul>
+    </div>
+  </div>
+<% end %>

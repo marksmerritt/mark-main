@@ -1,0 +1,144 @@
+<% content_for(:title) { "Goal Planner" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">track_changes</span>
+    Goal Planner
+  </h1>
+  <div class="page-actions">
+    <%= link_to "New Goal", new_budget_goal_path, class: "btn btn-primary btn-sm" %>
+  </div>
+</div>
+
+<%# Summary Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Active Goals</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @active_goals.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Overall Progress</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);"><%= @overall_pct %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Saved</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@total_saved) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Remaining</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@total_remaining) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">On Track</div>
+      <div style="font-size: 1.5rem; font-weight: 700;">
+        <span style="color: var(--positive);"><%= @on_track_count %></span>
+        <% if @at_risk_count > 0 %>
+          / <span style="color: var(--negative);"><%= @at_risk_count %> at risk</span>
+        <% end %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Available for Goals %>
+<% if @monthly_savings != 0 %>
+  <div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem; border-left: 4px solid var(--primary); display: flex; align-items: center; gap: 1rem;">
+    <span class="material-icons-outlined" style="font-size: 1.25rem; color: var(--primary);">info</span>
+    <div style="font-size: 0.875rem;">
+      Monthly savings: <strong><%= number_to_currency(@monthly_savings) %></strong>.
+      Suggested goal allocation: <strong style="color: var(--positive);"><%= number_to_currency(@available_for_goals) %></strong>/mo
+      (<%= number_to_currency(@available_for_goals / [@active_goals.count, 1].max) %> per goal).
+    </div>
+  </div>
+<% end %>
+
+<%# Goal Cards %>
+<% if @active_goals.any? %>
+  <div style="display: grid; gap: 1rem; margin-bottom: 1.5rem;">
+    <% @active_goals.each do |g| %>
+      <div class="card" style="<%= g[:on_track] == false ? 'border-left: 4px solid var(--negative);' : g[:on_track] == true ? 'border-left: 4px solid var(--positive);' : '' %>">
+        <div style="padding: 1.25rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="font-size: 1.125rem; font-weight: 700;"><%= g[:name] %></span>
+                <% if g[:priority] >= 75 %>
+                  <span style="font-size: 0.5625rem; padding: 0.125rem 0.375rem; border-radius: 9999px; background: rgba(234,67,53,0.15); color: var(--negative); font-weight: 600;">URGENT</span>
+                <% elsif g[:priority] >= 50 %>
+                  <span style="font-size: 0.5625rem; padding: 0.125rem 0.375rem; border-radius: 9999px; background: rgba(251,188,4,0.15); color: #fbbc04; font-weight: 600;">MODERATE</span>
+                <% end %>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                <% if g[:target_date] %>
+                  Target: <%= g[:target_date].strftime("%b %d, %Y") %>
+                  <% if g[:months_left] %> · <%= g[:months_left] %> months left<% end %>
+                <% end %>
+                <% if g[:monthly_needed] %> · Need <%= number_to_currency(g[:monthly_needed]) %>/mo<% end %>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);"><%= g[:pct] %>%</div>
+            </div>
+          </div>
+
+          <%# Progress bar %>
+          <div style="height: 0.75rem; background: var(--bg); border-radius: 6px; overflow: hidden; margin-bottom: 0.5rem;">
+            <div style="height: 100%; width: <%= [g[:pct], 100].min %>%; background: <%= g[:on_track] == false ? 'var(--negative)' : 'var(--positive)' %>; opacity: 0.7; border-radius: 6px; transition: width 0.3s;"></div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary);">
+            <span><%= number_to_currency(g[:current]) %> saved</span>
+            <span><%= number_to_currency(g[:remaining]) %> to go</span>
+            <span>Target: <%= number_to_currency(g[:target]) %></span>
+          </div>
+
+          <% if g[:months_to_complete] %>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+              <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px;">schedule</span>
+              At current pace: ~<%= g[:months_to_complete] %> months (<%= (g[:months_to_complete] / 12.0).round(1) %> years)
+              <% if g[:target_date] && g[:months_to_complete] > (g[:months_left] || 999) %>
+                — <span style="color: var(--negative); font-weight: 600;">behind schedule</span>
+              <% elsif g[:target_date] %>
+                — <span style="color: var(--positive); font-weight: 600;">on track</span>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card" style="padding: 3rem; text-align: center; margin-bottom: 1.5rem;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); margin-bottom: 1rem;">flag</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No Active Goals</div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">Create a financial goal to start tracking your progress.</div>
+    <%= link_to "Create Goal", new_budget_goal_path, class: "btn btn-primary", style: "margin-top: 1rem;" %>
+  </div>
+<% end %>
+
+<%# Completed Goals %>
+<% if @completed_goals.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">check_circle</span> Completed Goals (<%= @completed_goals.count %>)</h2>
+    </div>
+    <div style="padding: 0;">
+      <% @completed_goals.each do |g| %>
+        <div style="padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-weight: 600;"><%= g["name"] %></span>
+          </div>
+          <span style="font-weight: 700; color: var(--positive);"><%= number_to_currency(g["target_amount"]) %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Goals", budget_goals_path, class: "btn" %>
+  <%= link_to "Savings Dashboard", budget_savings_path, class: "btn" %>
+  <%= link_to "Savings Projection", budget_savings_projection_path, class: "btn" %>
+  <%= link_to "Budget Dashboard", budget_dashboard_path, class: "btn" %>
+</div>

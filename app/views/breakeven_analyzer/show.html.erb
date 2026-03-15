@@ -1,0 +1,512 @@
+<% content_for(:title) { "Breakeven Analysis" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #5d4037;">balance</span>
+    Breakeven Analysis
+  </h1>
+</div>
+
+<% if @trades.blank? || @trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem; color: #5d4037;">balance</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Not enough trading data</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades with P&amp;L to analyze breakeven thresholds and profitability margins.</div>
+  </div>
+<% else %>
+
+  <%# ── Stats Strip ── %>
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #5d4037;"><%= @breakeven_win_rate %>%</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Breakeven Win Rate</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @current_win_rate > @breakeven_win_rate ? 'var(--positive)' : 'var(--negative)' %>;"><%= @current_win_rate %>%</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Current Win Rate</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <% safety_color = case @margin_of_safety_label
+                         when "Strong" then "var(--positive)"
+                         when "Moderate" then "#e65100"
+                         when "Thin" then "#f9a825"
+                         else "var(--negative)"
+                         end %>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= safety_color %>;">
+        <%= @margin_of_safety_wr > 0 ? "+" : "" %><%= @margin_of_safety_wr %>%
+      </div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Margin of Safety (<%= @margin_of_safety_label %>)</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @cost_ratio < 20 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @cost_ratio %>%</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Cost Ratio</div>
+    </div>
+  </div>
+
+  <%# ── Breakeven Comparison Card ── %>
+  <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #5d4037;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #5d4037;">compare_arrows</span>
+        Breakeven vs Actual Performance
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+        Visual comparison of where you stand relative to breakeven thresholds.
+      </div>
+
+      <%# Win Rate gauge %>
+      <div style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <span style="font-size: 0.8125rem; font-weight: 600;">Win Rate</span>
+          <span style="font-size: 0.75rem; color: var(--text-secondary);">Need <%= @breakeven_win_rate %>% &middot; Have <%= @current_win_rate %>%</span>
+        </div>
+        <div style="position: relative; height: 2rem; background: var(--bg); border-radius: 0.5rem; overflow: hidden;">
+          <div style="position: absolute; left: 0; top: 0; height: 100%; width: <%= [@current_win_rate, 100].min %>%; background: <%= @current_win_rate >= @breakeven_win_rate ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.2; border-radius: 0.5rem;"></div>
+          <div style="position: absolute; left: <%= @breakeven_win_rate %>%; top: 0; height: 100%; width: 2px; background: #5d4037; z-index: 2;"></div>
+          <div style="position: absolute; left: <%= @breakeven_win_rate %>%; top: -0.25rem; transform: translateX(-50%); font-size: 0.625rem; color: #5d4037; font-weight: 700;">BE</div>
+          <div style="position: absolute; left: <%= [@current_win_rate, 98].min %>%; top: 50%; transform: translate(-50%, -50%); font-size: 0.75rem; font-weight: 700; color: <%= @current_win_rate >= @breakeven_win_rate ? 'var(--positive)' : 'var(--negative)' %>;"><%= @current_win_rate %>%</div>
+        </div>
+      </div>
+
+      <%# R:R gauge %>
+      <div style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <span style="font-size: 0.8125rem; font-weight: 600;">Risk:Reward Ratio</span>
+          <span style="font-size: 0.75rem; color: var(--text-secondary);">Need <%= @breakeven_rr %>:1 &middot; Have <%= @current_rr %>:1</span>
+        </div>
+        <% max_rr_display = [@current_rr, @breakeven_rr, 3.0].max %>
+        <div style="position: relative; height: 2rem; background: var(--bg); border-radius: 0.5rem; overflow: hidden;">
+          <% current_rr_pct = max_rr_display > 0 ? (@current_rr / max_rr_display * 100) : 0 %>
+          <% be_rr_pct = max_rr_display > 0 ? (@breakeven_rr / max_rr_display * 100) : 0 %>
+          <div style="position: absolute; left: 0; top: 0; height: 100%; width: <%= [current_rr_pct, 100].min %>%; background: <%= @current_rr >= @breakeven_rr ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.2; border-radius: 0.5rem;"></div>
+          <div style="position: absolute; left: <%= be_rr_pct %>%; top: 0; height: 100%; width: 2px; background: #5d4037; z-index: 2;"></div>
+          <div style="position: absolute; left: <%= be_rr_pct %>%; top: -0.25rem; transform: translateX(-50%); font-size: 0.625rem; color: #5d4037; font-weight: 700;">BE</div>
+          <div style="position: absolute; left: <%= [current_rr_pct, 95].min %>%; top: 50%; transform: translate(-50%, -50%); font-size: 0.75rem; font-weight: 700; color: <%= @current_rr >= @breakeven_rr ? 'var(--positive)' : 'var(--negative)' %>;"><%= @current_rr %>:1</div>
+        </div>
+      </div>
+
+      <%# Summary boxes %>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+        <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 0.5rem;">
+          <div style="font-size: 1.125rem; font-weight: 700; color: #5d4037;"><%= @breakeven_rr %>:1</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Breakeven R:R</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 0.5rem;">
+          <div style="font-size: 1.125rem; font-weight: 700; color: <%= @current_rr >= @breakeven_rr ? 'var(--positive)' : 'var(--negative)' %>;"><%= @current_rr %>:1</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Current R:R</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 0.5rem;">
+          <div style="font-size: 1.125rem; font-weight: 700; color: <%= @margin_of_safety_rr >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @margin_of_safety_rr > 0 ? "+" : "" %><%= @margin_of_safety_rr %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">R:R Margin</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Win Rate Sensitivity Table ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #5d4037;">tune</span>
+        Win Rate Sensitivity
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Expected P&amp;L at various win rates with your current avg win ($<%= number_with_delimiter(@avg_win) %>) and avg loss ($<%= number_with_delimiter(@avg_loss) %>).
+      </div>
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid var(--border);">
+              <th style="text-align: left; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Win Rate</th>
+              <th style="text-align: right; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Gross/Trade</th>
+              <th style="text-align: right; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Net/Trade</th>
+              <th style="text-align: right; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Est. Monthly</th>
+              <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @sensitivity_rows.each do |row| %>
+              <tr style="border-bottom: 1px solid var(--border); <%= row[:is_current] ? 'background: rgba(93, 64, 55, 0.08); font-weight: 600;' : '' %><%= row[:is_breakeven] && !row[:is_current] ? 'background: rgba(93, 64, 55, 0.04);' : '' %>">
+                <td style="padding: 0.5rem;">
+                  <%= row[:win_rate] %>%
+                  <% if row[:is_current] %><span style="color: #5d4037; font-size: 0.6875rem; margin-left: 0.25rem;">YOU</span><% end %>
+                  <% if row[:is_breakeven] && !row[:is_current] %><span style="color: #5d4037; font-size: 0.6875rem; margin-left: 0.25rem;">BE</span><% end %>
+                </td>
+                <td style="text-align: right; padding: 0.5rem;">
+                  <span style="color: <%= row[:gross_per_trade] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                    <%= number_to_currency(row[:gross_per_trade]) %>
+                  </span>
+                </td>
+                <td style="text-align: right; padding: 0.5rem;">
+                  <span style="color: <%= row[:net_per_trade] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;">
+                    <%= number_to_currency(row[:net_per_trade]) %>
+                  </span>
+                </td>
+                <td style="text-align: right; padding: 0.5rem;">
+                  <span style="color: <%= row[:monthly_est] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                    <%= number_to_currency(row[:monthly_est]) %>
+                  </span>
+                </td>
+                <td style="text-align: center; padding: 0.5rem;">
+                  <% if row[:profitable] %>
+                    <span style="color: var(--positive); font-size: 0.75rem;">Profitable</span>
+                  <% else %>
+                    <span style="color: var(--negative); font-size: 0.75rem;">Losing</span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Per-Symbol Breakeven Table ── %>
+  <% if @symbol_breakeven.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #5d4037;">list_alt</span>
+          Per-Symbol Breakeven
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @symbol_breakeven.count { |s| s[:profitable] } %>/<%= @symbol_breakeven.count %> above breakeven</span>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Breakeven thresholds per symbol. Symbols below breakeven are destroying edge.
+        </div>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border);">
+                <th style="text-align: left; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Symbol</th>
+                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Trades</th>
+                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Win Rate</th>
+                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">BE Win Rate</th>
+                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Margin</th>
+                <th style="text-align: right; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Total P&amp;L</th>
+                <th style="text-align: right; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Fees</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @symbol_breakeven.first(20).each do |sym| %>
+                <tr style="border-bottom: 1px solid var(--border); <%= !sym[:profitable] ? 'background: rgba(198, 40, 40, 0.04);' : '' %>">
+                  <td style="padding: 0.5rem; font-weight: 600;"><%= sym[:symbol] %></td>
+                  <td style="text-align: center; padding: 0.5rem;"><%= sym[:trades] %></td>
+                  <td style="text-align: center; padding: 0.5rem;">
+                    <span style="color: <%= sym[:win_rate] >= sym[:breakeven_wr] ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= sym[:win_rate] %>%</span>
+                  </td>
+                  <td style="text-align: center; padding: 0.5rem; color: #5d4037;"><%= sym[:breakeven_wr] %>%</td>
+                  <td style="text-align: center; padding: 0.5rem;">
+                    <span style="color: <%= sym[:margin] > 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;">
+                      <%= sym[:margin] > 0 ? "+" : "" %><%= sym[:margin] %>%
+                    </span>
+                  </td>
+                  <td style="text-align: right; padding: 0.5rem;">
+                    <span style="color: <%= sym[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                      <%= number_to_currency(sym[:total_pnl]) %>
+                    </span>
+                  </td>
+                  <td style="text-align: right; padding: 0.5rem; color: var(--text-secondary);"><%= number_to_currency(sym[:fees]) %></td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+
+    <%# ── Commission Impact Card ── %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">payments</span>
+          Commission Impact
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          How trading costs affect your profitability.
+        </div>
+        <div style="display: grid; gap: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+            <span style="font-size: 0.8125rem;">Total Fees/Commissions</span>
+            <span style="font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_costs) %></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+            <span style="font-size: 0.8125rem;">Est. Slippage</span>
+            <span style="font-weight: 700; color: var(--negative);"><%= number_to_currency(@estimated_slippage) %></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+            <span style="font-size: 0.8125rem;">All-In Costs</span>
+            <span style="font-weight: 700; color: var(--negative);"><%= number_to_currency(@all_in_costs) %></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+            <span style="font-size: 0.8125rem;">Gross P&amp;L</span>
+            <span style="font-weight: 700; color: <%= @gross_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@gross_pnl) %></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+            <span style="font-size: 0.8125rem;">Net P&amp;L</span>
+            <span style="font-weight: 700; color: <%= @total_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@total_pnl) %></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; border-top: 2px solid var(--border);">
+            <span style="font-size: 0.8125rem; font-weight: 600;">Trades to Cover Costs</span>
+            <span style="font-weight: 700; color: #5d4037;">
+              <% if @commission_breakeven_trades > 0 %>
+                <%= @commission_breakeven_trades %> trades
+              <% else %>
+                N/A
+              <% end %>
+            </span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+            <span style="font-size: 0.8125rem;">Avg Cost/Trade</span>
+            <span style="font-weight: 700;"><%= number_to_currency(@avg_cost_per_trade) %></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+            <span style="font-size: 0.8125rem;">Avg Monthly Costs</span>
+            <span style="font-weight: 700; color: var(--negative);"><%= number_to_currency(@avg_monthly_costs) %></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <%# ── Trades to Profitability Card ── %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2e7d32;">trending_up</span>
+          Path to Profitability
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          How many trades are needed at current expectancy to reach key milestones.
+        </div>
+        <div style="display: grid; gap: 0.75rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+            <span style="font-size: 0.8125rem;">Avg Expectancy/Trade</span>
+            <span style="font-weight: 700; color: <%= @avg_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@avg_pnl) %></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+            <span style="font-size: 0.8125rem;">Max Drawdown</span>
+            <span style="font-weight: 700; color: var(--negative);"><%= number_to_currency(@max_drawdown) %></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; border-top: 2px solid var(--border);">
+            <span style="font-size: 0.8125rem; font-weight: 600;">Trades to Recover Drawdown</span>
+            <span style="font-weight: 700; color: #5d4037;">
+              <% if @trades_to_recover_dd %>
+                <%= @trades_to_recover_dd %> trades
+              <% else %>
+                N/A
+              <% end %>
+            </span>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+            <span style="font-size: 0.8125rem;">Trades to Cover All Costs</span>
+            <span style="font-weight: 700; color: #5d4037;">
+              <% if @trades_to_cover_costs %>
+                <%= @trades_to_cover_costs %> trades
+              <% else %>
+                N/A
+              <% end %>
+            </span>
+          </div>
+          <% if @monthly_breakeven_trades %>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background: var(--bg); border-radius: 0.375rem;">
+              <span style="font-size: 0.8125rem;">Monthly Breakeven Trades</span>
+              <span style="font-weight: 700; color: #5d4037;"><%= @monthly_breakeven_trades %> trades/mo</span>
+            </div>
+          <% end %>
+          <% if @min_shares && @min_notional %>
+            <div style="padding: 0.75rem; background: rgba(93, 64, 55, 0.06); border-radius: 0.375rem; border-left: 3px solid #5d4037; margin-top: 0.25rem;">
+              <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.25rem;">Min Breakeven Position Size</div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                At least <strong><%= @min_shares %> shares</strong> (~<%= number_to_currency(@min_notional, precision: 0) %> notional) to cover avg trading costs per trade.
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ── What-If Scenarios ── %>
+  <% if @what_if_scenarios.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #5d4037;">science</span>
+          What-If Breakeven Scenarios
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Would you still be profitable if your win rate dropped? Stress-test your edge.
+        </div>
+
+        <%# SVG bar chart for what-if scenarios %>
+        <% chart_scenarios = @what_if_scenarios.first(6) %>
+        <svg viewBox="0 0 620 240" style="width: 100%; height: auto; overflow: visible;">
+          <% bar_w = 80 %>
+          <% bar_gap = 16 %>
+          <% max_abs = chart_scenarios.map { |s| s[:expected_pnl_per_trade].abs }.max %>
+          <% max_abs = [max_abs, 1].max %>
+          <% baseline_y = 160 %>
+
+          <%# Baseline %>
+          <line x1="30" y1="<%= baseline_y %>" x2="<%= 40 + chart_scenarios.count * (bar_w + bar_gap) %>" y2="<%= baseline_y %>" stroke="var(--border)" stroke-width="1"/>
+          <text x="24" y="<%= baseline_y + 4 %>" text-anchor="end" font-size="9" fill="var(--text-secondary)">$0</text>
+
+          <% chart_scenarios.each_with_index do |scenario, i| %>
+            <% x = 40 + i * (bar_w + bar_gap) %>
+            <% val = scenario[:expected_pnl_per_trade] %>
+            <% bar_h = (val.abs / max_abs * 120).round(0) %>
+            <% if val >= 0 %>
+              <% y = baseline_y - bar_h %>
+              <rect x="<%= x %>" y="<%= y %>" width="<%= bar_w %>" height="<%= bar_h %>" rx="3" fill="var(--positive)" opacity="0.7"/>
+            <% else %>
+              <% y = baseline_y %>
+              <rect x="<%= x %>" y="<%= y %>" width="<%= bar_w %>" height="<%= bar_h %>" rx="3" fill="var(--negative)" opacity="0.7"/>
+            <% end %>
+
+            <%# Value label %>
+            <% label_y = val >= 0 ? baseline_y - bar_h - 8 : baseline_y + bar_h + 14 %>
+            <text x="<%= x + bar_w / 2 %>" y="<%= label_y %>" text-anchor="middle" font-size="11" font-weight="700" fill="<%= val >= 0 ? 'var(--positive)' : 'var(--negative)' %>"><%= number_to_currency(val) %></text>
+
+            <%# Win rate label %>
+            <text x="<%= x + bar_w / 2 %>" y="<%= baseline_y + (val >= 0 ? 18 : bar_h + 30) %>" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-primary)"><%= scenario[:win_rate] %>% WR</text>
+            <text x="<%= x + bar_w / 2 %>" y="<%= baseline_y + (val >= 0 ? 32 : bar_h + 44) %>" text-anchor="middle" font-size="9" fill="var(--text-secondary)"><%= scenario[:label] %></text>
+
+            <%# Profitable indicator %>
+            <% if !scenario[:profitable] && i > 0 && @what_if_scenarios[i - 1][:profitable] %>
+              <line x1="<%= x - bar_gap / 2 %>" y1="10" x2="<%= x - bar_gap / 2 %>" y2="<%= baseline_y + 40 %>" stroke="#c62828" stroke-width="1.5" stroke-dasharray="4,3"/>
+              <text x="<%= x - bar_gap / 2 %>" y="8" text-anchor="middle" font-size="8" font-weight="700" fill="#c62828">BREAKEVEN LINE</text>
+            <% end %>
+          <% end %>
+        </svg>
+
+        <%# Scenario details table %>
+        <div style="overflow-x: auto; margin-top: 1rem;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border);">
+                <th style="text-align: left; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Scenario</th>
+                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Win Rate</th>
+                <th style="text-align: right; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">$/Trade</th>
+                <th style="text-align: right; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Total (<%= @total_trades %> trades)</th>
+                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">vs Breakeven</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @what_if_scenarios.each do |s| %>
+                <tr style="border-bottom: 1px solid var(--border); <%= !s[:profitable] ? 'background: rgba(198, 40, 40, 0.04);' : '' %>">
+                  <td style="padding: 0.5rem; font-weight: 600;"><%= s[:label] %></td>
+                  <td style="text-align: center; padding: 0.5rem;"><%= s[:win_rate] %>%</td>
+                  <td style="text-align: right; padding: 0.5rem;">
+                    <span style="color: <%= s[:expected_pnl_per_trade] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;">
+                      <%= number_to_currency(s[:expected_pnl_per_trade]) %>
+                    </span>
+                  </td>
+                  <td style="text-align: right; padding: 0.5rem;">
+                    <span style="color: <%= s[:total_expected] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                      <%= number_to_currency(s[:total_expected]) %>
+                    </span>
+                  </td>
+                  <td style="text-align: center; padding: 0.5rem;">
+                    <span style="color: <%= s[:margin_vs_breakeven] > 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;">
+                      <%= s[:margin_vs_breakeven] > 0 ? "+" : "" %><%= s[:margin_vs_breakeven] %>%
+                    </span>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Cost Analysis SVG ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #5d4037;">donut_small</span>
+        Cost vs P&amp;L Breakdown
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        How your gross profits are distributed between net P&amp;L and trading costs.
+      </div>
+      <% if @gross_pnl > 0 %>
+        <% net_pct = @gross_pnl > 0 ? (@total_pnl / @gross_pnl * 100).round(1) : 0 %>
+        <% fee_pct = @gross_pnl > 0 ? (@total_costs / @gross_pnl * 100).round(1) : 0 %>
+        <% slip_pct = @gross_pnl > 0 ? (@estimated_slippage / @gross_pnl * 100).round(1) : 0 %>
+        <svg viewBox="0 0 620 80" style="width: 100%; height: auto; overflow: visible;">
+          <%# Stacked horizontal bar %>
+          <% bar_y = 20 %>
+          <% bar_h = 36 %>
+          <% bar_total_w = 560 %>
+          <% x_start = 30 %>
+
+          <%# Net P&L portion %>
+          <% net_w = [net_pct, 0].max / 100.0 * bar_total_w %>
+          <rect x="<%= x_start %>" y="<%= bar_y %>" width="<%= [net_w, 0].max %>" height="<%= bar_h %>" rx="3" fill="var(--positive)" opacity="0.8"/>
+          <% if net_w > 60 %>
+            <text x="<%= x_start + net_w / 2 %>" y="<%= bar_y + bar_h / 2 + 4 %>" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Net P&amp;L (<%= net_pct %>%)</text>
+          <% end %>
+
+          <%# Fees portion %>
+          <% fee_w = [fee_pct, 0].max / 100.0 * bar_total_w %>
+          <rect x="<%= x_start + net_w %>" y="<%= bar_y %>" width="<%= [fee_w, 0].max %>" height="<%= bar_h %>" rx="0" fill="#e65100" opacity="0.7"/>
+          <% if fee_w > 50 %>
+            <text x="<%= x_start + net_w + fee_w / 2 %>" y="<%= bar_y + bar_h / 2 + 4 %>" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Fees (<%= fee_pct %>%)</text>
+          <% end %>
+
+          <%# Slippage portion %>
+          <% slip_w = [slip_pct, 0].max / 100.0 * bar_total_w %>
+          <rect x="<%= x_start + net_w + fee_w %>" y="<%= bar_y %>" width="<%= [slip_w, 0].max %>" height="<%= bar_h %>" rx="3" fill="#5d4037" opacity="0.6"/>
+          <% if slip_w > 50 %>
+            <text x="<%= x_start + net_w + fee_w + slip_w / 2 %>" y="<%= bar_y + bar_h / 2 + 4 %>" text-anchor="middle" font-size="10" font-weight="600" fill="#fff">Slip (<%= slip_pct %>%)</text>
+          <% end %>
+
+          <%# Legend %>
+          <rect x="<%= x_start %>" y="68" width="10" height="10" rx="2" fill="var(--positive)" opacity="0.8"/>
+          <text x="<%= x_start + 14 %>" y="77" font-size="9" fill="var(--text-secondary)">Net P&amp;L</text>
+          <rect x="<%= x_start + 80 %>" y="68" width="10" height="10" rx="2" fill="#e65100" opacity="0.7"/>
+          <text x="<%= x_start + 94 %>" y="77" font-size="9" fill="var(--text-secondary)">Fees/Commissions</text>
+          <rect x="<%= x_start + 210 %>" y="68" width="10" height="10" rx="2" fill="#5d4037" opacity="0.6"/>
+          <text x="<%= x_start + 224 %>" y="77" font-size="9" fill="var(--text-secondary)">Est. Slippage</text>
+        </svg>
+      <% else %>
+        <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary); font-size: 0.8125rem;">
+          <span class="material-icons-outlined" style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">info</span>
+          Gross P&amp;L is not positive, so cost breakdown is not applicable.
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ── Bottom Nav ── %>
+  <div style="display: flex; justify-content: center; gap: 1rem; padding: 1rem 0;">
+    <%= link_to edge_finder_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">gps_fixed</span> Edge Finder
+    <% end %>
+    <%= link_to rr_optimizer_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">tune</span> R:R Optimizer
+    <% end %>
+    <%= link_to trading_costs_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">payments</span> Cost Analysis
+    <% end %>
+  </div>
+
+<% end %>

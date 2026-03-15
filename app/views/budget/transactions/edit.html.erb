@@ -1,0 +1,134 @@
+<div class="page-header">
+  <h1>Edit Transaction</h1>
+  <div class="page-actions">
+    <%= link_to "Back", budget_transactions_path, class: "btn" %>
+  </div>
+</div>
+
+<div class="card">
+  <% if @errors.present? %>
+    <div class="alert alert-danger" style="margin: 1rem 1.25rem 0;">
+      <ul style="margin: 0; padding-left: 1rem;">
+        <% @errors.each do |error| %><li><%= error %></li><% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <%= form_with url: budget_transaction_path(@transaction["id"]), method: :patch, class: "form-container" do |f| %>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+      <div class="form-group">
+        <%= f.label :amount, "Amount" %>
+        <%= f.number_field :amount, value: @transaction["amount"], step: "0.01", class: "form-control", name: "transaction[amount]", required: true %>
+      </div>
+      <div class="form-group">
+        <%= f.label :transaction_date, "Date" %>
+        <%= f.date_field :transaction_date, value: @transaction["transaction_date"], class: "form-control", name: "transaction[transaction_date]" %>
+      </div>
+    </div>
+    <div class="form-group">
+      <%= f.label :description, "Description" %>
+      <%= f.text_field :description, value: @transaction["description"], class: "form-control", name: "transaction[description]" %>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+      <div class="form-group" data-controller="remote-autocomplete"
+           data-remote-autocomplete-url-value="<%= merchants_budget_transactions_path %>"
+           style="position: relative;">
+        <%= f.label :merchant, "Merchant" %>
+        <%= f.text_field :merchant, value: @transaction["merchant"], class: "form-control", name: "transaction[merchant]",
+            data: { remote_autocomplete_target: "input" }, autocomplete: "off" %>
+        <div class="autocomplete-list hidden" data-remote-autocomplete-target="list"></div>
+      </div>
+      <div class="form-group">
+        <%= f.label :transaction_type, "Type" %>
+        <%= f.select :transaction_type, [["Expense", "expense"], ["Income", "income"]], { selected: @transaction["transaction_type"] }, class: "form-control", name: "transaction[transaction_type]" %>
+      </div>
+    </div>
+    <div class="form-group">
+      <%= f.label :status, "Status" %>
+      <%= f.select :status, [["Cleared", "cleared"], ["Pending", "pending"], ["Reconciled", "reconciled"]], { selected: @transaction["status"] }, class: "form-control", name: "transaction[status]" %>
+    </div>
+    <div class="form-group">
+      <%= f.label :notes, "Notes" %>
+      <%= f.text_area :notes, value: @transaction["notes"], class: "form-control", name: "transaction[notes]", rows: 2, placeholder: "Receipt details, reminders, etc." %>
+    </div>
+    <div class="form-actions">
+      <%= f.submit "Update Transaction", class: "btn btn-primary" %>
+    </div>
+  <% end %>
+
+  <% if @transaction["tags"].is_a?(Array) && @transaction["tags"].any? %>
+    <div style="padding: 0 1.25rem; margin-bottom: 1rem;">
+      <span class="text-muted" style="font-size: 0.85rem;">Tags:</span>
+      <% @transaction["tags"].each do |tag| %>
+        <span class="transaction-tag" style="background: <%= tag["color"] %>20; color: <%= tag["color"] %>; border: 1px solid <%= tag["color"] %>40;">
+          <%= tag["name"] %>
+          <%= link_to "x", remove_tag_budget_transaction_path(@transaction["id"], tag_name: tag["name"]), data: { turbo_method: :delete }, style: "color: inherit; text-decoration: none; margin-left: 2px;" %>
+        </span>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%= form_with url: add_tag_budget_transaction_path(@transaction["id"]), method: :post, class: "form-container" do |f| %>
+    <div class="filter-row" style="align-items: flex-end;">
+      <div class="form-group" style="flex: 1;">
+        <%= f.label :tag_name, "Add Tag" %>
+        <%= f.text_field :tag_name, class: "form-control", placeholder: "e.g., tax-deductible, vacation" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Add Tag", class: "btn btn-sm" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% unless @transaction["split"] || @transaction["parent_id"] %>
+  <div class="card" style="margin-top: 1rem;" data-controller="split-transaction" data-split-transaction-total-value="<%= @transaction["amount"].to_f %>">
+    <div class="card-header" style="cursor: pointer;" data-action="click->split-transaction#toggle">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.25rem; vertical-align: -3px;">call_split</span>
+        Split Transaction
+      </h2>
+      <span class="material-icons-outlined" style="font-size: 1rem;" data-split-transaction-target="arrow">expand_more</span>
+    </div>
+    <div class="hidden" data-split-transaction-target="content">
+      <div style="padding: 1rem 1.25rem;">
+        <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 1rem;">
+          Split this <%= number_to_currency(@transaction["amount"]) %> transaction into multiple parts for different categories.
+        </p>
+
+        <form action="<%= split_budget_transaction_path(@transaction["id"]) %>" method="post">
+          <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+
+          <div data-split-transaction-target="rows">
+            <div class="split-row" style="display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 0.75rem; margin-bottom: 0.5rem;">
+              <div class="form-group">
+                <label>Amount</label>
+                <input type="number" name="splits[][amount]" class="form-control split-amount" step="0.01" required data-action="input->split-transaction#updateRemaining">
+              </div>
+              <div class="form-group">
+                <label>Description</label>
+                <input type="text" name="splits[][description]" class="form-control" placeholder="Groceries portion">
+              </div>
+              <div class="form-group">
+                <label>&nbsp;</label>
+                <button type="button" class="btn btn-sm" data-action="split-transaction#removeRow" style="margin-top: 0;">Remove</button>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
+            <div>
+              <button type="button" class="btn btn-sm" data-action="split-transaction#addRow">
+                <span class="material-icons-outlined" style="font-size: 14px; vertical-align: -2px;">add</span> Add Row
+              </button>
+              <span class="text-muted" style="font-size: 0.85rem; margin-left: 0.75rem;">
+                Remaining: <strong data-split-transaction-target="remaining"><%= number_to_currency(@transaction["amount"]) %></strong>
+              </span>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">Split Transaction</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+<% end %>

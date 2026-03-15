@@ -1,0 +1,437 @@
+<% content_for(:title) { "Focus Timer" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #283593;">timer</span>
+    Focus Timer
+  </h1>
+  <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= Date.current.strftime("%A, %B %-d, %Y") %></span>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Words This Week</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #283593;"><%= @total_words_this_week %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Writing Streak</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @writing_streak >= 3 ? 'var(--positive)' : 'var(--text)' %>;"><%= @writing_streak %> <span style="font-size: 0.75rem;">days</span></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Day</div>
+      <% if @best_day %>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @best_day[:words] %> <span style="font-size: 0.75rem;">words</span></div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= @best_day[:date].strftime("%a") %></div>
+      <% else %>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-secondary);">&mdash;</div>
+      <% end %>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Sessions Today</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @sessions_today %></div>
+    </div>
+  </div>
+</div>
+
+<%# Timer Card %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 2rem; text-align: center;" id="timer-card">
+  <div id="timer-status" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text-secondary); margin-bottom: 1rem;">
+    Ready to Focus
+  </div>
+
+  <%# SVG Timer Circle %>
+  <div style="display: inline-block; position: relative; width: 220px; height: 220px; margin: 0 auto 1.5rem;">
+    <svg width="220" height="220" viewBox="0 0 220 220" id="timer-svg">
+      <%# Background circle %>
+      <circle cx="110" cy="110" r="100" fill="none" stroke="var(--border)" stroke-width="8" opacity="0.3"/>
+      <%# Progress circle %>
+      <circle cx="110" cy="110" r="100" fill="none" stroke="#283593" stroke-width="8"
+              stroke-linecap="round" stroke-dasharray="628.318" stroke-dashoffset="0"
+              transform="rotate(-90 110 110)" id="timer-progress"
+              style="transition: stroke-dashoffset 1s linear;"/>
+    </svg>
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+      <div id="timer-display" style="font-size: 3rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em;">25:00</div>
+      <div id="timer-phase" style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase;">Work</div>
+    </div>
+  </div>
+
+  <%# Session counter %>
+  <div id="session-counter" style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+    Pomodoro <span id="current-session">1</span> of <span id="total-sessions">4</span>
+  </div>
+
+  <%# Controls %>
+  <div style="display: flex; justify-content: center; gap: 0.75rem; flex-wrap: wrap;">
+    <button id="btn-start" onclick="startTimer()" class="btn btn-primary" style="background: #283593; border-color: #283593; min-width: 7rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">play_arrow</span>
+      Start
+    </button>
+    <button id="btn-pause" onclick="pauseTimer()" class="btn" style="min-width: 7rem; display: none;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">pause</span>
+      Pause
+    </button>
+    <button id="btn-resume" onclick="resumeTimer()" class="btn btn-primary" style="background: #283593; border-color: #283593; min-width: 7rem; display: none;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">play_arrow</span>
+      Resume
+    </button>
+    <button id="btn-reset" onclick="resetTimer()" class="btn" style="min-width: 7rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">replay</span>
+      Reset
+    </button>
+    <button id="btn-skip" onclick="skipPhase()" class="btn" style="min-width: 7rem; display: none;">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">skip_next</span>
+      Skip
+    </button>
+  </div>
+
+  <%# Sound toggle %>
+  <div style="margin-top: 1rem;">
+    <label style="font-size: 0.75rem; color: var(--text-secondary); cursor: pointer; display: inline-flex; align-items: center; gap: 0.375rem;">
+      <input type="checkbox" id="sound-toggle" checked style="accent-color: #283593;">
+      <span class="material-icons-outlined" style="font-size: 0.875rem;">volume_up</span>
+      Sound notification
+    </label>
+  </div>
+</div>
+
+<%# Preset Selector %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">tune</span> Timer Presets</h2>
+  </div>
+  <div style="padding: 1.25rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem;">
+    <% @presets.each_with_index do |preset, i| %>
+      <button onclick="selectPreset(<%= i %>)" class="preset-btn" id="preset-<%= i %>"
+              style="padding: 1rem; border-radius: 8px; border: 2px solid <%= i == 0 ? preset[:color] : 'var(--border)' %>; background: <%= i == 0 ? "#{preset[:color]}11" : 'var(--card-bg, var(--bg))' %>; cursor: pointer; text-align: center; transition: all 0.2s;">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: <%= preset[:color] %>; display: block; margin-bottom: 0.375rem;"><%= preset[:icon] %></span>
+        <div style="font-size: 0.8125rem; font-weight: 600; color: var(--text);"><%= preset[:name] %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= preset[:work] %>m work / <%= preset[:break_time] %>m break</div>
+      </button>
+    <% end %>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Writing Suggestion %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">lightbulb</span> Writing Suggestion</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% if @suggested_topic %>
+        <div style="padding: 1rem; background: rgba(40, 53, 147, 0.06); border-radius: 8px; border-left: 3px solid #283593; margin-bottom: 1rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.375rem;">Suggested Focus</div>
+          <div style="font-weight: 600; font-size: 1rem; margin-bottom: 0.25rem;"><%= @suggested_topic[:notebook] %></div>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+            Last written <strong><%= @suggested_topic[:days_ago] %></strong> days ago
+            &middot; <%= @suggested_topic[:note_count] %> notes
+          </div>
+        </div>
+        <p style="font-size: 0.8125rem; color: var(--text-secondary); margin: 0;">
+          This notebook could use some attention. Start a focus session and write something new!
+        </p>
+      <% else %>
+        <div style="text-align: center; padding: 1rem; color: var(--text-secondary);">
+          <span class="material-icons-outlined" style="font-size: 2rem; display: block; margin-bottom: 0.5rem; opacity: 0.5;">check_circle</span>
+          <div style="font-size: 0.8125rem;">All notebooks are up to date! Pick any topic and start writing.</div>
+        </div>
+      <% end %>
+
+      <% if @neglected_notebooks.any? && @neglected_notebooks.count > 1 %>
+        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">Other Neglected Notebooks</div>
+          <% @neglected_notebooks.to_a[1..4].each do |name, data| %>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.375rem 0; font-size: 0.8125rem;">
+              <span><%= name %></span>
+              <span style="color: var(--text-secondary); font-size: 0.75rem;"><%= (Date.current - data[:last_date]).to_i %>d ago</span>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Recent Writing Activity %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">history</span> Recent Writing</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% if @last_five.any? %>
+        <% @last_five.each do |note| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0; border-bottom: 1px solid var(--border);">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: #283593; opacity: 0.6;">description</span>
+            <div style="flex: 1; min-width: 0;">
+              <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "font-size: 0.8125rem; font-weight: 500; color: var(--text); text-decoration: none; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" %>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+                <%= note["_word_count"] %> words
+                <% if note["_created_date"] %>
+                  &middot; <%= note["_created_date"].strftime("%b %-d") %>
+                <% end %>
+                <% nb = note.dig("notebook", "name") %>
+                <% if nb.present? %>
+                  &middot; <%= nb %>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      <% else %>
+        <div style="text-align: center; padding: 1.5rem; color: var(--text-secondary); font-size: 0.8125rem;">
+          No recent notes found. Start a focus session and write your first one!
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+</div>
+
+<%# Bottom Nav %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Notes", notes_path, class: "btn" %>
+  <%= link_to "Writing Prompts", writing_prompts_path, class: "btn" %>
+  <%= link_to "Writing Stats", writing_stats_path, class: "btn" %>
+</div>
+
+<script>
+(function() {
+  // Presets data
+  var presets = [
+    <%= @presets.map { |p| "{ name: '#{p[:name]}', work: #{p[:work]}, breakTime: #{p[:break_time]}, color: '#{p[:color]}' }" }.join(",\n    ") %>
+  ];
+
+  var currentPreset = 0;
+  var workDuration = presets[0].work * 60; // seconds
+  var breakDuration = presets[0].breakTime * 60;
+  var timeRemaining = workDuration;
+  var totalTime = workDuration;
+  var isRunning = false;
+  var isPaused = false;
+  var isBreak = false;
+  var currentSession = 1;
+  var totalSessions = 4;
+  var intervalId = null;
+
+  var CIRCUMFERENCE = 2 * Math.PI * 100; // 628.318
+
+  // DOM references
+  var display = document.getElementById('timer-display');
+  var phase = document.getElementById('timer-phase');
+  var status = document.getElementById('timer-status');
+  var progress = document.getElementById('timer-progress');
+  var currentSessionEl = document.getElementById('current-session');
+  var totalSessionsEl = document.getElementById('total-sessions');
+  var btnStart = document.getElementById('btn-start');
+  var btnPause = document.getElementById('btn-pause');
+  var btnResume = document.getElementById('btn-resume');
+  var btnReset = document.getElementById('btn-reset');
+  var btnSkip = document.getElementById('btn-skip');
+  var timerCard = document.getElementById('timer-card');
+
+  function formatTime(seconds) {
+    var m = Math.floor(seconds / 60);
+    var s = seconds % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function updateDisplay() {
+    display.textContent = formatTime(timeRemaining);
+    var fraction = 1 - (timeRemaining / totalTime);
+    var offset = fraction * CIRCUMFERENCE;
+    progress.setAttribute('stroke-dashoffset', offset);
+
+    // Update color based on phase
+    var color = isBreak ? '#2e7d32' : presets[currentPreset].color;
+    progress.setAttribute('stroke', color);
+
+    phase.textContent = isBreak ? 'Break' : 'Work';
+    currentSessionEl.textContent = currentSession;
+
+    // Update page title with timer
+    if (isRunning) {
+      document.title = formatTime(timeRemaining) + ' - ' + (isBreak ? 'Break' : 'Focus') + ' | Focus Timer';
+    } else {
+      document.title = 'Focus Timer';
+    }
+  }
+
+  function playNotification() {
+    if (!document.getElementById('sound-toggle').checked) return;
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // Play a pleasant two-tone chime
+      [440, 660, 880].forEach(function(freq, i) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.2 + 0.4);
+        osc.start(ctx.currentTime + i * 0.2);
+        osc.stop(ctx.currentTime + i * 0.2 + 0.4);
+      });
+    } catch(e) {}
+  }
+
+  function flashCard() {
+    timerCard.style.transition = 'box-shadow 0.3s';
+    var color = isBreak ? '#2e7d32' : '#283593';
+    timerCard.style.boxShadow = '0 0 0 4px ' + color + '44';
+    setTimeout(function() { timerCard.style.boxShadow = ''; }, 600);
+    setTimeout(function() { timerCard.style.boxShadow = '0 0 0 4px ' + color + '44'; }, 900);
+    setTimeout(function() { timerCard.style.boxShadow = ''; }, 1500);
+  }
+
+  function tick() {
+    if (timeRemaining <= 0) {
+      clearInterval(intervalId);
+      intervalId = null;
+      playNotification();
+      flashCard();
+
+      if (isBreak) {
+        // Break ended, start next work session
+        isBreak = false;
+        currentSession++;
+        if (currentSession > totalSessions) {
+          // All sessions complete
+          status.textContent = 'All Sessions Complete!';
+          status.style.color = 'var(--positive)';
+          isRunning = false;
+          showButtons('start');
+          timeRemaining = workDuration;
+          totalTime = workDuration;
+          currentSession = 1;
+          updateDisplay();
+          return;
+        }
+        timeRemaining = workDuration;
+        totalTime = workDuration;
+        status.textContent = 'Focus Time';
+        status.style.color = presets[currentPreset].color;
+      } else {
+        // Work ended, start break
+        isBreak = true;
+        timeRemaining = breakDuration;
+        totalTime = breakDuration;
+        status.textContent = 'Break Time';
+        status.style.color = '#2e7d32';
+      }
+
+      updateDisplay();
+      intervalId = setInterval(tick, 1000);
+      return;
+    }
+
+    timeRemaining--;
+    updateDisplay();
+  }
+
+  function showButtons(state) {
+    btnStart.style.display = 'none';
+    btnPause.style.display = 'none';
+    btnResume.style.display = 'none';
+    btnSkip.style.display = 'none';
+
+    if (state === 'start') {
+      btnStart.style.display = '';
+    } else if (state === 'running') {
+      btnPause.style.display = '';
+      btnSkip.style.display = '';
+    } else if (state === 'paused') {
+      btnResume.style.display = '';
+      btnSkip.style.display = '';
+    }
+  }
+
+  window.startTimer = function() {
+    if (isRunning) return;
+    isRunning = true;
+    isPaused = false;
+    isBreak = false;
+    currentSession = 1;
+    timeRemaining = workDuration;
+    totalTime = workDuration;
+    status.textContent = 'Focus Time';
+    status.style.color = presets[currentPreset].color;
+    updateDisplay();
+    showButtons('running');
+    intervalId = setInterval(tick, 1000);
+  };
+
+  window.pauseTimer = function() {
+    if (!isRunning || isPaused) return;
+    isPaused = true;
+    clearInterval(intervalId);
+    intervalId = null;
+    status.textContent = 'Paused';
+    status.style.color = '#ff9800';
+    showButtons('paused');
+  };
+
+  window.resumeTimer = function() {
+    if (!isPaused) return;
+    isPaused = false;
+    status.textContent = isBreak ? 'Break Time' : 'Focus Time';
+    status.style.color = isBreak ? '#2e7d32' : presets[currentPreset].color;
+    showButtons('running');
+    intervalId = setInterval(tick, 1000);
+  };
+
+  window.resetTimer = function() {
+    clearInterval(intervalId);
+    intervalId = null;
+    isRunning = false;
+    isPaused = false;
+    isBreak = false;
+    currentSession = 1;
+    timeRemaining = workDuration;
+    totalTime = workDuration;
+    status.textContent = 'Ready to Focus';
+    status.style.color = 'var(--text-secondary)';
+    showButtons('start');
+    updateDisplay();
+    document.title = 'Focus Timer';
+  };
+
+  window.skipPhase = function() {
+    clearInterval(intervalId);
+    intervalId = null;
+    timeRemaining = 0;
+    tick();
+  };
+
+  window.selectPreset = function(index) {
+    // Don't allow preset change while running
+    if (isRunning) return;
+
+    currentPreset = index;
+    workDuration = presets[index].work * 60;
+    breakDuration = presets[index].breakTime * 60;
+    timeRemaining = workDuration;
+    totalTime = workDuration;
+
+    // Update preset button styles
+    document.querySelectorAll('.preset-btn').forEach(function(btn, i) {
+      if (i === index) {
+        btn.style.borderColor = presets[i].color;
+        btn.style.background = presets[i].color + '11';
+      } else {
+        btn.style.borderColor = 'var(--border)';
+        btn.style.background = 'var(--card-bg, var(--bg))';
+      }
+    });
+
+    updateDisplay();
+  };
+
+  // Initial display
+  updateDisplay();
+})();
+</script>

@@ -1,0 +1,300 @@
+<% content_for(:title) { "Drawdown Tracker" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #c62828;">trending_down</span>
+    Drawdown Tracker
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Risk Analysis", reports_risk_analysis_path, class: "btn" %>
+    <%= link_to "Equity Curve", reports_equity_curve_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Current Status Banner %>
+<div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid <%= @current_drawdown[:pct] > 0 ? 'var(--negative)' : 'var(--positive)' %>;">
+  <div style="padding: 1.25rem; display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+    <div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Current Drawdown</div>
+      <div style="font-size: 2rem; font-weight: 700; color: <%= @current_drawdown[:pct] > 0 ? 'var(--negative)' : 'var(--positive)' %>;">
+        <% if @current_drawdown[:pct] > 0 %>
+          -<%= @current_drawdown[:pct] %>%
+        <% else %>
+          <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px;">check_circle</span> At Peak
+        <% end %>
+      </div>
+    </div>
+    <% if @current_drawdown[:pct] > 0 %>
+      <div style="flex: 1; min-width: 200px;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+          <span>Current: <%= number_to_currency(@current_drawdown[:current]) %></span>
+          <span>Peak: <%= number_to_currency(@current_drawdown[:peak]) %></span>
+        </div>
+        <div style="height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+          <% fill_pct = @current_drawdown[:peak] > 0 ? (@current_drawdown[:current] / @current_drawdown[:peak] * 100) : 100 %>
+          <div style="width: <%= fill_pct %>%; height: 100%; background: linear-gradient(90deg, var(--negative), #ff8a65); border-radius: 4px; transition: width 0.5s;"></div>
+        </div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Down <%= number_to_currency(@current_drawdown[:amount]) %> &middot; <%= @current_drawdown[:days] %> days from peak
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Recovery Progress %>
+<% if @recovery_info[:recovering] %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1a73e8;">restore</span> Recovery Progress</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+        <div style="text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Recovery Progress</div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: #1a73e8;"><%= @recovery_info[:progress_pct] %>%</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Needed to Recover</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@recovery_info[:needed]) %></div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Daily Gain</div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@recovery_info[:avg_daily_gain]) %></div>
+        </div>
+        <% if @recovery_info[:estimated_days] %>
+          <div style="text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Est. Recovery</div>
+            <div style="font-size: 1.5rem; font-weight: 700;"><%= @recovery_info[:estimated_days] %> days</div>
+          </div>
+        <% end %>
+      </div>
+      <div style="height: 12px; background: var(--border); border-radius: 6px; overflow: hidden;">
+        <div style="width: <%= @recovery_info[:progress_pct] %>%; height: 100%; background: linear-gradient(90deg, #1a73e8, #42a5f5); border-radius: 6px; transition: width 0.5s;"></div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Drawdown Chart %>
+<% if @drawdown_chart.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Drawdown Over Time</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <%
+        chart = @drawdown_chart
+        min_dd = chart.map { |p| p[:drawdown_pct] }.min
+        min_dd = [min_dd, -1].min
+        chart_w = 700
+        chart_h = 200
+        x_step = chart.length > 1 ? chart_w.to_f / (chart.length - 1) : chart_w
+      %>
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h + 30 %>" style="width: 100%; height: auto;">
+        <%# Zero line %>
+        <line x1="0" y1="10" x2="<%= chart_w %>" y2="10" stroke="var(--text-secondary)" stroke-width="0.5" stroke-dasharray="4,4"/>
+        <text x="2" y="8" font-size="8" fill="var(--text-secondary)">0%</text>
+
+        <%# 5% threshold %>
+        <% y5 = 10 + (-5.0 / min_dd * chart_h).abs %>
+        <% if y5 < chart_h + 10 %>
+          <line x1="0" y1="<%= y5 %>" x2="<%= chart_w %>" y2="<%= y5 %>" stroke="#f9a825" stroke-width="0.5" stroke-dasharray="2,4"/>
+          <text x="2" y="<%= y5 - 2 %>" font-size="7" fill="#f9a825">-5%</text>
+        <% end %>
+
+        <%# 10% threshold %>
+        <% y10 = 10 + (-10.0 / min_dd * chart_h).abs %>
+        <% if y10 < chart_h + 10 %>
+          <line x1="0" y1="<%= y10 %>" x2="<%= chart_w %>" y2="<%= y10 %>" stroke="var(--negative)" stroke-width="0.5" stroke-dasharray="2,4"/>
+          <text x="2" y="<%= y10 - 2 %>" font-size="7" fill="var(--negative)">-10%</text>
+        <% end %>
+
+        <%# Area fill %>
+        <%
+          path_points = chart.each_with_index.map do |p, i|
+            x = i * x_step
+            y = 10 + (p[:drawdown_pct].abs / min_dd.abs * chart_h)
+            [x.round(1), y.round(1)]
+          end
+        %>
+        <path d="M 0 10 <%= path_points.map { |x, y| "L #{x} #{y}" }.join(' ') %> L <%= chart_w %> 10 Z"
+              fill="var(--negative)" fill-opacity="0.15"/>
+        <polyline points="<%= path_points.map { |x, y| "#{x},#{y}" }.join(' ') %>"
+                  fill="none" stroke="var(--negative)" stroke-width="1.5"/>
+
+        <%# Date labels %>
+        <% label_every = [chart.length / 6, 1].max %>
+        <% chart.each_with_index do |p, i| %>
+          <% if i % label_every == 0 || i == chart.length - 1 %>
+            <text x="<%= (i * x_step).round(1) %>" y="<%= chart_h + 25 %>" font-size="7" fill="var(--text-secondary)" text-anchor="middle">
+              <%= Date.parse(p[:date]).strftime("%b %d") rescue p[:date] %>
+            </text>
+          <% end %>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+  <%# Max Drawdown Card %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #c62828;">dangerous</span> Max Drawdown</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 2rem; font-weight: 700; color: var(--negative); margin-bottom: 0.75rem;">
+        -<%= @max_drawdown[:pct] %>%
+      </div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.6;">
+        <div>Peak: <strong><%= number_to_currency(@max_drawdown[:peak]) %></strong></div>
+        <div>Trough: <strong><%= number_to_currency(@max_drawdown[:trough] || 0) %></strong></div>
+        <div>Amount: <strong><%= number_to_currency(@max_drawdown[:amount]) %></strong></div>
+        <% if @max_drawdown[:start_date] %>
+          <div>Period: <%= @max_drawdown[:start_date] %> → <%= @max_drawdown[:end_date] %></div>
+        <% end %>
+        <% if @max_drawdown[:recovery_date] %>
+          <div style="color: var(--positive);">Recovered: <%= @max_drawdown[:recovery_date] %></div>
+        <% else %>
+          <div style="color: var(--negative);">Not yet recovered</div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Risk Metrics Card %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1a73e8;">shield</span> Risk Metrics</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% [
+        { label: "Sharpe Ratio", value: @risk_metrics[:sharpe], good: @risk_metrics[:sharpe].to_f > 1 },
+        { label: "Sortino Ratio", value: @risk_metrics[:sortino], good: @risk_metrics[:sortino].to_f > 1.5 },
+        { label: "Calmar Ratio", value: @risk_metrics[:calmar], good: @risk_metrics[:calmar].to_f > 1 },
+        { label: "Win Rate", value: @risk_metrics[:win_rate] ? "#{@risk_metrics[:win_rate]}%" : nil, good: @risk_metrics[:win_rate].to_f > 50 },
+        { label: "Profit Factor", value: @risk_metrics[:profit_factor], good: @risk_metrics[:profit_factor].to_f > 1.5 }
+      ].each do |metric| %>
+        <div style="display: flex; justify-content: space-between; padding: 0.375rem 0; border-bottom: 1px solid var(--border); font-size: 0.8125rem;">
+          <span><%= metric[:label] %></span>
+          <span style="font-weight: 600; color: <%= metric[:value] ? (metric[:good] ? 'var(--positive)' : 'var(--negative)') : 'var(--text-secondary)' %>;">
+            <%= metric[:value] || "—" %>
+          </span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Historical Drawdown Periods %>
+<% if @drawdown_history.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">history</span> Top Drawdown Periods</h2>
+    </div>
+    <div style="padding: 0;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.625rem 1rem; text-align: left;">#</th>
+            <th style="padding: 0.625rem 0.75rem; text-align: left;">Start</th>
+            <th style="padding: 0.625rem 0.75rem; text-align: left;">Bottom</th>
+            <th style="padding: 0.625rem 0.75rem; text-align: right;">Depth</th>
+            <th style="padding: 0.625rem 0.75rem; text-align: right;">Amount</th>
+            <th style="padding: 0.625rem 1rem; text-align: center;">Recovery</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @drawdown_history.each_with_index do |dd, i| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.625rem 1rem; font-weight: 600;"><%= i + 1 %></td>
+              <td style="padding: 0.625rem 0.75rem;"><%= dd[:start] %></td>
+              <td style="padding: 0.625rem 0.75rem;"><%= dd[:bottom] %></td>
+              <td style="padding: 0.625rem 0.75rem; text-align: right; color: var(--negative); font-weight: 600;">-<%= dd[:depth] %>%</td>
+              <td style="padding: 0.625rem 0.75rem; text-align: right;"><%= number_to_currency(dd[:amount]) %></td>
+              <td style="padding: 0.625rem 1rem; text-align: center;">
+                <% if dd[:recovery] %>
+                  <span style="color: var(--positive);"><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">check</span> <%= dd[:recovery] %></span>
+                <% else %>
+                  <span style="color: var(--negative);">Ongoing</span>
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Monthly Drawdowns %>
+<% if @monthly_drawdowns.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">calendar_month</span> Monthly Drawdowns</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <%
+        max_monthly_dd = @monthly_drawdowns.map { |m| m[:max_drawdown] }.max
+        max_monthly_dd = [max_monthly_dd, 1].max
+      %>
+      <div style="display: flex; gap: 4px; align-items: flex-end; height: 120px;">
+        <% @monthly_drawdowns.each do |m| %>
+          <% bar_h = max_monthly_dd > 0 ? (m[:max_drawdown] / max_monthly_dd * 100) : 0 %>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;">
+            <div style="font-size: 0.5625rem; color: var(--text-secondary);"><%= number_to_currency(m[:max_drawdown], precision: 0) %></div>
+            <div style="width: 100%; height: <%= bar_h %>%; min-height: 2px; background: <%= m[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; border-radius: 2px 2px 0 0; opacity: 0.8;"
+                 title="<%= m[:month] %> — Max DD: $<%= m[:max_drawdown] %>, P&L: $<%= m[:total_pnl] %>"></div>
+            <div style="font-size: 0.5625rem; color: var(--text-secondary);"><%= m[:month].sub(/^\d{4}-/, '') %></div>
+          </div>
+        <% end %>
+      </div>
+      <div style="text-align: center; margin-top: 0.5rem; font-size: 0.625rem; color: var(--text-secondary);">
+        <span style="display: inline-block; width: 8px; height: 8px; background: var(--positive); border-radius: 1px;"></span> Profitable month
+        <span style="display: inline-block; width: 8px; height: 8px; background: var(--negative); border-radius: 1px; margin-left: 0.5rem;"></span> Losing month
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+  <%# Worst Days %>
+  <% if @worst_days.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">warning</span> Worst Trading Days</h2>
+      </div>
+      <div style="padding: 0;">
+        <% @worst_days.each do |day| %>
+          <div style="display: flex; justify-content: space-between; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border); font-size: 0.8125rem;">
+            <span><%= day[:date] %></span>
+            <span style="color: var(--negative); font-weight: 600;"><%= number_to_currency(day[:pnl]) %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Drawdown Rules %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00897b;">gavel</span> Drawdown Rules</h2>
+    </div>
+    <div style="padding: 0.5rem 0;">
+      <% @drawdown_rules.each do |rule| %>
+        <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.625rem 1.25rem; font-size: 0.8125rem;">
+          <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= rule[:color] %>; margin-top: 1px;"><%= rule[:icon] %></span>
+          <span><%= rule[:text] %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Risk Analysis", reports_risk_analysis_path, class: "btn" %>
+  <%= link_to "Loss Recovery", loss_recovery_path, class: "btn" %>
+  <%= link_to "Monte Carlo", reports_monte_carlo_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+</div>

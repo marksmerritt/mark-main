@@ -1,0 +1,257 @@
+<div class="page-header">
+  <h1>Spending Insights</h1>
+  <div class="page-actions">
+    <%= link_to "Back", budget_reports_spending_path, class: "btn" %>
+  </div>
+</div>
+
+<% if @data.is_a?(Hash) && @data["error"].nil? %>
+  <%
+    current_total = @data["current_total"].to_f
+    avg_monthly = @data["avg_monthly"].to_f
+    change = @data["overall_change_pct"]
+    status = @data["spending_status"]
+  %>
+
+  <%# Spending health gauge %>
+  <div class="card" style="display: flex; align-items: center; gap: 2rem; padding: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+    <div style="flex-shrink: 0;">
+      <%
+        # Spending ratio: current vs average. < 1 is good, > 1 is over.
+        spend_ratio = avg_monthly > 0 ? (current_total / avg_monthly).clamp(0, 2) : 1
+        # Score: 100 = spending at 0, 50 = on target, 0 = 2x over
+        spend_score = ((1 - (spend_ratio - 1).abs) * 100).clamp(0, 100).round(0)
+        # Flip: underspending is also fine
+        spend_score = 100 - ((spend_ratio - 1).abs * 100).clamp(0, 100).round(0) if spend_ratio <= 1
+        spend_score = [100 - ((spend_ratio - 1) * 100).round(0), 0].max if spend_ratio > 1
+        gauge_color = spend_ratio <= 0.9 ? "var(--positive)" : spend_ratio <= 1.1 ? "var(--primary)" : spend_ratio <= 1.3 ? "#f9ab00" : "var(--negative)"
+        gauge_pct = [1 - (spend_ratio - 1).clamp(-1, 1) * 0.5, 0].max.clamp(0, 1)
+      %>
+      <svg viewBox="0 0 140 85" style="width: 130px;">
+        <%
+          arc_angle = gauge_pct * 180
+          end_rad = (180 - arc_angle) * Math::PI / 180
+          end_x = (70 + 55 * Math.cos(end_rad)).round(1)
+          end_y = (75 - 55 * Math.sin(end_rad)).round(1)
+        %>
+        <path d="M 15 75 A 55 55 0 0 1 125 75" fill="none" stroke="var(--border)" stroke-width="8" stroke-linecap="round" />
+        <% if arc_angle > 0 %>
+          <path d="M 15 75 A 55 55 0 <%= arc_angle > 180 ? 1 : 0 %> 1 <%= end_x %> <%= end_y %>"
+                fill="none" stroke="<%= gauge_color %>" stroke-width="8" stroke-linecap="round" />
+        <% end %>
+        <text x="70" y="62" text-anchor="middle" fill="<%= gauge_color %>" font-size="15" font-weight="700"><%= number_to_currency(current_total, precision: 0) %></text>
+        <text x="70" y="80" text-anchor="middle" fill="var(--text-secondary)" font-size="8">avg: <%= number_to_currency(avg_monthly, precision: 0) %></text>
+      </svg>
+    </div>
+    <div>
+      <h2 style="margin-bottom: 0.25rem;">
+        Spending:
+        <span class="badge badge-<%= status == "high" ? "danger" : status == "elevated" ? "warning" : status == "low" ? "info" : "success" %>" style="font-size: 0.875rem;">
+          <%= status&.capitalize %>
+        </span>
+      </h2>
+      <p class="text-muted" style="font-size: 0.875rem;">
+        <% if change %>
+          <span class="<%= change.to_f > 0 ? 'negative' : 'positive' %>"><%= change > 0 ? "+" : "" %><%= change %>%</span> vs your 3-month average.
+        <% end %>
+        <% if spend_ratio <= 0.85 %>
+          You're well under your typical spending this month.
+        <% elsif spend_ratio <= 1.1 %>
+          Spending is tracking close to your average.
+        <% elsif spend_ratio <= 1.3 %>
+          Spending is elevated — check for one-off expenses.
+        <% else %>
+          Spending significantly exceeds your average. Review recent transactions.
+        <% end %>
+      </p>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">This Month</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(current_total) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">3-Month Average</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(avg_monthly) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Change</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= change.to_f > 0 ? 'negative' : 'positive' %>">
+          <% if change %>
+            <%= change > 0 ? "+" : "" %><%= change %>%
+          <% else %>
+            N/A
+          <% end %>
+        </div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">vs Average</div>
+        <div style="font-size: 1.5rem; font-weight: 700;">
+          <% diff = current_total - avg_monthly %>
+          <span class="<%= diff <= 0 ? 'positive' : 'negative' %>"><%= diff >= 0 ? "+" : "" %><%= number_to_currency(diff) %></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content-grid" style="margin-bottom: 1.5rem;">
+    <% anomalies = @data["merchant_anomalies"] %>
+    <% if anomalies.is_a?(Array) && anomalies.any? %>
+      <div class="card">
+        <div class="card-header"><h2>Unusual Spending</h2></div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Merchant</th>
+              <th style="text-align: right;">This Month</th>
+              <th style="text-align: right;">Average</th>
+              <th style="text-align: right;">Change</th>
+              <th>Type</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% anomalies.each do |a| %>
+              <tr>
+                <td><strong><%= a["merchant"] %></strong></td>
+                <td style="text-align: right;"><%= number_to_currency(a["current"]) %></td>
+                <td style="text-align: right;"><%= number_to_currency(a["average"]) %></td>
+                <td style="text-align: right;" class="<%= a["direction"] == "increase" ? "negative" : (a["direction"] == "decrease" ? "positive" : "") %>">
+                  <% if a["change_pct"] %>
+                    <%= a["change_pct"] > 0 ? "+" : "" %><%= a["change_pct"] %>%
+                  <% else %>
+                    &mdash;
+                  <% end %>
+                </td>
+                <td>
+                  <% color = case a["direction"]
+                    when "increase" then "warning"
+                    when "decrease" then "success"
+                    when "new" then "info"
+                    else "primary"
+                  end %>
+                  <span class="badge badge-<%= color %>"><%= a["direction"]&.capitalize %></span>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+
+    <div class="card">
+      <div class="card-header"><h2>Spending by Day of Week</h2></div>
+      <% patterns = @data["daily_patterns"] %>
+      <% if patterns.is_a?(Array) %>
+        <% max_day = patterns.map { |p| p["total"].to_f }.max %>
+        <div class="chart-container" data-controller="chart"
+             data-chart-type-value="bar"
+             data-chart-labels-value="<%= patterns.map { |p| p["day"] }.to_json %>"
+             data-chart-data-value="<%= patterns.map { |p| p["total"] }.to_json %>"
+             data-chart-color-value="var(--primary)"
+             style="height: 200px; padding: 1rem;">
+          <canvas data-chart-target="canvas"></canvas>
+        </div>
+        <table class="table">
+          <thead>
+            <tr><th>Day</th><th style="text-align: right;">Total</th><th style="text-align: right;">Transactions</th></tr>
+          </thead>
+          <tbody>
+            <% patterns.each do |p| %>
+              <tr class="<%= 'table-row-warning' if p["total"].to_f == max_day && max_day > 0 %>">
+                <td><%= p["day"] %></td>
+                <td style="text-align: right;"><%= number_to_currency(p["total"]) %></td>
+                <td style="text-align: right;"><%= p["count"] %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% end %>
+    </div>
+  </div>
+
+  <% biggest = @data["biggest_transactions"] %>
+  <% if biggest.is_a?(Array) && biggest.any? %>
+    <%
+      max_txn = biggest.map { |t| t["amount"].to_f }.max.to_f
+      max_txn = 1 if max_txn == 0
+    %>
+    <div class="card">
+      <div class="card-header"><h2>Largest Transactions</h2></div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Merchant</th>
+            <th>Description</th>
+            <th style="text-align: right;">Amount</th>
+            <th>Impact</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% biggest.each do |txn| %>
+            <% amt = txn["amount"].to_f %>
+            <tr>
+              <td><%= Date.parse(txn["date"]).strftime("%b %d") rescue txn["date"] %></td>
+              <td><strong><%= txn["merchant"] %></strong></td>
+              <td><%= txn["description"] %></td>
+              <td style="text-align: right;" class="negative"><%= number_to_currency(amt) %></td>
+              <td style="min-width: 80px;">
+                <div style="height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden;">
+                  <div style="height: 100%; width: <%= (amt / max_txn * 100).round(1) %>%; background: var(--negative); opacity: 0.5; border-radius: 5px;"></div>
+                </div>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
+  <%# Quick Recommendations %>
+  <%
+    recommendations = []
+    anomalies_data = @data["merchant_anomalies"]
+    if anomalies_data.is_a?(Array)
+      increases = anomalies_data.select { |a| a["direction"] == "increase" }
+      if increases.count >= 2
+        recommendations << { icon: "trending_up", text: "#{increases.count} merchants show increased spending. Review #{increases.first(2).map { |a| a["merchant"] }.join(" and ")} for potential savings.", type: "warning" }
+      end
+      new_merchants = anomalies_data.select { |a| a["direction"] == "new" }
+      if new_merchants.any?
+        recommendations << { icon: "new_releases", text: "New merchant spending at #{new_merchants.map { |a| a["merchant"] }.first(3).join(", ")}. Track if these become recurring.", type: "info" }
+      end
+    end
+    if change.to_f > 20
+      recommendations << { icon: "warning", text: "Spending is #{change}% above average. Consider deferring non-essential purchases.", type: "danger" }
+    elsif change.to_f < -20
+      recommendations << { icon: "savings", text: "Spending is #{change.to_f.abs}% below average — great restraint this month!", type: "success" }
+    end
+    patterns_data = @data["daily_patterns"]
+    if patterns_data.is_a?(Array) && patterns_data.any?
+      peak_day = patterns_data.max_by { |p| p["total"].to_f }
+      if peak_day
+        recommendations << { icon: "calendar_today", text: "#{peak_day["day"]} is your highest spending day. Plan lighter activity or meal prep to cut costs.", type: "info" }
+      end
+    end
+  %>
+  <% if recommendations.any? %>
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header"><h2>Recommendations</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <% recommendations.each do |rec| %>
+          <div class="insight-item insight-<%= rec[:type] %>" style="margin-bottom: 0.5rem;">
+            <span class="material-icons-outlined"><%= rec[:icon] %></span>
+            <span><%= rec[:text] %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p>No spending data available for this month.</p>
+  </div>
+<% end %>

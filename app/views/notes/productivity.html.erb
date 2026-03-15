@@ -1,0 +1,230 @@
+<div class="page-header">
+  <h1>Writing Productivity</h1>
+  <div class="page-actions">
+    <%= link_to "Notes", notes_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Writing streak and stats %>
+<div class="card" style="display: flex; align-items: center; gap: 2rem; padding: 1.5rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+  <%# Streak circle %>
+  <div style="text-align: center; flex-shrink: 0;">
+    <%
+      streak_color = @writing_streak >= 7 ? "var(--positive)" : @writing_streak >= 3 ? "var(--primary)" : "var(--border)"
+    %>
+    <div style="width: 70px; height: 70px; border-radius: 50%; border: 3px solid <%= streak_color %>;
+                display: flex; flex-direction: column; align-items: center; justify-content: center;">
+      <span style="font-size: 1.5rem; font-weight: 700; color: <%= @writing_streak >= 3 ? 'var(--primary)' : 'var(--text-secondary)' %>;"><%= @writing_streak %></span>
+      <span style="font-size: 0.5rem; color: var(--text-secondary);">day streak</span>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; flex: 1;">
+    <div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Notes</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= @stats["total_notes"] || @recent_notes.count %></div>
+    </div>
+    <div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Words Written</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= number_with_delimiter(@total_words) %></div>
+    </div>
+    <% if @stats["total_notebooks"].present? %>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notebooks</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @stats["total_notebooks"] %></div>
+      </div>
+    <% end %>
+    <% if @stats["pinned_count"].present? %>
+      <div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Pinned</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @stats["pinned_count"] %></div>
+      </div>
+    <% end %>
+    <% if @writing_streak >= 3 %>
+      <div style="display: flex; align-items: center; gap: 0.25rem;">
+        <span class="material-icons-outlined" style="font-size: 1rem; color: var(--positive);">local_fire_department</span>
+        <span style="font-size: 0.875rem; font-weight: 600; color: var(--positive);">
+          <%= @writing_streak >= 7 ? "On fire!" : "Building momentum" %>
+        </span>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Writing Heatmap (90 days) %>
+<% if @daily_notes.any? %>
+  <%
+    hm_end = Date.current
+    hm_start = hm_end - 89.days
+    hm_grid_start = hm_start - hm_start.wday.days
+    hm_max = [@daily_notes.values.max.to_f, 1].max
+    hm_total_days = (hm_end - hm_grid_start).to_i + 1
+    hm_weeks = (hm_total_days / 7.0).ceil
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Writing Activity (90 Days)</h2></div>
+    <div style="padding: 1rem 1.25rem; overflow-x: auto;">
+      <div style="display: flex; gap: 0.125rem; font-size: 0.5625rem;">
+        <div style="display: flex; flex-direction: column; gap: 0.125rem; margin-right: 0.25rem;">
+          <% %w[S M T W T F S].each do |d| %>
+            <div style="width: 1rem; height: 0.75rem; line-height: 0.75rem; text-align: right; color: var(--text-secondary);"><%= d %></div>
+          <% end %>
+        </div>
+        <% hm_weeks.times do |w| %>
+          <div style="display: flex; flex-direction: column; gap: 0.125rem;">
+            <% 7.times do |d| %>
+              <%
+                cell_date = hm_grid_start + (w * 7 + d).days
+                in_range = cell_date >= hm_start && cell_date <= hm_end
+                count = @daily_notes[cell_date.to_s].to_i
+                intensity = in_range && count > 0 ? (count / hm_max).clamp(0, 1) : 0
+                if !in_range
+                  bg = "transparent"
+                elsif count == 0
+                  bg = "var(--bg)"
+                else
+                  opacity = (0.2 + intensity * 0.7).round(2)
+                  bg = "rgba(26, 115, 232, #{opacity})"
+                end
+              %>
+              <div style="width: 0.75rem; height: 0.75rem; border-radius: 2px; background: <%= bg %>;<%= in_range ? ' border: 1px solid var(--border);' : '' %>"
+                   title="<%= cell_date.strftime('%b %d') %>: <%= count %> note<%= count == 1 ? '' : 's' %>"></div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.75rem; font-size: 0.6875rem; color: var(--text-secondary);">
+        <span>Less</span>
+        <% [0, 0.2, 0.4, 0.6, 0.8, 1.0].each do |level| %>
+          <div style="width: 0.75rem; height: 0.75rem; border-radius: 2px; border: 1px solid var(--border);
+                      background: <%= level == 0 ? 'var(--bg)' : "rgba(26, 115, 232, #{(0.2 + level * 0.7).round(2)})" %>;"></div>
+        <% end %>
+        <span>More</span>
+        <% active_days = @daily_notes.count { |date, _| d = Date.parse(date) rescue nil; d && d >= hm_start && d <= hm_end } %>
+        <span style="margin-left: auto;"><%= active_days %> active days out of 90</span>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div class="content-grid">
+  <%# Notebook distribution %>
+  <% if @by_notebook.is_a?(Array) && @by_notebook.any? %>
+    <div class="card">
+      <div class="card-header"><h2>By Notebook</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <%
+          nb_max = @by_notebook.map { |nb| nb["note_count"].to_i }.max.to_f
+          nb_max = 1 if nb_max == 0
+          nb_colors = ["#1a73e8", "#0d904f", "#e8710a", "#d93025", "#9334e6", "#00bcd4", "#f9ab00"]
+        %>
+        <% @by_notebook.sort_by { |nb| -nb["note_count"].to_i }.first(10).each_with_index do |nb, i| %>
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.8125rem; font-weight: 500; min-width: 8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><%= nb["name"] || nb["notebook_name"] || "Unnamed" %></span>
+            <div style="flex: 1; height: 0.5rem; background: var(--bg); border-radius: 0.25rem; overflow: hidden;">
+              <div style="height: 100%; width: <%= (nb["note_count"].to_i / nb_max * 100).round(1) %>%; background: <%= nb_colors[i % nb_colors.length] %>; border-radius: 0.25rem;"></div>
+            </div>
+            <span style="font-size: 0.8125rem; font-weight: 700; min-width: 2rem; text-align: right;"><%= nb["note_count"] %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Tag usage %>
+  <% if @by_tag.is_a?(Array) && @by_tag.any? %>
+    <div class="card">
+      <div class="card-header"><h2>Most Used Tags</h2></div>
+      <div style="padding: 1rem 1.25rem; display: flex; flex-wrap: wrap; gap: 0.375rem;">
+        <%
+          tag_max = @by_tag.map { |t| t["note_count"].to_i }.max.to_f
+          tag_max = 1 if tag_max == 0
+        %>
+        <% @by_tag.sort_by { |t| -t["note_count"].to_i }.first(20).each do |tag| %>
+          <%
+            tag_size = 0.7 + (tag["note_count"].to_i / tag_max * 0.6)
+          %>
+          <span class="tag" style="font-size: <%= tag_size %>rem; <% if tag["color"].present? %>background-color: <%= tag["color"] %>;<% end %>">
+            <%= tag["name"] || tag["tag_name"] %> (<%= tag["note_count"] %>)
+          </span>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Activity timeline %>
+<% if @activity.is_a?(Array) && @activity.any? %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header"><h2>Recent Activity</h2></div>
+    <div style="padding: 0.5rem 1.25rem;">
+      <% @activity.first(20).each do |event| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+          <%
+            ev_icon = case event["action"].to_s
+                      when "create" then "add_circle"
+                      when "update" then "edit"
+                      when "delete" then "delete"
+                      when "pin" then "push_pin"
+                      when "favorite" then "star"
+                      else "description"
+                      end
+            ev_color = case event["action"].to_s
+                       when "create" then "var(--positive)"
+                       when "delete" then "var(--negative)"
+                       else "var(--text-secondary)"
+                       end
+          %>
+          <span class="material-icons-outlined" style="font-size: 1rem; color: <%= ev_color %>;"><%= ev_icon %></span>
+          <div style="flex: 1; min-width: 0;">
+            <span style="font-size: 0.8125rem; font-weight: 500;"><%= event["action"]&.capitalize %></span>
+            <% if event["title"].present? %>
+              <span style="font-size: 0.8125rem; color: var(--text-secondary);"> &mdash; <%= truncate(event["title"].to_s, length: 50) %></span>
+            <% end %>
+          </div>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary);">
+            <% if event["created_at"].present? %>
+              <%= time_ago_in_words(Time.parse(event["created_at"])) %> ago
+            <% end %>
+          </span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Writing Insights %>
+<div class="card" style="margin-top: 1.5rem;">
+  <div class="card-header"><h2>Writing Insights</h2></div>
+  <div style="padding: 1rem 1.25rem;">
+    <% w_insights = [] %>
+
+    <% if @writing_streak >= 7 %>
+      <% w_insights << { icon: "emoji_events", color: "var(--positive)", text: "Amazing #{@writing_streak}-day writing streak! Consistency is the key to building a knowledge base." } %>
+    <% elsif @writing_streak >= 3 %>
+      <% w_insights << { icon: "local_fire_department", color: "var(--positive)", text: "#{@writing_streak}-day writing streak going strong. Keep the momentum!" } %>
+    <% elsif @writing_streak == 0 && @recent_notes.any? %>
+      <% w_insights << { icon: "info", color: "var(--primary)", text: "No notes today yet. Write something to start a new streak!" } %>
+    <% end %>
+
+    <% if @total_words > 10000 %>
+      <% w_insights << { icon: "auto_stories", color: "var(--positive)", text: "You've written over #{number_with_delimiter(@total_words)} words. That's like a small book!" } %>
+    <% end %>
+
+    <% if @daily_notes.any? %>
+      <% most_productive_day = @daily_notes.max_by { |_, v| v } %>
+      <% w_insights << { icon: "lightbulb", color: "var(--primary)", text: "Your most productive day was #{Date.parse(most_productive_day[0]).strftime('%B %d')} with #{most_productive_day[1]} notes." } %>
+    <% end %>
+
+    <% if w_insights.empty? %>
+      <% w_insights << { icon: "edit_note", color: "var(--primary)", text: "Start writing notes regularly to build your personal knowledge base and track your productivity." } %>
+    <% end %>
+
+    <% w_insights.each do |insight| %>
+      <div style="display: flex; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0.5rem; border-radius: var(--radius); background: var(--bg);">
+        <span class="material-icons-outlined" style="font-size: 1rem; color: <%= insight[:color] %>; margin-top: 2px;"><%= insight[:icon] %></span>
+        <span style="font-size: 0.8125rem;"><%= insight[:text] %></span>
+      </div>
+    <% end %>
+  </div>
+</div>

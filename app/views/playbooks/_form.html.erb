@@ -1,0 +1,79 @@
+<div class="card">
+  <div style="padding: 1.25rem;">
+    <%= form_with url: (playbook["id"] ? playbook_path(playbook["id"]) : playbooks_path),
+                  method: (playbook["id"] ? :patch : :post),
+                  class: "playbook-form" do |f| %>
+
+      <div class="form-group">
+        <%= f.label :name, "Playbook Name" %>
+        <%= f.text_field :name, value: playbook["name"], class: "form-control", placeholder: "e.g., Breakout Strategy", required: true, name: "playbook[name]" %>
+      </div>
+
+      <div class="form-group">
+        <%= f.label :description, "Description" %>
+        <%= f.text_area :description, value: playbook["description"], class: "form-control", rows: 2, placeholder: "Brief description of this strategy...", name: "playbook[description]" %>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem;">
+        <div class="form-group">
+          <label>Asset Classes</label>
+          <input type="text" class="form-control" name="playbook[asset_classes]" value="<%= playbook["asset_classes"] %>" placeholder="e.g., Stocks, Options">
+        </div>
+        <div class="form-group">
+          <label>Timeframes</label>
+          <input type="text" class="form-control" name="playbook[timeframes]" value="<%= playbook["timeframes"] %>" placeholder="e.g., 5min, Daily">
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select class="form-control" name="playbook[status]">
+            <option value="active" <%= "selected" if playbook["status"] != "archived" %>>Active</option>
+            <option value="archived" <%= "selected" if playbook["status"] == "archived" %>>Archived</option>
+          </select>
+        </div>
+      </div>
+
+      <hr style="margin: 1rem 0; border-color: var(--border);">
+
+      <div class="form-group">
+        <label>
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">visibility</span>
+          Setup Rules
+        </label>
+        <textarea class="form-control" name="playbook[setup_rules]" rows="4" placeholder="What conditions must be present before considering a trade?&#10;&#10;- Market trend direction&#10;- Key levels identified&#10;- Volume confirmation"><%= playbook["setup_rules"] %></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">login</span>
+          Entry Criteria
+        </label>
+        <textarea class="form-control" name="playbook[entry_criteria]" rows="4" placeholder="What triggers your entry?&#10;&#10;- Price action signal&#10;- Indicator confirmation&#10;- Order type and placement"><%= playbook["entry_criteria"] %></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">logout</span>
+          Exit Criteria
+        </label>
+        <textarea class="form-control" name="playbook[exit_criteria]" rows="4" placeholder="When do you exit the trade?&#10;&#10;- Take profit targets&#10;- Trailing stop rules&#10;- Time-based exits"><%= playbook["exit_criteria"] %></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>
+          <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">shield</span>
+          Risk Management
+        </label>
+        <textarea class="form-control" name="playbook[risk_rules]" rows="4" placeholder="How do you manage risk?&#10;&#10;- Position sizing rules&#10;- Max loss per trade&#10;- Daily loss limit"><%= playbook["risk_rules"] %></textarea>
+      </div>
+
+      <div class="form-actions">
+        <%= f.submit (playbook["id"] ? "Update Playbook" : "Create Playbook"), class: "btn btn-primary" %>
+        <% if playbook["id"] %>
+          <%= link_to "Cancel", playbook_path(playbook["id"]), class: "btn" %>
+        <% else %>
+          <%= link_to "Cancel", playbooks_path, class: "btn" %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>

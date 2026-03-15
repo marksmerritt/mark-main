@@ -1,0 +1,297 @@
+<% content_for(:title) { "Activity Feed" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #e65100;">rss_feed</span>
+    Trading Activity Feed
+  </h1>
+</div>
+
+<%# === Today's Summary Card === %>
+<div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid #e65100;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">today</span> Today's Summary</h2>
+  </div>
+  <div style="padding: 1rem 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem;">
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades Today</div>
+        <div style="font-size: 1.75rem; font-weight: 700; color: var(--text);"><%= @trades_today %></div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">P&L Today</div>
+        <div style="font-size: 1.75rem; font-weight: 700;" class="<%= @pnl_today >= 0 ? 'positive' : 'negative' %>">
+          <%= @pnl_today >= 0 ? "" : "-" %>$<%= "%.2f" % @pnl_today.abs %>
+        </div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate Today</div>
+        <div style="font-size: 1.75rem; font-weight: 700;" class="<%= @win_rate_today >= 50 ? 'positive' : (@trades_today > 0 ? 'negative' : '') %>">
+          <%= @win_rate_today %>%
+        </div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Journal Today</div>
+        <div style="font-size: 1.75rem; font-weight: 700; color: var(--text);"><%= @journal_today %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# === Stats Strip === %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Events</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_events %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trade Events</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_trade_events %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Journal</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_journal_events %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Milestones</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #f9a825;"><%= @total_milestone_events %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Running P&L</div>
+      <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @running_pnl >= 0 ? 'positive' : 'negative' %>">
+        <%= @running_pnl >= 0 ? "" : "-" %>$<%= "%.2f" % @running_pnl.abs %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# === Filter Bar === %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; gap: 0.5rem; padding: 0.75rem 1.25rem; flex-wrap: wrap; align-items: center;">
+    <span class="material-icons-outlined" style="font-size: 1rem; color: var(--text-secondary);">filter_list</span>
+    <%= link_to "All", trade_feed_path, class: "btn btn-sm #{@filter == 'all' ? 'btn-primary' : ''}" %>
+    <%= link_to "Trades", trade_feed_path(filter: "trades"), class: "btn btn-sm #{@filter == 'trades' ? 'btn-primary' : ''}" %>
+    <%= link_to "Journal", trade_feed_path(filter: "journal"), class: "btn btn-sm #{@filter == 'journal' ? 'btn-primary' : ''}" %>
+    <%= link_to "Milestones", trade_feed_path(filter: "milestones"), class: "btn btn-sm #{@filter == 'milestones' ? 'btn-primary' : ''}" %>
+  </div>
+</div>
+
+<%# === Running P&L Sparkline === %>
+<% if @running_pnl_data.any? && @running_pnl_data.length > 1 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Running P&L</h2>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <%
+        spark_data = @running_pnl_data
+        spark_min = spark_data.min
+        spark_max = spark_data.max
+        spark_range = spark_max - spark_min
+        spark_range = 1.0 if spark_range == 0
+        svg_w = 700
+        svg_h = 100
+        pad = 10
+        chart_w = svg_w - (pad * 2)
+        chart_h = svg_h - (pad * 2)
+        zero_y = pad + chart_h - ((0 - spark_min) / spark_range * chart_h)
+        points = spark_data.each_with_index.map { |v, i|
+          x = pad + (i.to_f / [spark_data.length - 1, 1].max * chart_w)
+          y = pad + chart_h - ((v - spark_min) / spark_range * chart_h)
+          "#{x.round(1)},#{y.round(1)}"
+        }.join(" ")
+        fill_points = "#{pad},#{zero_y.round(1)} #{points} #{pad + chart_w},#{zero_y.round(1)}"
+        line_color = @running_pnl >= 0 ? "var(--positive)" : "var(--negative)"
+        fill_color = @running_pnl >= 0 ? "rgba(46,125,50,0.1)" : "rgba(211,47,47,0.1)"
+      %>
+      <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; height: auto;" preserveAspectRatio="none">
+        <line x1="<%= pad %>" y1="<%= zero_y.round(1) %>" x2="<%= svg_w - pad %>" y2="<%= zero_y.round(1) %>"
+              stroke="var(--border)" stroke-width="1" stroke-dasharray="4,3" />
+        <polygon points="<%= fill_points %>" fill="<%= fill_color %>" />
+        <polyline points="<%= points %>" fill="none" stroke="<%= line_color %>" stroke-width="2" />
+        <% last_x = pad + ((spark_data.length - 1).to_f / [spark_data.length - 1, 1].max * chart_w) %>
+        <% last_y = pad + chart_h - ((spark_data.last - spark_min) / spark_range * chart_h) %>
+        <circle cx="<%= last_x.round(1) %>" cy="<%= last_y.round(1) %>" r="3" fill="<%= line_color %>" />
+      </svg>
+      <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+        <span>Oldest</span>
+        <span>Current: <strong class="<%= @running_pnl >= 0 ? 'positive' : 'negative' %>"><%= @running_pnl >= 0 ? "" : "-" %>$<%= "%.2f" % @running_pnl.abs %></strong></span>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# === Activity Timeline === %>
+<% if @grouped.any? %>
+  <div style="position: relative; padding-left: 2rem;">
+    <%# Vertical timeline line %>
+    <div style="position: absolute; left: 0.9375rem; top: 0; bottom: 0; width: 2px; background: var(--border);"></div>
+
+    <%
+      running_idx = 0
+    %>
+    <% @grouped.each do |date, events| %>
+      <%
+        parsed_date = Date.parse(date) rescue nil
+        day_label = if parsed_date == Date.current
+                      "Today"
+                    elsif parsed_date == Date.current - 1
+                      "Yesterday"
+                    elsif parsed_date && parsed_date >= Date.current.beginning_of_week
+                      parsed_date.strftime("%A")
+                    else
+                      parsed_date&.strftime("%B %-d, %Y") || date
+                    end
+        day_pnl = events.select { |e| e[:pnl] }.sum { |e| e[:pnl].to_f }
+        day_trades_count = events.count { |e| %w[trade_closed stop_hit target_hit].include?(e[:type]) }
+      %>
+
+      <%# Day header %>
+      <div style="position: relative; margin-bottom: 0.5rem; margin-top: 1.75rem;">
+        <div style="position: absolute; left: -2rem; top: 50%; transform: translateY(-50%); width: 12px; height: 12px;
+                    background: var(--surface); border: 2px solid #e65100; border-radius: 50%;"></div>
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+          <div style="font-size: 0.9375rem; font-weight: 700; color: var(--text); padding: 0.25rem 0;">
+            <%= day_label %>
+          </div>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary);">
+            <%= events.count %> event<%= events.count == 1 ? "" : "s" %>
+          </span>
+          <% if day_trades_count > 0 %>
+            <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 3px; font-weight: 600;
+                         background: <%= day_pnl >= 0 ? 'rgba(46,125,50,0.1)' : 'rgba(211,47,47,0.1)' %>;
+                         color: <%= day_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+              Day P&L: <%= day_pnl >= 0 ? "" : "-" %>$<%= "%.2f" % day_pnl.abs %>
+            </span>
+          <% end %>
+        </div>
+      </div>
+
+      <%# Events for this day %>
+      <% events.each do |event| %>
+        <%
+          type_config = {
+            "trade_opened" => { bg: "rgba(21,101,192,0.06)", border: "#1565c0", label: "Opened" },
+            "trade_closed" => { bg: "rgba(46,125,50,0.06)", border: "var(--positive)", label: "Closed" },
+            "stop_hit"     => { bg: "rgba(211,47,47,0.06)", border: "#d32f2f", label: "Stop Hit" },
+            "target_hit"   => { bg: "rgba(46,125,50,0.06)", border: "#2e7d32", label: "Target Hit" },
+            "journal"      => { bg: "rgba(106,27,154,0.06)", border: "#6a1b9a", label: "Journal" },
+            "milestone"    => { bg: "rgba(249,168,37,0.06)", border: "#f9a825", label: "Milestone" }
+          }
+          cfg = type_config[event[:type]] || type_config["trade_closed"]
+
+          # Relative time
+          begin
+            event_time = Time.parse(event[:timestamp])
+            diff = Time.current - event_time
+            if diff < 60
+              time_ago = "just now"
+            elsif diff < 3600
+              mins = (diff / 60).to_i
+              time_ago = "#{mins}m ago"
+            elsif diff < 86400
+              hours = (diff / 3600).to_i
+              time_ago = "#{hours}h ago"
+            elsif diff < 172800
+              time_ago = "yesterday"
+            else
+              time_ago = event_time.strftime("%b %-d")
+            end
+            time_display = event_time.strftime("%H:%M")
+          rescue
+            time_ago = ""
+            time_display = ""
+          end
+        %>
+        <div style="position: relative; margin-bottom: 0.5rem;">
+          <%# Timeline dot %>
+          <div style="position: absolute; left: -2rem; top: 0.875rem; transform: translateY(-50%); width: 8px; height: 8px;
+                      background: <%= event[:color] %>; border-radius: 50%;"></div>
+
+          <div class="card" style="border-left: 3px solid <%= cfg[:border] %>; margin-bottom: 0;">
+            <div style="padding: 0.75rem 1rem; display: flex; align-items: flex-start; gap: 0.75rem;">
+              <%# Icon circle %>
+              <div style="width: 36px; height: 36px; border-radius: 50%; background: <%= cfg[:bg] %>;
+                          display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= event[:color] %>;"><%= event[:icon] %></span>
+              </div>
+
+              <%# Content %>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                  <% if event[:trade_id] %>
+                    <a href="/trades/<%= event[:trade_id] %>" style="font-size: 0.875rem; font-weight: 600; text-decoration: none; color: var(--text);">
+                      <%= event[:title] %>
+                    </a>
+                  <% elsif event[:journal_id] %>
+                    <a href="/journal_entries/<%= event[:journal_id] %>" style="font-size: 0.875rem; font-weight: 600; text-decoration: none; color: var(--text);">
+                      <%= event[:title] %>
+                    </a>
+                  <% else %>
+                    <span style="font-size: 0.875rem; font-weight: 600; color: var(--text);">
+                      <%= event[:title] %>
+                    </span>
+                  <% end %>
+                  <span style="font-size: 0.5625rem; padding: 0.125rem 0.375rem; border-radius: 3px; background: <%= cfg[:bg] %>; color: <%= cfg[:border] %>; font-weight: 600; text-transform: uppercase;">
+                    <%= cfg[:label] %>
+                  </span>
+                </div>
+
+                <% if event[:details].present? %>
+                  <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                    <%= event[:details] %>
+                  </div>
+                <% end %>
+              </div>
+
+              <%# Right side: P&L badge + time %>
+              <div style="text-align: right; flex-shrink: 0;">
+                <% if event[:pnl] %>
+                  <div style="font-size: 0.8125rem; font-weight: 700; padding: 0.125rem 0.5rem; border-radius: 4px; display: inline-block;
+                              background: <%= event[:pnl] >= 0 ? 'rgba(46,125,50,0.1)' : 'rgba(211,47,47,0.1)' %>;
+                              color: <%= event[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                    <%= event[:pnl] >= 0 ? "+" : "-" %>$<%= "%.2f" % event[:pnl].abs %>
+                  </div>
+                <% end %>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                  <% if time_display.present? %>
+                    <%= time_display %>
+                  <% end %>
+                  <% if time_ago.present? %>
+                    <div style="font-size: 0.625rem; color: var(--text-secondary); opacity: 0.7;"><%= time_ago %></div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <% running_idx += 1 %>
+      <% end %>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem; color: #e65100;">rss_feed</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No activity yet</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Start trading and writing journal entries to see your live activity feed.</div>
+  </div>
+<% end %>
+
+<%# === Bottom Navigation === %>
+<div class="card" style="margin-top: 2rem;">
+  <div style="display: flex; justify-content: center; gap: 1rem; padding: 1rem; flex-wrap: wrap;">
+    <a href="<%= trades_path %>" class="btn" style="display: flex; align-items: center; gap: 0.375rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem;">candlestick_chart</span> Trades
+    </a>
+    <a href="<%= journal_entries_path %>" class="btn" style="display: flex; align-items: center; gap: 0.375rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem;">auto_stories</span> Journal
+    </a>
+    <a href="<%= root_path %>" class="btn" style="display: flex; align-items: center; gap: 0.375rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem;">dashboard</span> Dashboard
+    </a>
+    <a href="<%= milestones_path %>" class="btn" style="display: flex; align-items: center; gap: 0.375rem;">
+      <span class="material-icons-outlined" style="font-size: 1rem;">emoji_events</span> Milestones
+    </a>
+  </div>
+</div>

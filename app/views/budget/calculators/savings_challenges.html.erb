@@ -1,0 +1,326 @@
+<% content_for(:title) { "Savings Challenges" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #f9a825;">military_tech</span>
+    Savings Challenges
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Savings Projection", budget_savings_projection_path, class: "btn btn-sm" %>
+    <%= link_to "Goals", budget_goals_path, class: "btn btn-sm" %>
+    <%= link_to "Dashboard", budget_dashboard_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<%# Level Card %>
+<%
+  level_color = @level[:color]
+  level_icon = @level[:icon]
+%>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: linear-gradient(135deg, var(--card-bg) 0%, var(--bg) 100%);">
+  <div style="display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap;">
+    <div style="width: 72px; height: 72px; border-radius: 50%; background: <%= level_color %>22; display: flex; align-items: center; justify-content: center; border: 3px solid <%= level_color %>;">
+      <span class="material-icons-outlined" style="font-size: 2rem; color: <%= level_color %>;"><%= level_icon %></span>
+    </div>
+    <div style="flex: 1; min-width: 200px;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Current Level</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= level_color %>; margin-bottom: 0.25rem;"><%= @level[:name] %></div>
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <div style="flex: 1; height: 8px; background: var(--border); border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: <%= @level_progress %>%; background: <%= level_color %>; border-radius: 4px; transition: width 0.5s;"></div>
+        </div>
+        <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);"><%= @points %> pts</span>
+      </div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+        <% if @level[:rank] < 3 %>
+          <%= (@level[:max] - @points) %> points to next level
+        <% else %>
+          Maximum level reached!
+        <% end %>
+      </div>
+    </div>
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      <% @badges.select { |b| b[:earned] }.first(5).each do |badge| %>
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: #f9a82522; display: flex; align-items: center; justify-content: center;" title="<%= badge[:name] %>: <%= badge[:description] %>">
+          <span class="material-icons-outlined" style="font-size: 1.125rem; color: #f9a825;"><%= badge[:icon] %></span>
+        </div>
+      <% end %>
+      <% unearned = @badges.count { |b| !b[:earned] } %>
+      <% if unearned > 0 %>
+        <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--border); display: flex; align-items: center; justify-content: center;" title="<%= unearned %> more badges to earn">
+          <span style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);">+<%= unearned %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Active Challenges</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);"><%= @active_challenges %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Potential Annual Savings</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@total_potential_savings) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">No-Spend Streak</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= @no_spend_streak %> <span style="font-size: 0.75rem; font-weight: 400;">days</span></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings Rate</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: <%= @current_savings_rate >= 20 ? 'var(--positive)' : @current_savings_rate >= 10 ? '#f9ab00' : 'var(--negative)' %>;"><%= @current_savings_rate %>%</div>
+    </div>
+  </div>
+</div>
+
+<%# Challenge Cards Grid %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <% @challenges.each do |challenge| %>
+    <%
+      status_label = case challenge[:status]
+                     when "completed" then "Completed"
+                     when "on_track" then "On Track"
+                     when "behind" then "Behind"
+                     when "starting" then "Getting Started"
+                     when "high_impact" then "High Impact"
+                     when "moderate" then "Moderate"
+                     when "low" then "Low Impact"
+                     when "improving" then "Improving"
+                     when "flat" then "Flat"
+                     when "declining" then "Declining"
+                     when "active" then "Active"
+                     when "no_debt" then "No Debt"
+                     else "Active"
+                     end
+      status_color = case challenge[:status]
+                     when "completed" then "var(--positive)"
+                     when "on_track", "improving" then "#1a73e8"
+                     when "behind", "declining" then "var(--negative)"
+                     when "high_impact" then "#e65100"
+                     when "starting", "flat", "moderate", "low" then "#f9ab00"
+                     when "no_debt" then "var(--text-secondary)"
+                     else "var(--primary)"
+                     end
+    %>
+    <div class="card" style="padding: 1.25rem;">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.625rem;">
+          <div style="width: 40px; height: 40px; border-radius: 10px; background: <%= challenge[:color] %>18; display: flex; align-items: center; justify-content: center;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= challenge[:color] %>;"><%= challenge[:icon] %></span>
+          </div>
+          <div>
+            <div style="font-size: 0.9375rem; font-weight: 600;"><%= challenge[:name] %></div>
+          </div>
+        </div>
+        <span style="font-size: 0.6875rem; font-weight: 600; padding: 0.125rem 0.5rem; border-radius: 9999px; background: <%= status_color %>18; color: <%= status_color %>;"><%= status_label %></span>
+      </div>
+
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.4;"><%= challenge[:description] %></div>
+
+      <%# Progress Bar %>
+      <div style="margin-bottom: 0.75rem;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">
+          <span style="font-weight: 500;">Progress</span>
+          <span style="color: var(--text-secondary);"><%= challenge[:current_progress] %>%</span>
+        </div>
+        <div style="height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+          <div style="height: 100%; width: <%= [challenge[:current_progress], 100].min %>%; background: <%= challenge[:color] %>; border-radius: 3px; transition: width 0.5s;"></div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <% if challenge[:savings_potential].to_f > 0 %>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--positive);">savings</span>
+            Potential: <strong style="color: var(--positive);"><%= number_to_currency(challenge[:savings_potential]) %></strong>/yr
+          </div>
+        <% else %>
+          <div></div>
+        <% end %>
+        <% if challenge[:name] == "No-Spend Challenge" && challenge[:extra] %>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Best: <strong><%= challenge[:extra][:best_streak] %></strong> days</div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Latte Factor Breakdown %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <div class="card">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #795548;">local_cafe</span>
+        Latte Factor Breakdown
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem;">
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Daily</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: #795548;"><%= number_to_currency(@latte_daily) %></div>
+        </div>
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: #795548;"><%= number_to_currency(@latte_monthly) %></div>
+        </div>
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Annual</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@latte_annual) %></div>
+        </div>
+      </div>
+
+      <% if @latte_by_merchant.any? %>
+        <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.5rem;">Top Small-Purchase Merchants</div>
+        <% @latte_by_merchant.each do |merchant, data| %>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+            <div>
+              <div style="font-size: 0.8125rem; font-weight: 500;"><%= merchant %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= data[:count] %> purchases</div>
+            </div>
+            <div style="font-size: 0.875rem; font-weight: 600;"><%= number_to_currency(data[:total]) %></div>
+          </div>
+        <% end %>
+      <% else %>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); text-align: center; padding: 1rem;">No small purchases found.</div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Round-Up Savings Projection %>
+  <div class="card">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2196f3;">arrow_circle_up</span>
+        Round-Up Savings Projection
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;">Projected Annual Round-Up Savings</div>
+        <div style="font-size: 2.5rem; font-weight: 700; color: #2196f3;"><%= number_to_currency(@round_up_projection) %></div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">From rounding up every purchase to the nearest dollar</div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem;">
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(@round_up_projection / 12.0) %></div>
+        </div>
+        <div style="text-align: center; padding: 0.75rem; background: var(--bg); border-radius: 8px;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">5-Year Total</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@round_up_projection * 5) %></div>
+        </div>
+      </div>
+
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #2196f3;">info</span>
+        Round-up savings automatically redirect spare change from each transaction. Many banks and apps offer this feature. Even small amounts compound over time.
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Badges Collection %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2>
+      <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #f9a825;">emoji_events</span>
+      Badges
+    </h2>
+    <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @badges.count { |b| b[:earned] } %>/<%= @badges.count %> earned</span>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem;">
+      <% @badges.each do |badge| %>
+        <div style="text-align: center; padding: 0.75rem; border-radius: 10px; background: <%= badge[:earned] ? '#f9a82510' : 'var(--bg)' %>; opacity: <%= badge[:earned] ? '1' : '0.5' %>;">
+          <div style="width: 44px; height: 44px; margin: 0 auto 0.5rem; border-radius: 50%; background: <%= badge[:earned] ? '#f9a82522' : 'var(--border)' %>; display: flex; align-items: center; justify-content: center;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= badge[:earned] ? '#f9a825' : 'var(--text-secondary)' %>;"><%= badge[:icon] %></span>
+          </div>
+          <div style="font-size: 0.75rem; font-weight: 600;"><%= badge[:name] %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= badge[:description] %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Savings Rate Trend %>
+<% if @monthly_savings_rates.any? %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2>
+      <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00bcd4;">trending_up</span>
+      Savings Rate Trend
+    </h2>
+    <span style="font-size: 0.75rem; font-weight: 600; color: <%= @savings_rate_trend > 0 ? 'var(--positive)' : @savings_rate_trend < 0 ? 'var(--negative)' : 'var(--text-secondary)' %>;">
+      <%= @savings_rate_trend > 0 ? '+' : '' %><%= @savings_rate_trend.round(1) %>% MoM
+    </span>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: flex; align-items: flex-end; gap: 0.5rem; height: 120px;">
+      <% max_rate = [@monthly_savings_rates.map { |r| r[:rate].abs }.max || 1, 1].max %>
+      <% @monthly_savings_rates.each do |entry| %>
+        <% bar_height = max_rate > 0 ? (entry[:rate].abs / max_rate * 100).round(1) : 0 %>
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;">
+          <div style="font-size: 0.6875rem; font-weight: 600; margin-bottom: 0.25rem; color: <%= entry[:rate] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= entry[:rate] %>%</div>
+          <div style="width: 100%; max-width: 48px; height: <%= [bar_height, 5].max %>%; background: <%= entry[:rate] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; border-radius: 4px 4px 0 0; opacity: 0.8;"></div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= entry[:month]&.slice(5, 2) || "" %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+<% end %>
+
+<%# Cash Envelope Suggestions %>
+<% if @envelope_suggestions.any? %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2>
+      <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #9c27b0;">payments</span>
+      Cash Envelope Budgets
+    </h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+      Suggested weekly cash amounts for discretionary categories based on your spending history.
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;">
+      <% @envelope_suggestions.each do |env| %>
+        <div style="padding: 0.75rem; background: var(--bg); border-radius: 8px; border-left: 3px solid #9c27b0;">
+          <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.25rem;"><%= env[:category] %></div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">Weekly</span>
+            <span style="font-size: 0.875rem; font-weight: 600;"><%= number_to_currency(env[:weekly]) %></span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="font-size: 0.75rem; color: var(--text-secondary);">Monthly</span>
+            <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= number_to_currency(env[:monthly]) %></span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+<% end %>
+
+<%# Bottom Navigation %>
+<div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+  <%= link_to budget_savings_projection_path, class: "card", style: "flex: 1; min-width: 160px; padding: 1rem; text-align: center; text-decoration: none; color: inherit;" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary); display: block; margin-bottom: 0.25rem;">query_stats</span>
+    <span style="font-size: 0.8125rem; font-weight: 600;">Savings Projection</span>
+  <% end %>
+  <%= link_to budget_goals_path, class: "card", style: "flex: 1; min-width: 160px; padding: 1rem; text-align: center; text-decoration: none; color: inherit;" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--positive); display: block; margin-bottom: 0.25rem;">flag</span>
+    <span style="font-size: 0.8125rem; font-weight: 600;">Goals</span>
+  <% end %>
+  <%= link_to budget_dashboard_path, class: "card", style: "flex: 1; min-width: 160px; padding: 1rem; text-align: center; text-decoration: none; color: inherit;" do %>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; color: #f9a825; display: block; margin-bottom: 0.25rem;">dashboard</span>
+    <span style="font-size: 0.8125rem; font-weight: 600;">Dashboard</span>
+  <% end %>
+</div>

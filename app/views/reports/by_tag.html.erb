@@ -1,0 +1,140 @@
+<div class="page-header">
+  <h1>Performance by Tag</h1>
+</div>
+
+<div class="card">
+  <%= form_with url: reports_by_tag_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :start_date, "Start Date" %>
+        <%= f.date_field :start_date, value: params[:start_date], class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :end_date, "End Date" %>
+        <%= f.date_field :end_date, value: params[:end_date], class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+        <%= link_to "Clear", reports_by_tag_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @tags.is_a?(Array) && @tags.any? %>
+  <%
+    max_pnl = @tags.map { |t| t["total_pnl"].to_f.abs }.max || 1
+    profitable_tags = @tags.count { |t| t["total_pnl"].to_f > 0 }
+    total_tag_pnl = @tags.sum { |t| t["total_pnl"].to_f }
+    best_tag = @tags.max_by { |t| t["total_pnl"].to_f }
+    worst_tag = @tags.min_by { |t| t["total_pnl"].to_f }
+    best_wr_tag = @tags.select { |t| t["trade_count"].to_i >= 5 }.max_by { |t| t["win_rate"].to_f }
+  %>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Tags</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @tags.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profitable Tags</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= profitable_tags %> / <%= @tags.count %></div>
+      </div>
+      <% if best_tag %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Tag</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= (best_tag["tag"].is_a?(Hash) ? best_tag["tag"]["name"] : best_tag["name"]) || best_tag["tag"] %></div>
+        </div>
+      <% end %>
+      <% if best_wr_tag %>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Win Rate (5+)</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= (best_wr_tag["tag"].is_a?(Hash) ? best_wr_tag["tag"]["name"] : best_wr_tag["name"]) || best_wr_tag["tag"] %> (<%= best_wr_tag["win_rate"] %>%)</div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Visual tag performance bubbles %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Tag Performance Map</h2></div>
+    <div style="padding: 1rem 1.25rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">
+      <% @tags.sort_by { |t| -t["total_pnl"].to_f.abs }.each do |t| %>
+        <%
+          tag_data = t["tag"] || t
+          tag_name = tag_data.is_a?(Hash) ? tag_data["name"] : (t["name"] || t["tag"])
+          tag_color = tag_data.is_a?(Hash) ? tag_data["color"] : t["color"]
+          pnl = t["total_pnl"].to_f
+          size_pct = (pnl.abs / max_pnl).clamp(0.3, 1)
+          font_size = (0.75 + size_pct * 0.5).round(2)
+          padding_h = (0.5 + size_pct * 0.5).round(2)
+          padding_v = (0.25 + size_pct * 0.25).round(2)
+        %>
+        <div style="display: inline-flex; flex-direction: column; align-items: center; padding: <%= padding_v %>rem <%= padding_h %>rem;
+                    border-radius: var(--radius); border: 1px solid var(--border);
+                    background: rgba(<%= pnl >= 0 ? '13,144,79' : '217,48,37' %>, 0.06);"
+             title="<%= tag_name %>: P&L <%= number_to_currency(pnl) %>, Win Rate <%= t["win_rate"] %>%, Trades: <%= t["trade_count"] %>">
+          <span style="font-size: <%= font_size %>rem; font-weight: 600;" class="<%= pnl >= 0 ? 'positive' : 'negative' %>">
+            <%= tag_name %>
+          </span>
+          <span style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.125rem;">
+            <%= number_to_currency(pnl, precision: 0) %>
+          </span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<div class="card">
+  <% if @tags.is_a?(Array) && @tags.any? %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Tag</th>
+          <th>Trades</th>
+          <th>Total P&L</th>
+          <th>Avg P&L</th>
+          <th>Win Rate</th>
+          <th>Wins</th>
+          <th>Losses</th>
+          <th style="width: 20%;">P&L</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% tag_max_pnl = @tags.map { |t| t["total_pnl"].to_f.abs }.max.to_f %>
+        <% @tags.sort_by { |t| -t["total_pnl"].to_f }.each do |t| %>
+          <tr>
+            <td>
+              <% tag_data = t["tag"] || t %>
+              <% tag_color = tag_data.is_a?(Hash) ? tag_data["color"] : t["color"] %>
+              <% tag_name = tag_data.is_a?(Hash) ? tag_data["name"] : (t["name"] || t["tag"]) %>
+              <span class="tag" <% if tag_color.present? %>style="background-color: <%= tag_color %>"<% end %>>
+                <%= tag_name %>
+              </span>
+            </td>
+            <td><%= t["trade_count"] %></td>
+            <td class="<%= t["total_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+              <%= number_to_currency(t["total_pnl"]) %>
+            </td>
+            <td class="<%= t["avg_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+              <%= number_to_currency(t["avg_pnl"]) %>
+            </td>
+            <td><%= t["win_rate"] %>%</td>
+            <td class="positive"><%= t["wins"] %></td>
+            <td class="negative"><%= t["losses"] %></td>
+            <td>
+              <div class="mini-bar-container">
+                <div class="mini-bar <%= t["total_pnl"].to_f >= 0 ? 'positive' : 'negative' %>"
+                     style="width: <%= tag_max_pnl > 0 ? (t["total_pnl"].to_f.abs / tag_max_pnl * 100).round(1) : 0 %>%"></div>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  <% else %>
+    <p class="empty-state">No data available.</p>
+  <% end %>
+</div>

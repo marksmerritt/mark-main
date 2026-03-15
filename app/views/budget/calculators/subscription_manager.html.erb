@@ -1,0 +1,228 @@
+<% content_for(:title) { "Subscription Manager" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #7c4dff;">subscriptions</span>
+    Subscription Manager
+  </h1>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Active Subscriptions</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @active_subscriptions.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Cost</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_monthly) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Annual Cost</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_annual) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Daily Cost</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@daily_cost) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">% of Income</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @income_pct > 15 ? 'var(--negative)' : 'var(--positive)' %>;">
+        <%= @income_pct > 0 ? "#{@income_pct}%" : "N/A" %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Subscription List %>
+<% if @subscriptions.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7c4dff;">subscriptions</span> All Subscriptions</h2>
+    </div>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.625rem 1rem;">Service</th>
+            <th style="text-align: right; padding: 0.625rem;">Monthly</th>
+            <th style="text-align: right; padding: 0.625rem;">Annual</th>
+            <th style="text-align: center; padding: 0.625rem;">Category</th>
+            <th style="text-align: center; padding: 0.625rem;">Last Charge</th>
+            <th style="text-align: center; padding: 0.625rem;">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @subscriptions.each do |s| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem 1rem;">
+                <span style="font-weight: 600;"><%= s[:name] %></span>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+                  <%= s[:frequency].capitalize %> &middot; <%= s[:charge_count] %> charges &middot; Score: <%= s[:worth_score] %>
+                </div>
+              </td>
+              <td style="text-align: right; padding: 0.5rem; font-weight: 700;"><%= number_to_currency(s[:monthly_cost]) %></td>
+              <td style="text-align: right; padding: 0.5rem; color: var(--text-secondary);"><%= number_to_currency(s[:annual_cost]) %></td>
+              <td style="text-align: center; padding: 0.5rem;">
+                <span style="font-size: 0.6875rem; background: var(--bg); padding: 0.125rem 0.5rem; border-radius: 9999px;"><%= s[:category] %></span>
+              </td>
+              <td style="text-align: center; padding: 0.5rem; font-size: 0.8125rem;"><%= s[:last_charge].strftime("%b %d, %Y") %></td>
+              <td style="text-align: center; padding: 0.5rem;">
+                <% status_color = case s[:status]
+                   when "active" then "var(--positive)"
+                   when "overdue" then "var(--warning, orange)"
+                   else "var(--text-secondary)"
+                   end %>
+                <span style="font-size: 0.6875rem; font-weight: 600; color: <%= status_color %>; text-transform: uppercase;">
+                  <%= s[:status].gsub("_", " ") %>
+                </span>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% else %>
+  <div class="card" style="margin-bottom: 1.5rem; padding: 2rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 2rem; margin-bottom: 0.5rem;">search_off</span>
+    <div>No recurring subscriptions detected. More transaction history may be needed.</div>
+  </div>
+<% end %>
+
+<%# Price Increase Alerts %>
+<% if @price_increases.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">trending_up</span> Price Increase Alerts</h2>
+    </div>
+    <div style="padding: 0;">
+      <% @price_increases.each do |s| %>
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-weight: 600;"><%= s[:name] %></span>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.5rem;">
+              since <%= s[:first_seen].strftime("%b %Y") %>
+            </span>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-weight: 700; color: var(--negative);">+<%= number_to_currency(s[:price_change]) %></span>
+            <span style="font-size: 0.6875rem; color: var(--negative); margin-left: 0.25rem;">(+<%= s[:price_change_pct] %>%)</span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Category Breakdown %>
+<% if @by_category.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">category</span> Subscription Cost by Category</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% cat_max = @by_category.values.map { |v| v[:monthly] }.max.to_f; cat_max = 1 if cat_max == 0 %>
+      <% @by_category.each do |cat, data| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+          <span style="width: 7rem; font-size: 0.8125rem; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><%= cat %></span>
+          <div style="flex: 1; height: 1rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= (data[:monthly] / cat_max * 100).round(1) %>%; background: #7c4dff; opacity: 0.6; border-radius: 4px;"></div>
+          </div>
+          <span style="min-width: 5rem; text-align: right; font-size: 0.8125rem; font-weight: 600;"><%= number_to_currency(data[:monthly]) %>/mo</span>
+          <span style="min-width: 1.5rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary);"><%= data[:count] %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Savings Opportunity %>
+<% if @cut_candidates.any? %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--positive);">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">savings</span> Savings Opportunity</h2>
+    </div>
+    <div style="padding: 0 1.25rem 1rem;">
+      <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+        If you cancel these <%= @cut_candidates.count %> least-used subscriptions, you could save
+        <strong style="color: var(--positive);"><%= number_to_currency(@projected_savings) %>/year</strong>.
+      </p>
+      <% @cut_candidates.each do |s| %>
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+          <div>
+            <span style="font-weight: 600;"><%= s[:name] %></span>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.5rem;">Worth-it score: <%= s[:worth_score] %></span>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-weight: 700;"><%= number_to_currency(s[:monthly_cost]) %>/mo</span>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.25rem;">(<%= number_to_currency(s[:annual_cost]) %>/yr)</span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Cost Timeline %>
+<% if @cost_timeline.count > 1 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">timeline</span> Subscription Cost Over Time</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <%
+        timeline_max = @cost_timeline.map { |p| p[:total] }.max.to_f
+        timeline_max = 1 if timeline_max == 0
+        chart_w = 800
+        chart_h = 200
+        padding_left = 50
+        padding_bottom = 30
+        usable_w = chart_w - padding_left
+        usable_h = chart_h - padding_bottom
+        step_x = @cost_timeline.count > 1 ? usable_w.to_f / (@cost_timeline.count - 1) : usable_w
+        points = @cost_timeline.each_with_index.map { |p, i|
+          x = padding_left + (i * step_x)
+          y = usable_h - (p[:total] / timeline_max * usable_h)
+          [x.round(1), y.round(1)]
+        }
+        polyline = points.map { |x, y| "#{x},#{y}" }.join(" ")
+        area_points = "#{padding_left},#{usable_h} #{polyline} #{points.last[0]},#{usable_h}"
+      %>
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h %>" style="width: 100%; height: auto; font-family: inherit;">
+        <%# Grid lines %>
+        <% 5.times do |i| %>
+          <% y = usable_h - (usable_h * i / 4.0) %>
+          <line x1="<%= padding_left %>" y1="<%= y.round(1) %>" x2="<%= chart_w %>" y2="<%= y.round(1) %>" stroke="var(--border)" stroke-width="0.5" />
+          <text x="<%= padding_left - 5 %>" y="<%= y.round(1) + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="9">
+            $<%= (timeline_max * i / 4.0).round(0) %>
+          </text>
+        <% end %>
+        <%# Area fill %>
+        <polygon points="<%= area_points %>" fill="#7c4dff" opacity="0.1" />
+        <%# Line %>
+        <polyline points="<%= polyline %>" fill="none" stroke="#7c4dff" stroke-width="2" stroke-linejoin="round" />
+        <%# Data points %>
+        <% points.each_with_index do |(x, y), i| %>
+          <circle cx="<%= x %>" cy="<%= y %>" r="3" fill="#7c4dff" />
+        <% end %>
+        <%# X-axis labels (show every nth) %>
+        <% label_step = [(@cost_timeline.count / 8.0).ceil, 1].max %>
+        <% @cost_timeline.each_with_index do |p, i| %>
+          <% next unless i % label_step == 0 || i == @cost_timeline.count - 1 %>
+          <text x="<%= points[i][0] %>" y="<%= chart_h - 5 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="9">
+            <%= p[:label] %>
+          </text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Nav %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Recurring Analyzer", budget_recurring_analyzer_path, class: "btn" %>
+  <%= link_to "Bill Tracker", budget_reports_bill_tracker_path, class: "btn" %>
+  <%= link_to "Spending Report", budget_reports_spending_path, class: "btn" %>
+</div>

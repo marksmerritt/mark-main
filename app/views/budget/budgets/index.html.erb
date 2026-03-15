@@ -1,0 +1,62 @@
+<div class="page-header">
+  <h1>Budgets</h1>
+  <div class="page-actions">
+    <%= link_to "New Budget", new_budget_budget_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<% if @budgets.is_a?(Array) && @budgets.any? %>
+  <div class="tags-grid">
+    <% @budgets.each do |budget| %>
+      <%
+        b_pct = budget["percentage_spent"].to_f
+        b_color = b_pct >= 100 ? "var(--negative)" : b_pct >= 80 ? "#f9ab00" : "var(--positive)"
+      %>
+      <div class="card">
+        <div class="card-header">
+          <h2><%= link_to budget["display_name"] || budget_month_name(budget["month"], budget["year"]), budget_budget_path(budget["id"]) %></h2>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <%= zero_based_indicator(budget) %>
+            <span style="font-size: 1.125rem; font-weight: 700; color: <%= b_color %>;"><%= b_pct %>%</span>
+          </div>
+        </div>
+
+        <div style="padding: 0 1.25rem 0.75rem;">
+          <div style="height: 0.5rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= [b_pct, 100].min %>%; background: <%= b_color %>; opacity: 0.7; border-radius: 4px;"></div>
+          </div>
+        </div>
+
+        <div style="padding: 0 1.25rem 0.75rem; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; font-size: 0.8125rem;">
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Income</div>
+            <div style="font-weight: 600;"><%= number_to_currency(budget["income"]) %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Planned</div>
+            <div style="font-weight: 600;"><%= number_to_currency(budget["total_planned"]) %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Spent</div>
+            <div style="font-weight: 600; color: var(--negative);"><%= number_to_currency(budget["total_spent"]) %></div>
+          </div>
+          <div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Remaining</div>
+            <% remaining = budget["income"].to_f - budget["total_spent"].to_f %>
+            <div style="font-weight: 600;" class="<%= remaining >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(remaining) %></div>
+          </div>
+        </div>
+
+        <div style="padding: 0 1.25rem 1rem; display: flex; gap: 0.5rem;">
+          <%= link_to "View", budget_budget_path(budget["id"]), class: "btn btn-sm btn-primary" %>
+          <%= link_to "Edit", edit_budget_budget_path(budget["id"]), class: "btn btn-sm" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No budgets yet. Create your first monthly budget to start tracking expenses.</p>
+    <%= link_to "Create Budget", new_budget_budget_path, class: "btn btn-primary" %>
+  </div>
+<% end %>

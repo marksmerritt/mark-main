@@ -1,0 +1,259 @@
+<% content_for(:title) { "Edge Finder" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #2e7d32;">gps_fixed</span>
+    Edge Finder
+  </h1>
+</div>
+
+<% if @trades.blank? || @trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem; color: #2e7d32;">gps_fixed</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Not enough trading data</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades with P&amp;L to discover your statistical edges.</div>
+  </div>
+<% else %>
+
+  <%# ── Stats Strip ── %>
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #2e7d32;"><%= @edges_found %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Edges Found</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @top_win_rate ? "#{@top_win_rate[:win_rate]}%" : "--" %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Top Edge Win Rate</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);"><%= @best_symbol_edge ? @best_symbol_edge[:name] : "--" %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Best Symbol</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #2e7d32;"><%= @strongest_edge ? @strongest_edge[:name] : "--" %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Strongest Edge</div>
+    </div>
+  </div>
+
+  <% if @playbook.any? %>
+    <%# ── Trading Playbook ── %>
+    <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #2e7d32;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2e7d32;">menu_book</span>
+          Trading Playbook
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Your top statistical edges to exploit. Focus on these patterns for the highest probability trades.
+        </div>
+        <div style="display: grid; gap: 1rem;">
+          <% @playbook.each_with_index do |edge, idx| %>
+            <div style="display: flex; gap: 1rem; align-items: flex-start; padding: 1rem; background: var(--bg); border-radius: 0.5rem; border-left: 4px solid #2e7d32;">
+              <div style="min-width: 2rem; height: 2rem; border-radius: 50%; background: #2e7d32; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.875rem;"><%= idx + 1 %></div>
+              <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 0.9375rem;"><%= edge[:name] %></div>
+                <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= edge[:description] %> &middot; <%= edge[:category] %></div>
+                <div style="display: flex; gap: 1.5rem; margin-top: 0.5rem; font-size: 0.8125rem;">
+                  <span><strong style="color: var(--positive);"><%= edge[:win_rate] %>%</strong> win rate</span>
+                  <span><strong style="color: <%= edge[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(edge[:avg_pnl]) %></strong> avg P&amp;L</span>
+                  <span><strong><%= edge[:trade_count] %></strong> trades</span>
+                  <span style="font-size: 0.75rem; color: #2e7d32; font-weight: 600;">Score: <%= edge[:edge_score] %></span>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Edges by Category ── %>
+  <% category_icons = {
+    "Symbol" => "sell",
+    "Time of Day" => "schedule",
+    "Day of Week" => "date_range",
+    "Position Size" => "tune",
+    "Hold Duration" => "timelapse",
+    "Direction" => "swap_vert",
+    "Setup/Tag" => "label",
+    "Month" => "calendar_month",
+    "Stop Loss" => "shield",
+    "Risk/Reward" => "balance"
+  } %>
+
+  <% if @categories.any? %>
+    <div style="margin-bottom: 1.5rem;">
+      <% @categories.each do |category, edges| %>
+        <details class="card" style="margin-bottom: 0.75rem;" open>
+          <summary class="card-header" style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 0.5rem;">
+            <span class="material-icons-outlined" style="font-size: 1.1rem; color: #2e7d32;"><%= category_icons[category] || "insights" %></span>
+            <h2 style="flex: 1; margin: 0;"><%= category %></h2>
+            <span style="font-size: 0.75rem; color: var(--text-secondary); margin-right: 0.5rem;"><%= edges.count %> edge<%= edges.count == 1 ? "" : "s" %></span>
+          </summary>
+          <div style="padding: 0.5rem 1.25rem 1.25rem;">
+            <% edges.sort_by { |e| -e[:edge_score] }.each do |edge| %>
+              <div style="display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border);">
+                <div style="flex: 1; min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-weight: 600; font-size: 0.875rem;"><%= edge[:name] %></span>
+                    <% if edge[:significant] %>
+                      <span style="font-size: 0.625rem; padding: 0.125rem 0.375rem; background: #2e7d32; color: #fff; border-radius: 0.75rem; font-weight: 600; white-space: nowrap;">SIGNIFICANT</span>
+                    <% end %>
+                  </div>
+                  <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= edge[:description] %></div>
+                </div>
+                <%# Win rate bar %>
+                <div style="width: 8rem;">
+                  <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; margin-bottom: 0.125rem;">
+                    <span>Win Rate</span>
+                    <span style="font-weight: 700; color: <%= edge[:win_rate] >= 55 ? 'var(--positive)' : edge[:win_rate] >= 45 ? 'var(--text-primary)' : 'var(--negative)' %>;"><%= edge[:win_rate] %>%</span>
+                  </div>
+                  <div style="height: 0.375rem; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                    <div style="height: 100%; width: <%= [edge[:win_rate], 100].min %>%; background: <%= edge[:win_rate] >= 55 ? 'var(--positive)' : edge[:win_rate] >= 45 ? 'var(--primary)' : 'var(--negative)' %>; opacity: 0.7; border-radius: 3px;"></div>
+                  </div>
+                </div>
+                <div style="text-align: right; min-width: 5rem;">
+                  <div style="font-weight: 700; font-size: 0.875rem; color: <%= edge[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(edge[:avg_pnl]) %></div>
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary);">avg P&amp;L</div>
+                </div>
+                <div style="text-align: center; min-width: 3.5rem;">
+                  <div style="font-weight: 600; font-size: 0.875rem;"><%= edge[:trade_count] %></div>
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary);">trades</div>
+                </div>
+                <div style="text-align: center; min-width: 3rem;">
+                  <div style="font-weight: 700; font-size: 0.8125rem; color: #2e7d32;"><%= edge[:edge_score] %></div>
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary);">score</div>
+                </div>
+              </div>
+            <% end %>
+          </div>
+        </details>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# ── Edge Heatmap: Symbol x Time of Day ── %>
+  <% if @heatmap_symbols.any? && @heatmap_hours.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2e7d32;">grid_on</span>
+          Edge Heatmap &mdash; Symbol x Time of Day
+        </h2>
+      </div>
+      <div style="padding: 1.25rem; overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
+          <thead>
+            <tr>
+              <th style="padding: 0.375rem 0.5rem; text-align: left; border-bottom: 2px solid var(--border);">Symbol</th>
+              <% @heatmap_hours.each do |hr| %>
+                <th style="padding: 0.375rem 0.5rem; text-align: center; border-bottom: 2px solid var(--border); white-space: nowrap;"><%= hr %></th>
+              <% end %>
+            </tr>
+          </thead>
+          <tbody>
+            <% @heatmap_symbols.each do |sym| %>
+              <tr>
+                <td style="padding: 0.375rem 0.5rem; font-weight: 600; border-bottom: 1px solid var(--border);"><%= sym %></td>
+                <% @heatmap_hours.each do |hr| %>
+                  <% cell = @heatmap_data.dig(sym, hr) %>
+                  <% if cell %>
+                    <%
+                      wr = cell[:win_rate]
+                      bg = if wr >= 65
+                        "rgba(46, 125, 50, 0.3)"
+                      elsif wr >= 55
+                        "rgba(46, 125, 50, 0.15)"
+                      elsif wr >= 45
+                        "rgba(0, 0, 0, 0.04)"
+                      elsif wr >= 35
+                        "rgba(211, 47, 47, 0.15)"
+                      else
+                        "rgba(211, 47, 47, 0.3)"
+                      end
+                      fg = wr >= 55 ? "#2e7d32" : wr < 45 ? "#d32f2f" : "var(--text-secondary)"
+                    %>
+                    <td style="padding: 0.375rem 0.5rem; text-align: center; background: <%= bg %>; border-bottom: 1px solid var(--border);">
+                      <span style="font-weight: 700; color: <%= fg %>;"><%= wr %>%</span>
+                      <div style="font-size: 0.625rem; color: var(--text-secondary);">n=<%= cell[:count] %></div>
+                    </td>
+                  <% else %>
+                    <td style="padding: 0.375rem 0.5rem; text-align: center; border-bottom: 1px solid var(--border); color: var(--text-secondary);">&mdash;</td>
+                  <% end %>
+                <% end %>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Anti-Edges Section ── %>
+  <% if @anti_edges.any? %>
+    <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid var(--negative);">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">dangerous</span>
+          Anti-Edges &mdash; Combinations to Avoid
+        </h2>
+      </div>
+      <div style="padding: 0.5rem 1.25rem 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          These patterns have a win rate below 40%. Consider avoiding or reworking these setups.
+        </div>
+        <% @anti_edges.each do |edge| %>
+          <div style="display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border);">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--negative);">block</span>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 600; font-size: 0.875rem;"><%= edge[:name] %></div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= edge[:description] %> &middot; <%= edge[:category] %></div>
+            </div>
+            <div style="width: 6rem;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; margin-bottom: 0.125rem;">
+                <span>Win Rate</span>
+                <span style="font-weight: 700; color: var(--negative);"><%= edge[:win_rate] %>%</span>
+              </div>
+              <div style="height: 0.375rem; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; width: <%= [edge[:win_rate], 100].min %>%; background: var(--negative); opacity: 0.7; border-radius: 3px;"></div>
+              </div>
+            </div>
+            <div style="text-align: right; min-width: 5rem;">
+              <div style="font-weight: 700; font-size: 0.875rem; color: var(--negative);"><%= number_to_currency(edge[:avg_pnl]) %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">avg P&amp;L</div>
+            </div>
+            <div style="text-align: center; min-width: 3.5rem;">
+              <div style="font-weight: 600; font-size: 0.875rem;"><%= edge[:trade_count] %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">trades</div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+<% end %>
+
+<%# ── Bottom Nav ── %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to reports_index_path, class: "btn" do %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">hub</span> Reports Hub<% end %>
+  <%= link_to account_summary_path, class: "btn" do %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">account_balance</span> Account Summary<% end %>
+  <%= link_to trading_mentor_path, class: "btn" do %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">psychology</span> Mentor<% end %>
+</div>
+
+<style>
+  details.card > summary { list-style: none; }
+  details.card > summary::-webkit-details-marker { display: none; }
+  details.card > summary::after { content: "expand_more"; font-family: "Material Icons Outlined"; font-size: 1.25rem; color: var(--text-secondary); }
+  details.card[open] > summary::after { content: "expand_less"; }
+  @media (max-width: 640px) {
+    div[style*="grid-template-columns: repeat(4"] { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>

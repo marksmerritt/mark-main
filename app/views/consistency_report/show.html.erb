@@ -1,0 +1,166 @@
+<% content_for(:title, "Consistency Report") %>
+
+<div style="max-width: 64rem; margin: 0 auto; padding: 1.5rem 1rem;">
+  <div style="margin-bottom: 1.5rem;">
+    <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">
+      <span class="material-icons-outlined" style="vertical-align: -4px; color: var(--primary);">verified</span>
+      Consistency Report
+    </h1>
+    <p style="color: var(--text-secondary); margin: 0.25rem 0 0; font-size: 0.875rem;">
+      Behavioral consistency across <%= @trade_count %> trades
+    </p>
+  </div>
+
+  <!-- Overall Score -->
+  <%
+    ring_r = 50
+    ring_c = 2 * Math::PI * ring_r
+    ring_offset = ring_c * (1 - @overall_score / 100.0)
+    score_color = @overall_score >= 70 ? "var(--positive)" : @overall_score >= 40 ? "#f9a825" : "var(--negative)"
+    grade = case @overall_score
+            when 80..100 then "A"
+            when 60..79 then "B"
+            when 40..59 then "C"
+            when 20..39 then "D"
+            else "F"
+            end
+  %>
+  <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem; text-align: center;">
+    <svg width="130" height="130" viewBox="0 0 130 130" style="margin: 0 auto; display: block;">
+      <circle cx="65" cy="65" r="<%= ring_r %>" fill="none" stroke="var(--surface)" stroke-width="10"/>
+      <circle cx="65" cy="65" r="<%= ring_r %>" fill="none" stroke="<%= score_color %>" stroke-width="10"
+              stroke-dasharray="<%= ring_c %>" stroke-dashoffset="<%= ring_offset %>"
+              stroke-linecap="round" transform="rotate(-90 65 65)"/>
+      <text x="65" y="58" text-anchor="middle" font-size="28" font-weight="800" fill="<%= score_color %>"><%= @overall_score %></text>
+      <text x="65" y="78" text-anchor="middle" font-size="12" fill="var(--text-secondary)">/ 100</text>
+    </svg>
+    <div style="font-size: 1.25rem; font-weight: 700; margin-top: 0.5rem;">
+      Grade: <span style="color: <%= score_color %>;"><%= grade %></span>
+    </div>
+    <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+      Overall Consistency Score
+    </div>
+  </div>
+
+  <!-- Dimension Radar/Grid -->
+  <div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+    <div class="card-header" style="margin-bottom: 1rem;">Dimension Breakdown</div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.75rem;">
+      <% @dimension_scores.each do |dim|
+           dim_color = dim[:score] >= 70 ? "var(--positive)" : dim[:score] >= 40 ? "#f9a825" : "var(--negative)"
+      %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: var(--surface); border-radius: 8px;">
+          <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= dim_color %>;"><%= dim[:icon] %></span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.25rem;">
+              <span style="font-size: 0.8125rem; font-weight: 600;"><%= dim[:name] %></span>
+              <span style="font-size: 0.875rem; font-weight: 700; color: <%= dim_color %>;"><%= dim[:score] %></span>
+            </div>
+            <div style="height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;">
+              <div style="height: 100%; width: <%= dim[:score] %>%; background: <%= dim_color %>; border-radius: 2px;"></div>
+            </div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= dim[:detail] %></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <!-- Radar Chart (SVG) -->
+  <div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+    <div class="card-header" style="margin-bottom: 0.75rem;">Consistency Radar</div>
+    <% dims = @dimension_scores
+       n = dims.length
+       cx = 180
+       cy = 180
+       r = 140
+    %>
+    <svg viewBox="0 0 360 360" style="width: 100%; max-width: 400px; height: auto; margin: 0 auto; display: block;">
+      <!-- Background rings -->
+      <% [0.25, 0.5, 0.75, 1.0].each do |pct| %>
+        <polygon points="<%= n.times.map { |i| angle = (2 * Math::PI * i / n) - Math::PI / 2; "#{(cx + r * pct * Math.cos(angle)).round(1)},#{(cy + r * pct * Math.sin(angle)).round(1)}" }.join(" ") %>"
+                 fill="none" stroke="var(--border)" stroke-width="0.5"/>
+      <% end %>
+      <!-- Axes -->
+      <% n.times do |i|
+           angle = (2 * Math::PI * i / n) - Math::PI / 2
+           x2 = cx + r * Math.cos(angle)
+           y2 = cy + r * Math.sin(angle)
+           lx = cx + (r + 18) * Math.cos(angle)
+           ly = cy + (r + 18) * Math.sin(angle)
+      %>
+        <line x1="<%= cx %>" y1="<%= cy %>" x2="<%= x2.round(1) %>" y2="<%= y2.round(1) %>" stroke="var(--border)" stroke-width="0.5"/>
+        <text x="<%= lx.round(1) %>" y="<%= ly.round(1) %>" text-anchor="middle" dominant-baseline="central" fill="var(--text-secondary)" font-size="7"><%= dims[i][:name].split(" ").first %></text>
+      <% end %>
+      <!-- Data polygon -->
+      <polygon points="<%= n.times.map { |i| angle = (2 * Math::PI * i / n) - Math::PI / 2; val = dims[i][:score] / 100.0; "#{(cx + r * val * Math.cos(angle)).round(1)},#{(cy + r * val * Math.sin(angle)).round(1)}" }.join(" ") %>"
+               fill="rgba(26,115,232,0.15)" stroke="var(--primary)" stroke-width="2"/>
+      <!-- Data points -->
+      <% n.times do |i|
+           angle = (2 * Math::PI * i / n) - Math::PI / 2
+           val = dims[i][:score] / 100.0
+           px = cx + r * val * Math.cos(angle)
+           py = cy + r * val * Math.sin(angle)
+      %>
+        <circle cx="<%= px.round(1) %>" cy="<%= py.round(1) %>" r="3" fill="var(--primary)"/>
+      <% end %>
+    </svg>
+  </div>
+
+  <!-- Win Rate Stability Chart -->
+  <% if @rolling_win_rates.any? %>
+    <div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+      <div class="card-header" style="margin-bottom: 0.75rem;">
+        Win Rate Stability (Rolling 10-Trade Window)
+        <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary); margin-left: 0.5rem;">
+          CV: <%= @win_rate_stability[:cv] %>%
+        </span>
+      </div>
+      <%
+        chart_w = 720
+        chart_h = 160
+        wr_min = [@rolling_win_rates.min, 0].min
+        wr_max = [@rolling_win_rates.max, 100].max
+        wr_range = wr_max - wr_min
+        wr_range = 1 if wr_range == 0
+      %>
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h %>" style="width: 100%; height: auto;">
+        <!-- 50% reference line -->
+        <% y50 = ((wr_max - 50.0) / wr_range * chart_h).round(1) %>
+        <line x1="0" y1="<%= y50 %>" x2="<%= chart_w %>" y2="<%= y50 %>" stroke="var(--border)" stroke-width="1" stroke-dasharray="4"/>
+        <text x="4" y="<%= y50 - 4 %>" fill="var(--text-secondary)" font-size="8">50%</text>
+
+        <polyline points="<%= @rolling_win_rates.each_with_index.map { |v, i| x = (i.to_f / [@rolling_win_rates.length - 1, 1].max * chart_w).round(1); y = ((wr_max - v) / wr_range * chart_h).round(1); "#{x},#{y}" }.join(" ") %>"
+                  fill="none" stroke="var(--primary)" stroke-width="1.5"/>
+      </svg>
+    </div>
+  <% end %>
+
+  <!-- Recommendations -->
+  <div class="card" style="padding: 1rem;">
+    <div class="card-header" style="margin-bottom: 0.75rem;">Improvement Areas</div>
+    <% weakest = @dimension_scores.sort_by { |d| d[:score] }.first(3) %>
+    <% weakest.each do |dim| %>
+      <% tip = case dim[:name]
+               when "Entry Timing" then "Try to enter trades during the same window each day. High variance suggests impulsive or reactive entries."
+               when "Position Sizing" then "Use a fixed fractional sizing model to reduce volatility in your risk per trade."
+               when "Hold Time" then "Set clear exit rules. Wide variation in hold times may indicate either premature exits or overstaying."
+               when "Journaling" then "Journal every trading day, even on days with no activity. Reflection compounds over time."
+               when "Stop-Losses" then "Set a stop-loss on every trade before entering. This is your #1 risk management tool."
+               when "Trade Review" then "Review every closed trade within 24 hours. Pattern recognition needs fresh context."
+               when "Plan Adherence" then "Create a playbook for your top setups and tag every trade with the relevant playbook."
+               when "Daily Volume" then "Set a max daily trade limit. Overtrading on some days and undertrading on others signals inconsistency."
+               when "Win Rate Stability" then "Volatile win rates suggest your edge is not well-defined. Focus on your best setups and eliminate the rest."
+               else "Focus on making this metric more consistent over time."
+               end
+      %>
+      <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; background: var(--surface); border-radius: 8px; margin-bottom: 0.5rem;">
+        <span class="material-icons-outlined" style="color: var(--negative); font-size: 1.25rem; margin-top: 0.125rem;"><%= dim[:icon] %></span>
+        <div>
+          <div style="font-weight: 600; font-size: 0.875rem;"><%= dim[:name] %> (<%= dim[:score] %>/100)</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= tip %></div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

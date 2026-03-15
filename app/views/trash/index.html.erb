@@ -1,0 +1,29 @@
+<div class="page-header">
+  <h1>Trash</h1>
+  <% if @notes.any? %>
+    <%= link_to "Empty Trash", empty_trash_index_path, method: :delete, data: { turbo_method: :delete, turbo_confirm: "Permanently delete all trashed notes?" }, class: "btn btn-danger" %>
+  <% end %>
+</div>
+
+<% if @notes.any? %>
+  <div class="entries-list">
+    <% @notes.each do |note| %>
+      <div class="card entry-card">
+        <div class="entry-card-header">
+          <span class="entry-date"><%= note["title"].presence || "Untitled" %></span>
+          <span class="text-muted"><%= time_ago_short(note["deleted_at"] || note["updated_at"]) %> ago</span>
+        </div>
+        <% if note["content_plain"].present? %>
+          <p class="text-muted"><%= truncate(note["content_plain"], length: 150) %></p>
+        <% end %>
+        <div class="entry-card-footer">
+          <%= link_to "Restore", restore_trash_path(note["id"]), data: { turbo_method: :post }, class: "btn btn-sm btn-primary" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>Trash is empty.</p>
+  </div>
+<% end %>

@@ -1,0 +1,279 @@
+<% content_for(:title, "Snapshot Report - #{@report[:period_label]}") %>
+
+<div style="max-width: 64rem; margin: 0 auto; padding: 1.5rem 1rem;">
+  <!-- Header -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+    <div>
+      <h1 style="font-size: 1.5rem; font-weight: 700; margin: 0;">
+        <span class="material-icons-outlined" style="vertical-align: -4px; color: var(--primary);">summarize</span>
+        Snapshot Report
+      </h1>
+      <p style="color: var(--text-secondary); margin: 0.25rem 0 0; font-size: 0.875rem;">
+        <%= @report[:period_label] %> &middot; as of <%= @as_of.strftime("%B %d, %Y") %>
+      </p>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <% %w[7d 30d 90d ytd].each do |p| %>
+        <a href="<%= snapshot_report_path(period: p) %>"
+           class="btn btn-sm<%= ' btn-primary' if @period == p %>"
+           style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">
+          <%= p == "ytd" ? "YTD" : p.sub("d", "D") %>
+        </a>
+      <% end %>
+      <button onclick="window.print()" class="btn btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.75rem;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">print</span> Print
+      </button>
+    </div>
+  </div>
+
+  <!-- Grade Banner -->
+  <% grade = @report[:grade] || "N/A"
+     grade_color = case grade
+                   when "A" then "#2e7d32"
+                   when "B" then "#1565c0"
+                   when "C" then "#f9a825"
+                   when "D" then "#e65100"
+                   else "#c62828"
+                   end %>
+  <div class="card" style="padding: 1.5rem; margin-bottom: 1.5rem; text-align: center; background: linear-gradient(135deg, <%= grade_color %>11, <%= grade_color %>22);">
+    <div style="font-size: 3.5rem; font-weight: 800; color: <%= grade_color %>; line-height: 1;"><%= grade %></div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">Overall Grade</div>
+    <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.5rem;">
+      Based on win rate, profitability, risk/reward, consistency, and activity
+    </div>
+  </div>
+
+  <!-- Key Metrics -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Total P&L</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @report[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <%= @report[:total_pnl] >= 0 ? '+' : '' %>$<%= number_with_delimiter(@report[:total_pnl].abs, delimiter: ',') %>
+      </div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Win Rate</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @report[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <%= @report[:win_rate] %>%
+      </div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Total Trades</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @report[:total_trades] %></div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Trading Days</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @report[:trading_days] %></div>
+    </div>
+  </div>
+
+  <!-- Win/Loss + Avg Win/Loss -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem;">
+      <div class="card-header" style="margin-bottom: 0.75rem;">Win / Loss Breakdown</div>
+      <div style="display: flex; gap: 1.5rem; align-items: center;">
+        <div style="text-align: center;">
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= @report[:wins] %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Wins</div>
+        </div>
+        <div style="flex: 1; height: 0.75rem; background: var(--surface); border-radius: 6px; overflow: hidden;">
+          <% win_pct = @report[:total_trades] > 0 ? (@report[:wins].to_f / @report[:total_trades] * 100) : 0 %>
+          <div style="height: 100%; width: <%= win_pct %>%; background: var(--positive); border-radius: 6px;"></div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= @report[:losses] %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Losses</div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="padding: 1rem;">
+      <div class="card-header" style="margin-bottom: 0.75rem;">Avg Win vs Avg Loss</div>
+      <div style="display: flex; gap: 2rem; justify-content: center;">
+        <div style="text-align: center;">
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);">+$<%= @report[:avg_win].abs %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Avg Win</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);">-$<%= @report[:avg_loss].abs %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Avg Loss</div>
+        </div>
+        <div style="text-align: center;">
+          <% payoff = @report[:avg_loss] != 0 ? (@report[:avg_win].abs / @report[:avg_loss].abs).round(2) : 0 %>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--primary);"><%= payoff %>x</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Payoff Ratio</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Streak + Day Stats -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem;">
+      <div class="card-header" style="margin-bottom: 0.75rem;">Current Streak</div>
+      <div style="display: flex; align-items: center; gap: 0.75rem; justify-content: center;">
+        <span class="material-icons-outlined" style="font-size: 2rem; color: <%= @report[:streak_type] == 'win' ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @report[:streak_type] == 'win' ? 'local_fire_department' : 'ac_unit' %>
+        </span>
+        <div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= @report[:streak_count] %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= (@report[:streak_type] || "").capitalize %> streak</div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="padding: 1rem;">
+      <div class="card-header" style="margin-bottom: 0.75rem;">Day Consistency</div>
+      <div style="display: flex; gap: 2rem; justify-content: center;">
+        <div style="text-align: center;">
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= @report[:profitable_days] %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Green Days</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= @report[:trading_days] - @report[:profitable_days] %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Red Days</div>
+        </div>
+        <div style="text-align: center;">
+          <% day_rate = @report[:trading_days] > 0 ? (@report[:profitable_days].to_f / @report[:trading_days] * 100).round(0) : 0 %>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= day_rate %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Day Win Rate</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Best & Worst Days -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <% if @report[:best_day] %>
+      <div class="card" style="padding: 1rem; border-left: 4px solid var(--positive);">
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Best Day</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);">+$<%= @report[:best_day][1].round(2) %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @report[:best_day][0] %></div>
+      </div>
+    <% end %>
+    <% if @report[:worst_day] %>
+      <div class="card" style="padding: 1rem; border-left: 4px solid var(--negative);">
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Worst Day</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);">$<%= @report[:worst_day][1].round(2) %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @report[:worst_day][0] %></div>
+      </div>
+    <% end %>
+  </div>
+
+  <!-- Daily P&L Chart -->
+  <% series = @report[:daily_pnl_series] || [] %>
+  <% if series.any? %>
+    <div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+      <div class="card-header" style="margin-bottom: 0.75rem;">Daily P&L</div>
+      <% max_val = series.map { |_, v| v.abs }.max
+         max_val = 1 if max_val == 0
+         chart_w = 720
+         chart_h = 200
+         bar_w = [((chart_w - 40).to_f / series.length).floor, 20].min
+         total_bar_w = bar_w * series.length
+         offset_x = ((chart_w - total_bar_w) / 2.0).round
+         mid_y = chart_h / 2 %>
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h + 30 %>" style="width: 100%; height: auto;">
+        <line x1="0" y1="<%= mid_y %>" x2="<%= chart_w %>" y2="<%= mid_y %>" stroke="var(--border)" stroke-width="1"/>
+        <% series.each_with_index do |(date, val), i|
+             bar_h = (val.abs / max_val * (mid_y - 10)).round
+             x = offset_x + i * bar_w
+             color = val >= 0 ? "var(--positive)" : "var(--negative)"
+             if val >= 0
+               y = mid_y - bar_h
+             else
+               y = mid_y
+             end %>
+          <rect x="<%= x + 1 %>" y="<%= y %>" width="<%= [bar_w - 2, 1].max %>" height="<%= [bar_h, 1].max %>" fill="<%= color %>" rx="1">
+            <title><%= date %>: $<%= val.round(2) %></title>
+          </rect>
+          <% if series.length <= 15 || i % (series.length / 7.0).ceil == 0 %>
+            <text x="<%= x + bar_w / 2 %>" y="<%= chart_h + 20 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8"><%= date.to_s.slice(5, 5) %></text>
+          <% end %>
+        <% end %>
+        <text x="4" y="14" fill="var(--text-secondary)" font-size="9">+$<%= max_val.round(0) %></text>
+        <text x="4" y="<%= chart_h - 4 %>" fill="var(--text-secondary)" font-size="9">-$<%= max_val.round(0) %></text>
+      </svg>
+    </div>
+  <% end %>
+
+  <!-- Top Symbols -->
+  <% if @report[:top_symbols].present? %>
+    <div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+      <div class="card-header" style="margin-bottom: 0.75rem;">Top Symbols</div>
+      <table style="width: 100%; font-size: 0.8125rem; border-collapse: collapse;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.375rem 0.5rem;">Symbol</th>
+            <th style="text-align: right; padding: 0.375rem 0.5rem;">Trades</th>
+            <th style="text-align: right; padding: 0.375rem 0.5rem;">P&L</th>
+            <th style="text-align: right; padding: 0.375rem 0.5rem;">Win Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @report[:top_symbols].each do |sym| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.375rem 0.5rem; font-weight: 600;"><%= sym[:name] %></td>
+              <td style="text-align: right; padding: 0.375rem 0.5rem;"><%= sym[:count] %></td>
+              <td style="text-align: right; padding: 0.375rem 0.5rem; color: <%= sym[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;">
+                <%= sym[:total_pnl] >= 0 ? '+' : '' %>$<%= sym[:total_pnl] %>
+              </td>
+              <td style="text-align: right; padding: 0.375rem 0.5rem;"><%= sym[:win_rate] %>%</td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
+  <!-- Budget Summary (if available) -->
+  <% if @report[:total_spending].present? || @report[:total_income].present? %>
+    <div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
+      <div class="card-header" style="margin-bottom: 0.75rem;">
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px; color: #1a73e8;">account_balance_wallet</span>
+        Budget Summary
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">
+        <div>
+          <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Income</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);">$<%= number_with_delimiter(@report[:total_income].round(2), delimiter: ',') %></div>
+        </div>
+        <div>
+          <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Spending</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);">$<%= number_with_delimiter(@report[:total_spending].round(2), delimiter: ',') %></div>
+        </div>
+        <div>
+          <% net = (@report[:total_income] || 0) - (@report[:total_spending] || 0) %>
+          <div style="font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">Net</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: <%= net >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= net >= 0 ? '+' : '' %>$<%= number_with_delimiter(net.abs.round(2), delimiter: ',') %>
+          </div>
+        </div>
+      </div>
+      <% if @report[:total_pnl] && @report[:total_income] && @report[:total_income] > 0 %>
+        <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border); text-align: center;">
+          <% trading_pct = (@report[:total_pnl] / @report[:total_income] * 100).round(1) %>
+          <span style="font-size: 0.8125rem; color: var(--text-secondary);">
+            Trading P&L is <strong style="color: <%= trading_pct >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= trading_pct >= 0 ? '+' : '' %><%= trading_pct %>%</strong> of income
+          </span>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <!-- Footer -->
+  <div style="text-align: center; padding: 1rem 0; color: var(--text-secondary); font-size: 0.75rem; border-top: 1px solid var(--border);">
+    Generated on <%= Time.now.strftime("%B %d, %Y at %I:%M %p") %> &middot; <%= @report[:period_label] %>
+  </div>
+</div>
+
+<style>
+  @media print {
+    .navbar, .app-footer, .toast-container, .back-to-top, [data-controller="command-palette"],
+    [data-controller="quick-trade"], [data-controller="quick-journal"], [data-controller="quick-capture"],
+    [data-controller="quick-expense"] { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { box-shadow: none !important; border: 1px solid #ddd !important; break-inside: avoid; }
+    body { background: white !important; color: black !important; }
+    a.btn { display: none !important; }
+    button { display: none !important; }
+  }
+</style>

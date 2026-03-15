@@ -1,0 +1,13 @@
+<div class="page-header">
+  <h1>New Goal</h1>
+  <div class="page-actions"><%= link_to "Back", budget_goals_path, class: "btn" %></div>
+</div>
+
+<div class="card">
+  <%= form_with url: budget_goals_path, method: :post, class: "form-container" do |f| %>
+    <%= render "form", f: f, goal: @goal %>
+    <div class="form-actions">
+      <%= f.submit "Create Goal", class: "btn btn-primary" %>
+    </div>
+  <% end %>
+</div>

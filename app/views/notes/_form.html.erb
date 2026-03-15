@@ -1,0 +1,69 @@
+<%= render "shared/errors", errors: local_assigns[:errors] || @errors %>
+
+<%= form_with url: form_url, method: form_method do %>
+  <div class="form-group">
+    <%= label_tag "note[title]", "Title" %>
+    <%= text_field_tag "note[title]", note["title"], class: "form-control", placeholder: "Note title...", autofocus: true %>
+  </div>
+
+  <div class="form-group" data-controller="markdown-preview">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.375rem;">
+      <%= label_tag "note[content]", "Content", style: "margin: 0;" %>
+      <button type="button" class="btn btn-sm" data-markdown-preview-target="toggle" data-action="markdown-preview#toggle">Preview</button>
+    </div>
+    <%= text_area_tag "note[content]", note["content"], class: "form-control", rows: 12, placeholder: "Write your note... (supports Markdown)", data: { markdown_preview_target: "input" } %>
+    <div class="text-content markdown-preview hidden" data-markdown-preview-target="preview" style="min-height: 12rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius);"></div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <%= label_tag "note[notebook_id]", "Notebook" %>
+      <% notebooks_for_select = notebooks.is_a?(Array) ? notebooks : [] %>
+      <%= select_tag "note[notebook_id]",
+            options_for_select(notebooks_for_select.map { |nb| [nb["name"], nb["id"]] }, note["notebook_id"]),
+            include_blank: "No Notebook", class: "form-control" %>
+    </div>
+
+    <div class="form-group">
+      <%= label_tag "note[color]", "Color" %>
+      <%= color_field_tag "note[color]", note["color"].presence || "#ffffff", class: "form-control" %>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label class="checkbox-label">
+        <%= check_box_tag "note[pinned]", "true", note["pinned"].present? && note["pinned"].to_s != "false" %>
+        Pinned
+      </label>
+    </div>
+
+    <div class="form-group">
+      <label class="checkbox-label">
+        <%= check_box_tag "note[favorited]", "true", note["favorited"].present? && note["favorited"].to_s != "false" %>
+        Favorited
+      </label>
+    </div>
+  </div>
+
+  <% if tags.present? && tags.is_a?(Array) && tags.any? %>
+    <fieldset>
+      <legend>Tags</legend>
+
+      <div class="checkbox-group">
+        <% note_tag_ids = (note["tags"] || []).map { |t| t["id"] } %>
+        <% tags.each do |tag| %>
+          <label class="checkbox-label">
+            <%= check_box_tag "tag_ids[]", tag["id"], note_tag_ids.include?(tag["id"]), id: "tag_#{tag["id"]}" %>
+            <span class="tag" <% if tag["color"].present? %>style="background-color: <%= tag["color"] %>"<% end %>><%= tag["name"] %></span>
+          </label>
+        <% end %>
+      </div>
+    </fieldset>
+  <% end %>
+
+  <div class="form-actions">
+    <%= submit_tag submit_label, class: "btn btn-primary" %>
+    <%= link_to "Cancel", cancel_path, class: "btn" %>
+  </div>
+<% end %>

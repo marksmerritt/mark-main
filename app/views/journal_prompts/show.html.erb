@@ -1,0 +1,137 @@
+<% content_for(:title) { "Journal Prompts" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #9c27b0;">psychology</span>
+    Journal Prompts
+  </h1>
+  <div class="page-actions">
+    <%= link_to "New Journal Entry", new_journal_entry_path, class: "btn btn-primary" %>
+    <%= link_to "Journal", journal_entries_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Context Banner %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
+  <div style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; font-size: 0.8125rem;">
+    <div>
+      <span style="color: var(--text-secondary);">Today's P&L:</span>
+      <strong style="color: <%= @context[:today_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <%= number_to_currency(@context[:today_pnl]) %>
+      </strong>
+    </div>
+    <div>
+      <span style="color: var(--text-secondary);">Trades today:</span>
+      <strong><%= @context[:today_trade_count] %></strong>
+    </div>
+    <% if @context[:streak_count] != 0 %>
+      <div>
+        <span style="color: var(--text-secondary);">Streak:</span>
+        <strong><%= @context[:streak_count].abs %> <%= @context[:streak_type]&.capitalize || "trade" %><%= @context[:streak_count].abs != 1 ? "s" : "" %></strong>
+      </div>
+    <% end %>
+    <% if @context[:win_rate] %>
+      <div>
+        <span style="color: var(--text-secondary);">Win Rate:</span>
+        <strong><%= @context[:win_rate].round(1) %>%</strong>
+      </div>
+    <% end %>
+    <% if @context[:recent_symbols].any? %>
+      <div>
+        <span style="color: var(--text-secondary);">Recent:</span>
+        <strong><%= @context[:recent_symbols].join(", ") %></strong>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Category Filter %>
+<div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem;" data-controller="prompt-filter">
+  <button class="preset-chip preset-chip-active" data-action="click->prompt-filter#filter" data-prompt-filter-category-param="all">All</button>
+  <% @categories.each do |cat| %>
+    <button class="preset-chip" data-action="click->prompt-filter#filter" data-prompt-filter-category-param="<%= cat %>"><%= cat %></button>
+  <% end %>
+</div>
+
+<%# Prompts Grid %>
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;" data-prompt-filter-target="grid">
+  <% @prompts.each_with_index do |prompt, i| %>
+    <div class="card prompt-card" data-category="<%= prompt[:category] %>" style="transition: opacity 0.2s, transform 0.2s;">
+      <div style="padding: 1.25rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= prompt[:color] %>;"><%= prompt[:icon] %></span>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 500;"><%= prompt[:category] %></span>
+        </div>
+        <div style="font-size: 0.9375rem; font-weight: 600; line-height: 1.5; margin-bottom: 0.75rem;">
+          <%= prompt[:text] %>
+        </div>
+        <% if prompt[:follow_up] %>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5; padding-left: 0.75rem; border-left: 2px solid <%= prompt[:color] %>;">
+            <%= prompt[:follow_up] %>
+          </div>
+        <% end %>
+        <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+          <%= link_to new_journal_entry_path(journal_entry: { content: "**#{prompt[:text]}**\n\n" }), class: "btn btn-sm", style: "font-size: 0.75rem;" do %>
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">edit</span> Write About This
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Daily Prompt Suggestion %>
+<div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid #9c27b0;">
+  <div style="padding: 1.25rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+      <span class="material-icons-outlined" style="color: #9c27b0;">auto_awesome</span>
+      <h3 style="margin: 0;">Today's Featured Prompt</h3>
+    </div>
+    <%
+      # Deterministic "random" prompt based on date
+      daily_seed = Date.today.to_s.bytes.sum
+      featured = @prompts[daily_seed % @prompts.length]
+    %>
+    <div style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem; line-height: 1.5;">
+      <%= featured[:text] %>
+    </div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 1rem;">
+      <%= featured[:follow_up] %>
+    </div>
+    <%= link_to new_journal_entry_path(journal_entry: { content: "**#{featured[:text]}**\n\n#{featured[:follow_up]}\n\n---\n\n" }), class: "btn btn-primary" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">edit</span> Start Writing
+    <% end %>
+  </div>
+</div>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "New Journal Entry", new_journal_entry_path, class: "btn btn-primary" %>
+  <%= link_to "Journal", journal_entries_path, class: "btn" %>
+  <%= link_to "Journal Calendar", calendar_journal_entries_path, class: "btn" %>
+  <%= link_to "Mood Analysis", mood_performance_path, class: "btn" %>
+</div>
+
+<script>
+  // Simple category filter without a full Stimulus controller
+  document.addEventListener("DOMContentLoaded", function() {
+    const chips = document.querySelectorAll("[data-prompt-filter-category-param]");
+    const cards = document.querySelectorAll(".prompt-card");
+
+    chips.forEach(chip => {
+      chip.addEventListener("click", function() {
+        const category = this.dataset.promptFilterCategoryParam;
+        chips.forEach(c => c.classList.remove("preset-chip-active"));
+        this.classList.add("preset-chip-active");
+
+        cards.forEach(card => {
+          if (category === "all" || card.dataset.category === category) {
+            card.style.display = "";
+            card.style.opacity = "1";
+          } else {
+            card.style.display = "none";
+          }
+        });
+      });
+    });
+  });
+</script>

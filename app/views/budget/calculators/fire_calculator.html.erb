@@ -1,0 +1,423 @@
+<% content_for(:title) { "FIRE Calculator" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #e65100;">local_fire_department</span>
+    FIRE Calculator
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Savings", budget_savings_path, class: "btn btn-sm" %>
+    <%= link_to "Net Worth", budget_net_worth_forecast_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<%# Inputs Card %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+  <%= form_tag budget_fire_calculator_path, method: :get, style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; align-items: end;" do %>
+    <div>
+      <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Current Age</label>
+      <input type="number" name="age" value="<%= @current_age %>" min="18" max="80" class="form-control" style="font-size: 0.875rem;">
+    </div>
+    <div>
+      <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Target Retirement Age</label>
+      <input type="number" name="retirement_age" value="<%= @target_retirement_age %>" min="25" max="90" class="form-control" style="font-size: 0.875rem;">
+    </div>
+    <div>
+      <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Expected Return %</label>
+      <input type="number" name="return_rate" value="<%= @assumed_return %>" step="0.5" min="0" max="20" class="form-control" style="font-size: 0.875rem;">
+    </div>
+    <div>
+      <button type="submit" class="btn btn-primary" style="width: 100%;">Calculate</button>
+    </div>
+  <% end %>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">FIRE Number</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #e65100;"><%= number_to_currency(@fire_number, precision: 0) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">25x annual expenses</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Years to FIRE</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @years_to_fire && @years_to_fire <= 20 ? 'var(--positive)' : (@years_to_fire ? '#f9ab00' : 'var(--negative)') %>;">
+        <% if @years_to_fire == 0 %>
+          <span class="material-icons-outlined" style="font-size: 1.25rem; vertical-align: -2px; color: var(--positive);">check_circle</span> Done!
+        <% elsif @years_to_fire %>
+          <%= @years_to_fire %> yrs
+        <% else %>
+          &mdash;
+        <% end %>
+      </div>
+      <% if @fire_date %>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @fire_date.strftime("%b %Y") %> (age <%= @fire_age&.round(0) %>)</div>
+      <% end %>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings Rate</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @savings_rate >= 50 ? 'var(--positive)' : (@savings_rate >= 20 ? '#f9ab00' : 'var(--negative)') %>;"><%= @savings_rate %>%</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= number_to_currency(@monthly_savings) %>/mo saved</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Income at FIRE</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@monthly_fire_income) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">4% safe withdrawal</div>
+    </div>
+  </div>
+</div>
+
+<%# FIRE Progress Card %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 2rem; text-align: center;">
+  <%
+    progress_color = if @fire_progress >= 100
+      "var(--positive)"
+    elsif @fire_progress >= 50
+      "#f9ab00"
+    elsif @fire_progress >= 25
+      "#e65100"
+    else
+      "var(--negative)"
+    end
+  %>
+  <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">FIRE Progress</div>
+
+  <%# Progress ring %>
+  <div style="margin: 0 auto 1.5rem; width: 160px; height: 160px; position: relative;">
+    <svg viewBox="0 0 160 160" style="transform: rotate(-90deg);">
+      <circle cx="80" cy="80" r="68" fill="none" stroke="var(--border)" stroke-width="10"/>
+      <circle cx="80" cy="80" r="68" fill="none" stroke="<%= progress_color %>" stroke-width="10"
+              stroke-dasharray="<%= (427.3 * [@fire_progress / 100.0, 1].min).round(1) %> 427.3"
+              stroke-linecap="round"/>
+    </svg>
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+      <div style="font-size: 1.75rem; font-weight: 700; color: <%= progress_color %>;"><%= @fire_progress %>%</div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">of FIRE goal</div>
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: center; gap: 2.5rem; font-size: 0.8125rem;">
+    <div>
+      <div style="color: var(--text-secondary);">Current Savings</div>
+      <div style="font-weight: 700; color: var(--positive);"><%= number_to_currency(@current_savings, precision: 0) %></div>
+    </div>
+    <div>
+      <div style="color: var(--text-secondary);">FIRE Target</div>
+      <div style="font-weight: 700; color: #e65100;"><%= number_to_currency(@fire_number, precision: 0) %></div>
+    </div>
+    <div>
+      <div style="color: var(--text-secondary);">Remaining</div>
+      <div style="font-weight: 700; color: var(--negative);"><%= number_to_currency([@fire_number - @current_savings, 0].max, precision: 0) %></div>
+    </div>
+  </div>
+
+  <% if @monthly_savings_needed > 0 %>
+    <div style="margin-top: 1.25rem; padding: 0.75rem; background: var(--bg); border-radius: 6px; font-size: 0.8125rem;">
+      <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--primary);">info</span>
+      To retire by age <strong><%= @target_retirement_age %></strong>, you need to save
+      <strong style="color: var(--primary);"><%= number_to_currency(@monthly_savings_needed) %>/month</strong>
+      (currently saving <%= number_to_currency(@monthly_savings) %>/month)
+    </div>
+  <% end %>
+</div>
+
+<%# FIRE Variants Cards %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">local_fire_department</span> FIRE Variants</h2>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0;">
+    <% @fire_variants.each_with_index do |v, i| %>
+      <div style="padding: 1.25rem; text-align: center;<%= i < @fire_variants.length - 1 ? ' border-right: 1px solid var(--border);' : '' %>">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: <%= v[:color] %>; display: block; margin-bottom: 0.375rem;"><%= v[:icon] %></span>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem;"><%= v[:name] %></div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= v[:color] %>;"><%= number_to_currency(v[:amount], precision: 0) %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          <% if v[:years_to_fire] == 0 %>
+            <span style="color: var(--positive);">Reached!</span>
+          <% elsif v[:years_to_fire] %>
+            <%= v[:years_to_fire] %> years
+          <% else %>
+            &mdash;
+          <% end %>
+        </div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= v[:description] %></div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Savings Projection Chart %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Savings Growth Projection</h2>
+  </div>
+  <div style="padding: 1.25rem; overflow-x: auto;">
+    <%
+      chart_max = [@projection_points.map { |p| p[:balance] }.max.to_f, @fire_number, 1].max
+      chart_w = 700
+      chart_h = 280
+      total_months_chart = @projection_points.last ? @projection_points.last[:month] : 120
+      total_months_chart = [total_months_chart, 1].max
+      x_scale = chart_w.to_f / total_months_chart
+      y_scale = (chart_h - 20).to_f / chart_max
+    %>
+    <svg viewBox="0 0 <%= chart_w + 80 %> <%= chart_h + 40 %>" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+      <%# Grid lines %>
+      <% 5.times do |i| %>
+        <% y_val = chart_max * i / 4.0 %>
+        <% y = chart_h - y_val * y_scale %>
+        <line x1="55" y1="<%= y %>" x2="<%= chart_w + 60 %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5"/>
+        <text x="50" y="<%= y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="7">$<%= (y_val / 1000).round(0) %>k</text>
+      <% end %>
+
+      <%# FIRE target line %>
+      <% fire_y = chart_h - @fire_number * y_scale %>
+      <line x1="55" y1="<%= fire_y %>" x2="<%= chart_w + 60 %>" y2="<%= fire_y %>" stroke="#e65100" stroke-width="1.5" stroke-dasharray="6"/>
+      <text x="<%= chart_w + 62 %>" y="<%= fire_y + 3 %>" fill="#e65100" font-size="7" font-weight="600">FIRE</text>
+
+      <%# Lean FIRE line %>
+      <% lean_y = chart_h - @lean_fire * y_scale %>
+      <line x1="55" y1="<%= lean_y %>" x2="<%= chart_w + 60 %>" y2="<%= lean_y %>" stroke="var(--positive)" stroke-width="1" stroke-dasharray="4"/>
+      <text x="<%= chart_w + 62 %>" y="<%= lean_y + 3 %>" fill="var(--positive)" font-size="6">Lean</text>
+
+      <%# Projection curve - fill area %>
+      <%
+        area_points = @projection_points.map { |p|
+          x = 60 + p[:month] * x_scale
+          y = chart_h - p[:balance] * y_scale
+          "#{x.round(1)},#{y.round(1)}"
+        }.join(" ")
+        first_x = 60 + @projection_points.first[:month] * x_scale
+        last_x = 60 + @projection_points.last[:month] * x_scale
+      %>
+      <polygon points="<%= first_x %>,<%= chart_h %> <%= area_points %> <%= last_x %>,<%= chart_h %>"
+               fill="#e65100" fill-opacity="0.08"/>
+      <polyline points="<%= area_points %>" fill="none" stroke="#e65100" stroke-width="2.5"/>
+
+      <%# End point %>
+      <% last_p = @projection_points.last %>
+      <% lx = 60 + last_p[:month] * x_scale %>
+      <% ly = chart_h - last_p[:balance] * y_scale %>
+      <circle cx="<%= lx %>" cy="<%= ly %>" r="4" fill="#e65100"/>
+
+      <%# Start point %>
+      <% first_p = @projection_points.first %>
+      <circle cx="<%= 60 + first_p[:month] * x_scale %>" cy="<%= chart_h - first_p[:balance] * y_scale %>" r="3" fill="#e65100"/>
+
+      <%# X-axis labels %>
+      <% total_years = (total_months_chart / 12.0).ceil %>
+      <% year_step = [total_years / 10, 1].max %>
+      <% (0..total_years).step(year_step).each do |yr| %>
+        <% x = 60 + yr * 12 * x_scale %>
+        <text x="<%= x %>" y="<%= chart_h + 18 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8">Yr <%= yr %></text>
+      <% end %>
+
+      <%# Legend %>
+      <line x1="60" y1="<%= chart_h + 32 %>" x2="75" y2="<%= chart_h + 32 %>" stroke="#e65100" stroke-width="2.5"/>
+      <text x="80" y="<%= chart_h + 35 %>" fill="var(--text-secondary)" font-size="7">Projected Savings</text>
+      <line x1="200" y1="<%= chart_h + 32 %>" x2="215" y2="<%= chart_h + 32 %>" stroke="#e65100" stroke-width="1.5" stroke-dasharray="6"/>
+      <text x="220" y="<%= chart_h + 35 %>" fill="var(--text-secondary)" font-size="7">FIRE Target</text>
+      <line x1="330" y1="<%= chart_h + 32 %>" x2="345" y2="<%= chart_h + 32 %>" stroke="var(--positive)" stroke-width="1" stroke-dasharray="4"/>
+      <text x="350" y="<%= chart_h + 35 %>" fill="var(--text-secondary)" font-size="7">Lean FIRE</text>
+    </svg>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Expense Reduction Scenarios %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">trending_down</span> What If You Cut Expenses?</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.5rem;">Cut</th>
+            <th style="text-align: right; padding: 0.5rem;">Expenses</th>
+            <th style="text-align: right; padding: 0.5rem;">FIRE #</th>
+            <th style="text-align: right; padding: 0.5rem;">Save Rate</th>
+            <th style="text-align: right; padding: 0.5rem;">Years</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border); background: var(--bg); font-weight: 600;">
+            <td style="padding: 0.5rem;">Current</td>
+            <td style="text-align: right; padding: 0.5rem;"><%= number_to_currency(@avg_monthly_expenses, precision: 0) %></td>
+            <td style="text-align: right; padding: 0.5rem;"><%= number_to_currency(@fire_number, precision: 0) %></td>
+            <td style="text-align: right; padding: 0.5rem;"><%= @savings_rate %>%</td>
+            <td style="text-align: right; padding: 0.5rem;"><%= @years_to_fire || "&mdash;".html_safe %></td>
+          </tr>
+          <% @expense_scenarios.each do |s| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem; color: var(--positive);">&minus;<%= s[:reduction_pct] %>%</td>
+              <td style="text-align: right; padding: 0.5rem;"><%= number_to_currency(s[:monthly_expenses], precision: 0) %></td>
+              <td style="text-align: right; padding: 0.5rem;"><%= number_to_currency(s[:fire_number], precision: 0) %></td>
+              <td style="text-align: right; padding: 0.5rem; color: var(--positive);"><%= s[:savings_rate] %>%</td>
+              <td style="text-align: right; padding: 0.5rem; font-weight: 600; color: var(--positive);">
+                <% if s[:years_to_fire] == 0 %>
+                  Done!
+                <% elsif s[:years_to_fire] %>
+                  <%= s[:years_to_fire] %>
+                <% else %>
+                  &mdash;
+                <% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+      <% if @years_to_fire && @expense_scenarios.last[:years_to_fire] %>
+        <div style="margin-top: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);">
+          <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: var(--positive);">lightbulb</span>
+          Cutting expenses by 30% could save you
+          <strong style="color: var(--positive);"><%= (@years_to_fire - @expense_scenarios.last[:years_to_fire]).round(1) %> years</strong>
+          on your FIRE journey.
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Monthly Income at FIRE %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">account_balance_wallet</span> Income at FIRE</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Portfolio Income</div>
+        <div style="font-size: 2.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@monthly_fire_income) %></div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary);">4% annual withdrawal from <%= number_to_currency(@fire_number, precision: 0) %></div>
+      </div>
+
+      <div style="border-top: 1px solid var(--border); padding-top: 1rem;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8125rem;">
+          <span style="color: var(--text-secondary);">Annual Income at FIRE</span>
+          <span style="font-weight: 600;"><%= number_to_currency(@fire_number * 0.04, precision: 0) %></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8125rem;">
+          <span style="color: var(--text-secondary);">Current Annual Expenses</span>
+          <span style="font-weight: 600;"><%= number_to_currency(@annual_expenses, precision: 0) %></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.8125rem;">
+          <span style="color: var(--text-secondary);">Monthly Essentials</span>
+          <span style="font-weight: 600;"><%= number_to_currency(@avg_essential) %></span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.8125rem;">
+          <span style="color: var(--text-secondary);">Monthly Discretionary</span>
+          <span style="font-weight: 600;"><%= number_to_currency(@avg_discretionary) %></span>
+        </div>
+      </div>
+
+      <%# Coverage bar %>
+      <% coverage_ratio = @avg_monthly_expenses > 0 ? (@monthly_fire_income / @avg_monthly_expenses * 100).round(1) : 0 %>
+      <div style="margin-top: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">
+          <span style="color: var(--text-secondary);">Expense Coverage</span>
+          <span style="font-weight: 600; color: <%= coverage_ratio >= 100 ? 'var(--positive)' : '#f9ab00' %>;"><%= coverage_ratio %>%</span>
+        </div>
+        <div style="height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: <%= [coverage_ratio, 100].min %>%; background: <%= coverage_ratio >= 100 ? 'var(--positive)' : '#f9ab00' %>; border-radius: 4px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Expense Breakdown %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">pie_chart</span> Monthly Spending Snapshot</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Monthly Income</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@avg_monthly_income) %></div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Monthly Expenses</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@avg_monthly_expenses) %></div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Savings</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= @monthly_savings >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@monthly_savings) %></div>
+      </div>
+    </div>
+
+    <%# Savings rate bar %>
+    <div style="margin-top: 1.25rem;">
+      <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.25rem;">
+        <span style="color: var(--text-secondary);">Savings Rate</span>
+        <span style="font-weight: 600;"><%= @savings_rate %>%</span>
+      </div>
+      <div style="height: 10px; background: var(--bg); border-radius: 5px; overflow: hidden; position: relative;">
+        <div style="height: 100%; width: <%= [@savings_rate.abs, 100].min %>%; background: <%= @savings_rate >= 50 ? 'var(--positive)' : (@savings_rate >= 20 ? '#f9ab00' : 'var(--negative)') %>; border-radius: 5px;"></div>
+        <%# 50% marker %>
+        <div style="position: absolute; top: -2px; left: 50%; width: 2px; height: 14px; background: var(--text-secondary); opacity: 0.4;"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.125rem;">
+        <span>0%</span>
+        <span>50% (FIRE target)</span>
+        <span>100%</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Tips for Reaching FIRE Faster %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">tips_and_updates</span> Tips to Reach FIRE Faster</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; gap: 0.75rem;">
+      <% tips = [] %>
+      <% if @savings_rate < 50 %>
+        <% tips << { icon: "savings", text: "Aim for a 50%+ savings rate. You're at #{@savings_rate}% - increasing it is the single biggest lever for reaching FIRE.", color: "var(--primary)" } %>
+      <% end %>
+      <% if @avg_discretionary > @avg_essential * 0.5 %>
+        <% tips << { icon: "restaurant", text: "Your discretionary spending (#{number_to_currency(@avg_discretionary)}/mo) is significant. Even small cuts here compound over time.", color: "#e65100" } %>
+      <% end %>
+      <% if @current_savings < @coast_fire %>
+        <% tips << { icon: "sailing", text: "Reach Coast FIRE (#{number_to_currency(@coast_fire, precision: 0)}) and you'll never need to save another dollar - compound growth does the rest.", color: "#0277bd" } %>
+      <% end %>
+      <% if @monthly_savings > 0 && @monthly_savings_needed > @monthly_savings %>
+        <% tips << { icon: "speed", text: "You need #{number_to_currency(@monthly_savings_needed)}/mo to retire by #{@target_retirement_age}. Consider increasing income or cutting #{number_to_currency(@monthly_savings_needed - @monthly_savings)}/mo in expenses.", color: "#f9ab00" } %>
+      <% end %>
+      <% tips << { icon: "account_balance", text: "Maximize tax-advantaged accounts (401k, IRA, HSA) before taxable investing to keep more of your returns.", color: "var(--positive)" } %>
+      <% tips << { icon: "trending_up", text: "At #{@assumed_return}% returns, every $1 invested today is worth $#{((1 + @assumed_return / 100.0) ** 30).round(2)} in 30 years.", color: "var(--primary)" } %>
+      <% if @years_to_fire && @years_to_fire > 10 %>
+        <% tips << { icon: "work", text: "Focus on increasing income through skills, side hustles, or career moves. Higher income with stable expenses = faster FIRE.", color: "#6a1b9a" } %>
+      <% end %>
+
+      <% tips.first(5).each do |tip| %>
+        <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.625rem; background: var(--bg); border-radius: 6px;">
+          <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= tip[:color] %>; flex-shrink: 0; margin-top: 0.125rem;"><%= tip[:icon] %></span>
+          <div style="font-size: 0.8125rem; line-height: 1.5;"><%= tip[:text] %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Assumptions %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
+  <div style="font-size: 0.75rem; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">info</span>
+    <strong>Assumptions:</strong> FIRE number based on the 4% safe withdrawal rate (annual expenses x 25). Projections assume
+    <%= @assumed_return %>% annual returns compounded monthly. Calculations use your last 6 months of actual spending data.
+    Current age: <strong><%= @current_age %></strong> | Target retirement: <strong><%= @target_retirement_age %></strong>.
+    These are estimates and not guarantees of future performance.
+  </div>
+</div>
+
+<%# Bottom Nav %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Savings Projection", budget_savings_projection_path, class: "btn" %>
+  <%= link_to "Net Worth Forecast", budget_net_worth_forecast_path, class: "btn" %>
+  <%= link_to "Budget Dashboard", budget_dashboard_path, class: "btn" %>
+</div>

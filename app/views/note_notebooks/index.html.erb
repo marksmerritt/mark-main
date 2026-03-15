@@ -1,0 +1,101 @@
+<div class="page-header">
+  <h1>Notebooks</h1>
+  <div class="page-actions">
+    <%= link_to "New Notebook", new_note_notebook_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<%
+  if @notebooks.is_a?(Array) && @notebooks.any?
+    nb_total_notes = @notebooks.sum { |nb| (nb["notes_count"] || 0).to_i }
+    nb_largest = @notebooks.max_by { |nb| (nb["notes_count"] || 0).to_i }
+    nb_empty = @notebooks.count { |nb| (nb["notes_count"] || 0).to_i == 0 }
+%>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notebooks</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @notebooks.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Notes</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= nb_total_notes %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg / Notebook</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @notebooks.count > 0 ? (nb_total_notes.to_f / @notebooks.count).round(1) : 0 %></div>
+      </div>
+      <% if nb_largest %>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Largest</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= nb_largest["notes_count"] || 0 %></div>
+          <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= truncate(nb_largest["name"], length: 18) %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Notebook distribution bar %>
+  <% if @notebooks.count >= 2 && nb_total_notes > 0 %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Note Distribution</h2></div>
+      <div style="padding: 0.75rem 1.25rem;">
+        <%
+          nb_colors = ["#1a73e8", "#0d904f", "#e8710a", "#d93025", "#9334e6", "#00bcd4", "#f9ab00", "#795548"]
+          nb_total_f = nb_total_notes.to_f
+        %>
+        <div style="display: flex; height: 1.25rem; border-radius: 0.625rem; overflow: hidden; margin-bottom: 0.5rem;">
+          <% @notebooks.sort_by { |nb| -(nb["notes_count"] || 0).to_i }.each_with_index do |nb, i| %>
+            <% count = (nb["notes_count"] || 0).to_i; next if count == 0 %>
+            <div style="width: <%= (count / nb_total_f * 100).round(1) %>%; background: <%= nb_colors[i % nb_colors.length] %>; opacity: 0.7;"
+                 title="<%= nb["name"] %>: <%= count %> notes"></div>
+          <% end %>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; font-size: 0.75rem;">
+          <% @notebooks.sort_by { |nb| -(nb["notes_count"] || 0).to_i }.each_with_index do |nb, i| %>
+            <span style="display: flex; align-items: center; gap: 4px;">
+              <span style="width: 8px; height: 8px; border-radius: 2px; background: <%= nb_colors[i % nb_colors.length] %>;"></span>
+              <%= truncate(nb["name"], length: 20) %> (<%= nb["notes_count"] || 0 %>)
+            </span>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="tags-grid">
+    <% @notebooks.sort_by { |nb| -(nb["notes_count"] || 0).to_i }.each do |notebook| %>
+      <%
+        nc = (notebook["notes_count"] || 0).to_i
+      %>
+      <div class="card">
+        <div style="display: flex; align-items: center; gap: 1rem; padding: 1.25rem;">
+          <div style="flex-shrink: 0; width: 48px; height: 48px; border-radius: var(--radius); background: rgba(99,102,241,0.1); display: flex; align-items: center; justify-content: center;">
+            <span class="material-icons-outlined" style="font-size: 1.5rem; color: #6366f1;">menu_book</span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <strong style="font-size: 1rem;"><%= link_to notebook["name"], note_notebook_path(notebook["id"]) %></strong>
+              <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;"><%= nc %> <%= nc == 1 ? "note" : "notes" %></span>
+            </div>
+            <% if notebook["description"].present? %>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= truncate(notebook["description"], length: 100) %></div>
+            <% end %>
+          </div>
+        </div>
+        <div style="padding: 0 1.25rem 1rem; display: flex; gap: 0.5rem;">
+          <%= link_to "Open", note_notebook_path(notebook["id"]), class: "btn btn-sm" %>
+          <%= link_to "Edit", edit_note_notebook_path(notebook["id"]), class: "btn btn-sm" %>
+          <%= link_to new_note_path(notebook_id: notebook["id"]), class: "btn btn-sm btn-primary" do %>
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">add</span> Note
+          <% end %>
+          <%= link_to "Delete", note_notebook_path(notebook["id"]), data: { turbo_method: :delete, turbo_confirm: "Delete this notebook and all its notes?" }, class: "btn btn-sm btn-danger" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No notebooks yet. <%= link_to "Create your first notebook", new_note_notebook_path %>.</p>
+  </div>
+<% end %>

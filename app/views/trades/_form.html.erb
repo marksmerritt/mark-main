@@ -1,27 +1,35 @@
 <%= render "shared/errors", errors: local_assigns[:errors] || @errors %>
 
-<%= form_with url: form_url, method: form_method, class: "trade-form" do %>
+<%= form_with url: form_url, method: form_method, class: "trade-form",
+    data: {
+      controller: "tag-suggest",
+      tag_suggest_tags_value: (local_assigns[:tags] || []).map { |t| { id: t["id"], name: t["name"], color: t["color"] } }.to_json,
+      tag_suggest_history_value: (local_assigns[:tag_history] || @tag_history || {}).to_json
+    } do %>
   <fieldset>
     <legend>Trade Info</legend>
 
     <div class="form-row">
-      <div class="form-group">
+      <div class="form-group autocomplete-wrapper"
+           data-controller="autocomplete"
+           data-autocomplete-items-value="<%= (local_assigns[:symbols] || []).to_json %>">
         <%= label_tag "trade[symbol]", "Symbol" %>
-        <%= text_field_tag "trade[symbol]", trade["symbol"], class: "form-control", placeholder: "e.g. AAPL", autofocus: true %>
+        <%= text_field_tag "trade[symbol]", trade["symbol"], class: "form-control", placeholder: "e.g. AAPL", autofocus: true, autocomplete: "off", data: { autocomplete_target: "input", tag_suggest_target: "symbol", action: "change->tag-suggest#update" } %>
+        <div class="autocomplete-list hidden" data-autocomplete-target="list"></div>
       </div>
 
       <div class="form-group">
         <%= label_tag "trade[asset_class]", "Asset Class" %>
         <%= select_tag "trade[asset_class]",
               options_for_select([["Stocks", "stocks"], ["Options", "options"], ["Futures", "futures"], ["Forex", "forex"], ["Crypto", "crypto"]], trade["asset_class"]),
-              include_blank: "Select asset class", class: "form-control" %>
+              include_blank: "Select asset class", class: "form-control", data: { tag_suggest_target: "assetClass", action: "change->tag-suggest#update" } %>
       </div>
 
       <div class="form-group">
         <%= label_tag "trade[side]", "Side" %>
         <%= select_tag "trade[side]",
               options_for_select([["Long", "long"], ["Short", "short"]], trade["side"]),
-              include_blank: "Select side", class: "form-control" %>
+              include_blank: "Select side", class: "form-control", data: { tag_suggest_target: "side", action: "change->tag-suggest#update" } %>
       </div>
 
       <div class="form-group">
@@ -48,13 +56,29 @@
       <div class="form-group">
         <%= label_tag "trade[entry_time]", "Entry Time" %>
         <% entry_time = trade["entry_time"].present? ? Time.parse(trade["entry_time"]).strftime("%Y-%m-%dT%H:%M") : nil %>
-        <%= datetime_field_tag "trade[entry_time]", entry_time, class: "form-control" %>
+        <%= datetime_field_tag "trade[entry_time]", entry_time, class: "form-control", data: { tag_suggest_target: "entryTime", action: "change->tag-suggest#update" } %>
       </div>
 
       <div class="form-group">
         <%= label_tag "trade[exit_time]", "Exit Time" %>
         <% exit_time = trade["exit_time"].present? ? Time.parse(trade["exit_time"]).strftime("%Y-%m-%dT%H:%M") : nil %>
         <%= datetime_field_tag "trade[exit_time]", exit_time, class: "form-control" %>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Risk Management</legend>
+
+    <div class="form-row">
+      <div class="form-group">
+        <%= label_tag "trade[stop_loss]", "Stop Loss" %>
+        <%= number_field_tag "trade[stop_loss]", trade["stop_loss"], class: "form-control", step: "any", min: 0, placeholder: "Price level" %>
+      </div>
+
+      <div class="form-group">
+        <%= label_tag "trade[take_profit]", "Take Profit" %>
+        <%= number_field_tag "trade[take_profit]", trade["take_profit"], class: "form-control", step: "any", min: 0, placeholder: "Price level" %>
       </div>
     </div>
   </fieldset>
@@ -96,28 +120,42 @@
 
     <div class="form-group">
       <%= label_tag "trade[setup]", "Setup" %>
-      <%= text_field_tag "trade[setup]", trade["setup"], class: "form-control", placeholder: "e.g. Bull flag breakout" %>
+      <%= text_field_tag "trade[setup]", trade["setup"], class: "form-control", placeholder: "e.g. Bull flag breakout", data: { tag_suggest_target: "setup", action: "input->tag-suggest#update" } %>
     </div>
 
-    <div class="form-group">
-      <%= label_tag "trade[notes]", "Notes" %>
-      <%= text_area_tag "trade[notes]", trade["notes"], class: "form-control", rows: 4, placeholder: "General trade notes..." %>
+    <div class="form-group" data-controller="markdown-preview">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <%= label_tag "trade[notes]", "Notes" %>
+        <button type="button" class="btn btn-sm" data-markdown-preview-target="toggle" data-action="markdown-preview#toggle">Preview</button>
+      </div>
+      <%= text_area_tag "trade[notes]", trade["notes"], class: "form-control", rows: 4, placeholder: "General trade notes... (supports **bold**, *italic*, - lists)", data: { markdown_preview_target: "input" } %>
+      <div class="md-preview hidden" data-markdown-preview-target="preview"></div>
     </div>
 
-    <div class="form-group">
-      <%= label_tag "trade[mistakes]", "Mistakes" %>
-      <%= text_area_tag "trade[mistakes]", trade["mistakes"], class: "form-control", rows: 3, placeholder: "What went wrong?" %>
+    <div class="form-group" data-controller="markdown-preview">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <%= label_tag "trade[mistakes]", "Mistakes" %>
+        <button type="button" class="btn btn-sm" data-markdown-preview-target="toggle" data-action="markdown-preview#toggle">Preview</button>
+      </div>
+      <%= text_area_tag "trade[mistakes]", trade["mistakes"], class: "form-control", rows: 3, placeholder: "What went wrong?", data: { markdown_preview_target: "input" } %>
+      <div class="md-preview hidden" data-markdown-preview-target="preview"></div>
     </div>
 
-    <div class="form-group">
-      <%= label_tag "trade[lessons]", "Lessons Learned" %>
-      <%= text_area_tag "trade[lessons]", trade["lessons"], class: "form-control", rows: 3, placeholder: "What did you learn?" %>
+    <div class="form-group" data-controller="markdown-preview">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <%= label_tag "trade[lessons]", "Lessons Learned" %>
+        <button type="button" class="btn btn-sm" data-markdown-preview-target="toggle" data-action="markdown-preview#toggle">Preview</button>
+      </div>
+      <%= text_area_tag "trade[lessons]", trade["lessons"], class: "form-control", rows: 3, placeholder: "What did you learn?", data: { markdown_preview_target: "input" } %>
+      <div class="md-preview hidden" data-markdown-preview-target="preview"></div>
     </div>
   </fieldset>
 
   <% if tags.present? && tags.any? %>
     <fieldset>
       <legend>Tags</legend>
+
+      <div class="tag-suggestions hidden" data-tag-suggest-target="suggestions"></div>
 
       <div class="checkbox-group">
         <% trade_tag_ids = (trade["tags"] || []).map { |t| t["id"] } %>

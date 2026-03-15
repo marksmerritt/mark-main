@@ -1,5 +1,10 @@
 <div class="page-header">
   <h1>Performance by Symbol</h1>
+  <div class="page-actions">
+    <button onclick="window.print()" class="btn" title="Print">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">print</span> Print
+    </button>
+  </div>
 </div>
 
 <div class="card">
@@ -21,37 +26,170 @@
   <% end %>
 </div>
 
-<div class="card">
-  <% if @symbols.is_a?(Array) && @symbols.any? %>
-    <table class="table">
+<% if @symbols.is_a?(Array) && @symbols.any? %>
+  <%
+    sorted = @symbols.sort_by { |s| -s["total_pnl"].to_f }
+    max_abs_pnl = sorted.map { |s| s["total_pnl"].to_f.abs }.max.to_f
+    max_abs_pnl = 1 if max_abs_pnl == 0
+  %>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.25rem; vertical-align: -3px;">grid_view</span> Symbol Treemap</h2>
+    </div>
+    <div class="treemap-wrapper"
+         data-controller="treemap"
+         data-treemap-data-value='<%= sorted.map { |s|
+           wr = s["trade_count"].to_i > 0 ? (s["wins"].to_i.to_f / s["trade_count"].to_i * 100).round(1) : 0
+           { label: s["symbol"], value: s["trade_count"].to_i, pnl: s["total_pnl"].to_f.round(2), trades: s["trade_count"], winRate: wr }
+         }.to_json %>'>
+      <div data-treemap-target="container" class="treemap-container"></div>
+      <div class="treemap-tooltip" data-treemap-target="tooltip"></div>
+    </div>
+    <div class="treemap-legend">
+      <span class="treemap-legend-item"><span class="treemap-swatch" style="background: #d93025;"></span> Loss</span>
+      <span class="treemap-legend-item"><span class="treemap-swatch" style="background: #fef3f2;"></span> Small Loss</span>
+      <span class="treemap-legend-item"><span class="treemap-swatch" style="background: #f0f9f0;"></span> Small Profit</span>
+      <span class="treemap-legend-item"><span class="treemap-swatch" style="background: #0d904f;"></span> Profit</span>
+      <span class="treemap-legend-note">Size = number of trades</span>
+    </div>
+  </div>
+
+  <%
+    profitable = sorted.count { |s| s["total_pnl"].to_f > 0 }
+    total_pnl_all = sorted.sum { |s| s["total_pnl"].to_f }
+    total_trades_all = sorted.sum { |s| s["trade_count"].to_i }
+    best_wr_sym = sorted.select { |s| s["trade_count"].to_i >= 5 }.max_by { |s|
+      s["trade_count"].to_i > 0 ? (s["wins"].to_i.to_f / s["trade_count"].to_i) : 0
+    }
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Symbols</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= sorted.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profitable</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= profitable %> / <%= sorted.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Symbol</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= sorted.first["symbol"] %> (<%= number_to_currency(sorted.first["total_pnl"]) %>)</div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Win Rate (5+)</div>
+        <% if best_wr_sym %>
+          <% bwr = best_wr_sym["trade_count"].to_i > 0 ? (best_wr_sym["wins"].to_i.to_f / best_wr_sym["trade_count"].to_i * 100).round(1) : 0 %>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= best_wr_sym["symbol"] %> (<%= bwr %>%)</div>
+        <% else %>
+          <div style="font-size: 1.5rem; font-weight: 700;">—</div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Top 5 / Bottom 5 Leaderboard %>
+  <% if sorted.count >= 4 %>
+    <div class="content-grid" style="margin-bottom: 1.5rem;">
+      <div class="card">
+        <div class="card-header"><h2>Top Performers</h2></div>
+        <div style="padding: 0.5rem 1.25rem;">
+          <% sorted.first(5).each_with_index do |s, i| %>
+            <% bar_pct = max_abs_pnl > 0 ? (s["total_pnl"].to_f / max_abs_pnl * 100).round(1) : 0 %>
+            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+              <span style="font-size: 0.875rem; font-weight: 700; color: var(--text-secondary); min-width: 1.25rem;">#<%= i + 1 %></span>
+              <div style="flex: 1;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                  <strong><%= s["symbol"] %></strong>
+                  <span class="positive" style="font-weight: 600;"><%= number_to_currency(s["total_pnl"]) %></span>
+                </div>
+                <div class="budget-progress-bar" style="height: 6px;">
+                  <div class="budget-progress-fill progress-safe" style="width: <%= bar_pct %>%;"></div>
+                </div>
+                <div style="display: flex; gap: 0.75rem; font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                  <span><%= s["trade_count"] %> trades</span>
+                  <% wr = s["trade_count"].to_i > 0 ? (s["wins"].to_i.to_f / s["trade_count"].to_i * 100).round(1) : 0 %>
+                  <span><%= wr %>% win rate</span>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2>Worst Performers</h2></div>
+        <div style="padding: 0.5rem 1.25rem;">
+          <% sorted.last(5).reverse.each_with_index do |s, i| %>
+            <% bar_pct = max_abs_pnl > 0 ? (s["total_pnl"].to_f.abs / max_abs_pnl * 100).round(1) : 0 %>
+            <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+              <span style="font-size: 0.875rem; font-weight: 700; color: var(--text-secondary); min-width: 1.25rem;">#<%= i + 1 %></span>
+              <div style="flex: 1;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                  <strong><%= s["symbol"] %></strong>
+                  <span class="negative" style="font-weight: 600;"><%= number_to_currency(s["total_pnl"]) %></span>
+                </div>
+                <div class="budget-progress-bar" style="height: 6px;">
+                  <div class="budget-progress-fill progress-danger" style="width: <%= bar_pct %>%;"></div>
+                </div>
+                <div style="display: flex; gap: 0.75rem; font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                  <span><%= s["trade_count"] %> trades</span>
+                  <% wr = s["trade_count"].to_i > 0 ? (s["wins"].to_i.to_f / s["trade_count"].to_i * 100).round(1) : 0 %>
+                  <span><%= wr %>% win rate</span>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="card">
+    <table class="table" data-controller="sortable">
       <thead>
         <tr>
           <th>Symbol</th>
           <th>Trades</th>
+          <th>Win Rate</th>
           <th>Total P&L</th>
           <th>Avg P&L</th>
           <th>Wins</th>
           <th>Losses</th>
+          <th style="min-width: 100px;">P&L Distribution</th>
         </tr>
       </thead>
       <tbody>
-        <% @symbols.each do |s| %>
+        <% sorted.each do |s| %>
+          <%
+            win_rate = s["trade_count"].to_i > 0 ? (s["wins"].to_i.to_f / s["trade_count"].to_i * 100).round(1) : 0
+            pnl_pct = (s["total_pnl"].to_f / max_abs_pnl * 100).round(1)
+          %>
           <tr>
-            <td><strong><%= s["symbol"] %></strong></td>
+            <td><strong><%= link_to s["symbol"], trades_path(symbol: s["symbol"]) %></strong></td>
             <td><%= s["trade_count"] %></td>
-            <td class="<%= s["total_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+            <td><%= win_rate %>%</td>
+            <td class="<%= pnl_class(s["total_pnl"]) %>">
               <%= number_to_currency(s["total_pnl"]) %>
             </td>
-            <td class="<%= s["avg_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+            <td class="<%= pnl_class(s["avg_pnl"]) %>">
               <%= number_to_currency(s["avg_pnl"]) %>
             </td>
             <td class="positive"><%= s["wins"] %></td>
             <td class="negative"><%= s["losses"] %></td>
+            <td>
+              <div class="mini-bar">
+                <div class="mini-bar-fill <%= s["total_pnl"].to_f >= 0 ? 'mini-bar-positive' : 'mini-bar-negative' %>"
+                     style="width: <%= pnl_pct.abs %>%"></div>
+              </div>
+            </td>
           </tr>
         <% end %>
       </tbody>
     </table>
-  <% else %>
-    <p class="empty-state">No data available.</p>
-  <% end %>
-</div>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No data available.</p>
+  </div>
+<% end %>

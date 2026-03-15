@@ -1,0 +1,183 @@
+<div class="page-header">
+  <h1>Journal Calendar</h1>
+  <div class="page-actions">
+    <%= link_to "List View", journal_entries_path, class: "btn" %>
+    <%= link_to "New Entry", new_journal_entry_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<div class="week-nav">
+  <%= link_to calendar_journal_entries_path(month: @month_offset + 1), class: "btn btn-sm" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">chevron_left</span> Previous
+  <% end %>
+  <h2 class="week-nav-title"><%= @target_date.strftime("%B %Y") %></h2>
+  <% if @month_offset > 0 %>
+    <%= link_to calendar_journal_entries_path(month: @month_offset - 1), class: "btn btn-sm" do %>
+      Next <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">chevron_right</span>
+    <% end %>
+  <% else %>
+    <span class="btn btn-sm" style="opacity: 0.3; pointer-events: none;">Next</span>
+  <% end %>
+</div>
+
+<div class="journal-calendar">
+  <div class="journal-cal-header">
+    <% %w[Sun Mon Tue Wed Thu Fri Sat].each do |day| %>
+      <div class="journal-cal-day-name"><%= day %></div>
+    <% end %>
+  </div>
+
+  <div class="journal-cal-grid">
+    <% @month_start.wday.times do %>
+      <div class="journal-cal-cell journal-cal-cell-empty"></div>
+    <% end %>
+
+    <% (@month_start..@month_end).each do |date| %>
+      <%
+        date_str = date.strftime("%Y-%m-%d")
+        entry = @entries_by_date[date_str]
+        pnl = @daily_pnl[date_str]&.to_f
+        is_today = date == Date.current
+        is_future = date > Date.current
+      %>
+      <div class="journal-cal-cell
+                   <%= 'journal-cal-cell-today' if is_today %>
+                   <%= 'journal-cal-cell-future' if is_future %>
+                   <%= 'journal-cal-cell-has-entry' if entry %>">
+        <div class="journal-cal-date">
+          <span><%= date.day %></span>
+          <% if pnl %>
+            <span class="journal-cal-pnl <%= pnl >= 0 ? 'positive' : 'negative' %>">
+              <%= number_to_currency(pnl, precision: 0) %>
+            </span>
+          <% end %>
+        </div>
+
+        <% if entry %>
+          <%= link_to journal_entry_path(entry["id"]), class: "journal-cal-entry" do %>
+            <% if entry["mood"].present? %>
+              <span class="journal-cal-mood"><%= entry["mood"] %></span>
+            <% end %>
+            <% if entry["content"].present? %>
+              <span class="journal-cal-preview"><%= truncate(entry["content"], length: 60) %></span>
+            <% end %>
+          <% end %>
+        <% elsif !is_future %>
+          <%= link_to new_journal_entry_path("journal_entry[date]" => date_str), class: "journal-cal-add", title: "Add entry for #{date_str}" do %>
+            <span class="material-icons-outlined">add</span>
+          <% end %>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<div class="card" style="margin-top: 1.5rem;">
+  <div class="card-header">
+    <h2>Month Summary</h2>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Journal Entries</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @entries_by_date.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trading Days</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @daily_pnl.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Coverage</div>
+      <% trading_days = @daily_pnl.count %>
+      <% journaled_trading_days = @daily_pnl.keys.count { |d| @entries_by_date.key?(d) } %>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= trading_days > 0 ? "#{(journaled_trading_days.to_f / trading_days * 100).round}%" : "—" %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Month P&L</div>
+      <% month_pnl = @daily_pnl.values.sum %>
+      <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(month_pnl) %>"><%= number_to_currency(month_pnl) %></div>
+    </div>
+  </div>
+</div>
+
+<%# Mood ↔ Performance Correlation %>
+<%
+  mood_pnl_data = {}
+  @entries_by_date.each do |date, entry|
+    mood = entry["mood"].presence
+    pnl = @daily_pnl[date]&.to_f
+    next unless mood && pnl
+    mood_pnl_data[mood] ||= { pnls: [], count: 0 }
+    mood_pnl_data[mood][:pnls] << pnl
+    mood_pnl_data[mood][:count] += 1
+  end
+
+  journaled_pnl = @daily_pnl.select { |d, _| @entries_by_date.key?(d) }.values
+  unjournaled_pnl = @daily_pnl.reject { |d, _| @entries_by_date.key?(d) }.values
+%>
+<% if mood_pnl_data.any? || (journaled_pnl.any? && unjournaled_pnl.any?) %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -2px;">psychology</span> Mood–Performance Correlation</h2>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <% if journaled_pnl.any? && unjournaled_pnl.any? %>
+        <%
+          j_avg = (journaled_pnl.sum / journaled_pnl.count).round(2)
+          u_avg = (unjournaled_pnl.sum / unjournaled_pnl.count).round(2)
+          j_wr = (journaled_pnl.count { |p| p > 0 }.to_f / journaled_pnl.count * 100).round(0)
+          u_wr = (unjournaled_pnl.count { |p| p > 0 }.to_f / unjournaled_pnl.count * 100).round(0)
+        %>
+        <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+          <div style="flex: 1; min-width: 200px; padding: 0.75rem; border-radius: var(--radius); background: rgba(13,144,79, 0.06); border: 1px solid var(--border);">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Journaled Days (<%= journaled_pnl.count %>)</div>
+            <div style="font-size: 1.25rem; font-weight: 700;" class="<%= j_avg >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(j_avg) %>/day</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= j_wr %>% win rate</div>
+          </div>
+          <div style="flex: 1; min-width: 200px; padding: 0.75rem; border-radius: var(--radius); background: rgba(128,134,139, 0.06); border: 1px solid var(--border);">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Non-Journaled Days (<%= unjournaled_pnl.count %>)</div>
+            <div style="font-size: 1.25rem; font-weight: 700;" class="<%= u_avg >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(u_avg) %>/day</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= u_wr %>% win rate</div>
+          </div>
+        </div>
+        <% if j_avg > u_avg %>
+          <p style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">lightbulb</span>
+            You averaged <strong class="positive"><%= number_to_currency(j_avg - u_avg) %> more</strong> per day when you journaled. Keep writing!
+          </p>
+        <% end %>
+      <% end %>
+
+      <% if mood_pnl_data.any? %>
+        <%
+          mood_emoji = { "great" => "sentiment_very_satisfied", "good" => "sentiment_satisfied", "neutral" => "sentiment_neutral", "bad" => "sentiment_dissatisfied", "terrible" => "sentiment_very_dissatisfied" }
+          max_mood_abs = mood_pnl_data.values.map { |d| (d[:pnls].sum / d[:count]).abs }.max.to_f
+          max_mood_abs = 1 if max_mood_abs == 0
+        %>
+        <div style="margin-top: 0.5rem;">
+          <h3 style="font-size: 0.875rem; margin-bottom: 0.5rem;">P&L by Journal Mood</h3>
+          <% mood_pnl_data.sort_by { |_, d| -(d[:pnls].sum / d[:count]) }.each do |mood, data| %>
+            <%
+              avg = (data[:pnls].sum / data[:count]).round(2)
+              wr = (data[:pnls].count { |p| p > 0 }.to_f / data[:count] * 100).round(0)
+              bar_pct = (avg.abs / max_mood_abs * 100).round(1)
+            %>
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; color: var(--text-secondary);"><%= mood_emoji[mood] || "mood" %></span>
+              <span style="min-width: 3.5rem; font-size: 0.8125rem; font-weight: 600; text-transform: capitalize;"><%= mood %></span>
+              <div style="flex: 1; position: relative; height: 1rem;">
+                <% if avg >= 0 %>
+                  <div style="position: absolute; left: 50%; height: 100%; width: <%= bar_pct / 2 %>%; background: var(--positive); border-radius: 0 3px 3px 0; opacity: 0.7;"></div>
+                <% else %>
+                  <div style="position: absolute; right: 50%; height: 100%; width: <%= bar_pct / 2 %>%; background: var(--negative); border-radius: 3px 0 0 3px; opacity: 0.7;"></div>
+                <% end %>
+                <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border);"></div>
+              </div>
+              <span style="min-width: 5rem; text-align: right; font-size: 0.75rem;" class="<%= avg >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(avg) %> (<%= wr %>%)</span>
+              <span style="font-size: 0.6875rem; color: var(--text-secondary); min-width: 1.5rem;"><%= data[:count] %>d</span>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

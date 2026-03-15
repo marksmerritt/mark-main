@@ -1,0 +1,202 @@
+<% content_for(:title) { "Income Allocator" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--positive);">pie_chart</span>
+    Income Allocation Recommender
+  </h1>
+</div>
+
+<%# Income Input %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+  <%= form_tag budget_income_allocator_path, method: :get, style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; align-items: end;" do %>
+    <div>
+      <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Monthly Income</label>
+      <input type="number" name="income" value="<%= @income.round(0) %>" step="100" class="form-control" style="font-size: 0.875rem;">
+    </div>
+    <div>
+      <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Pay Frequency</label>
+      <select name="frequency" class="form-control" style="font-size: 0.875rem;">
+        <% [["Monthly", "monthly"], ["Semi-Monthly", "semimonthly"], ["Bi-Weekly", "biweekly"], ["Weekly", "weekly"]].each do |label, val| %>
+          <option value="<%= val %>" <%= val == @pay_frequency ? "selected" : "" %>><%= label %></option>
+        <% end %>
+      </select>
+    </div>
+    <div>
+      <button type="submit" class="btn btn-primary" style="width: 100%;">Calculate</button>
+    </div>
+  <% end %>
+</div>
+
+<%# Current Allocation vs Ideal %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">donut_large</span> Your Current Allocation</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem;">
+      <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 8px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Needs</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);"><%= @current_pcts[:needs] %>%</div>
+        <div style="font-size: 0.8125rem;"><%= number_to_currency(@needs_total) %>/mo</div>
+      </div>
+      <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 8px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Wants</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: #9c27b0;"><%= @current_pcts[:wants] %>%</div>
+        <div style="font-size: 0.8125rem;"><%= number_to_currency(@wants_total) %>/mo</div>
+      </div>
+      <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 8px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @current_pcts[:savings] %>%</div>
+        <div style="font-size: 0.8125rem;"><%= number_to_currency(@savings_total) %>/mo</div>
+      </div>
+    </div>
+    <%# Stacked bar %>
+    <div style="height: 1.5rem; border-radius: 6px; overflow: hidden; display: flex;">
+      <div style="width: <%= @current_pcts[:needs] %>%; background: var(--primary); opacity: 0.6;"></div>
+      <div style="width: <%= @current_pcts[:wants] %>%; background: #9c27b0; opacity: 0.5;"></div>
+      <div style="width: <%= @current_pcts[:savings] %>%; background: var(--positive); opacity: 0.6;"></div>
+    </div>
+    <div style="display: flex; justify-content: center; gap: 1.5rem; margin-top: 0.5rem; font-size: 0.6875rem; color: var(--text-secondary);">
+      <span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--primary); opacity: 0.6;"></span> Needs</span>
+      <span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: #9c27b0; opacity: 0.5;"></span> Wants</span>
+      <span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--positive); opacity: 0.6;"></span> Savings</span>
+    </div>
+  </div>
+</div>
+
+<%# Framework Recommendations %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <% @frameworks.each do |fw| %>
+    <% is_recommended = fw[:name] == @recommended %>
+    <div class="card" style="<%= is_recommended ? 'border: 2px solid var(--primary);' : '' %>">
+      <div style="padding: 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <h3 style="font-size: 1.125rem; font-weight: 700;"><%= fw[:name] %></h3>
+          <% if is_recommended %>
+            <span style="font-size: 0.625rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--primary); color: white; font-weight: 600;">RECOMMENDED</span>
+          <% end %>
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem;"><%= fw[:description] %></div>
+
+        <% fw[:buckets].each do |b| %>
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: <%= b[:color] %>;"><%= b[:icon] %></span>
+            <span style="font-size: 0.8125rem; font-weight: 600; width: 7rem;"><%= b[:name] %> (<%= b[:pct] %>%)</span>
+            <div style="flex: 1; height: 0.5rem; background: var(--bg); border-radius: 3px; overflow: hidden;">
+              <div style="height: 100%; width: <%= b[:pct] %>%; background: <%= b[:color] %>; opacity: 0.6; border-radius: 3px;"></div>
+            </div>
+            <span style="font-size: 0.8125rem; font-weight: 700; min-width: 4.5rem; text-align: right;"><%= number_to_currency(b[:amount]) %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Per-Paycheck Breakdown %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">payments</span> Per-Paycheck Breakdown (<%= @pay_frequency.titleize %>)</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="text-align: center; margin-bottom: 1rem;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Per Paycheck</div>
+      <div style="font-size: 2rem; font-weight: 700;"><%= number_to_currency(@per_paycheck) %></div>
+    </div>
+
+    <% rec_fw = @frameworks.find { |f| f[:name] == @recommended } || @frameworks.first %>
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+      <thead>
+        <tr style="border-bottom: 2px solid var(--border);">
+          <th style="text-align: left; padding: 0.5rem;">Category</th>
+          <th style="text-align: right; padding: 0.5rem;">Per Paycheck</th>
+          <th style="text-align: right; padding: 0.5rem;">Monthly</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rec_fw[:buckets].each do |b| %>
+          <% per_check = case @pay_frequency
+                         when "weekly" then (b[:amount] / 4.33).round(2)
+                         when "biweekly" then (b[:amount] / 2.17).round(2)
+                         when "semimonthly" then (b[:amount] / 2).round(2)
+                         else b[:amount]
+                         end %>
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 0.5rem;">
+              <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: <%= b[:color] %>;"><%= b[:icon] %></span>
+              <%= b[:name] %> (<%= b[:pct] %>%)
+            </td>
+            <td style="text-align: right; padding: 0.5rem; font-weight: 600;"><%= number_to_currency(per_check) %></td>
+            <td style="text-align: right; padding: 0.5rem; color: var(--text-secondary);"><%= number_to_currency(b[:amount]) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%# Fixed Obligations %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">lock</span> Fixed Monthly Obligations</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; text-align: center; margin-bottom: 1rem;">
+      <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Recurring Bills</div>
+        <div style="font-weight: 700;"><%= number_to_currency(@recurring_total) %></div>
+      </div>
+      <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Debt Payments</div>
+        <div style="font-weight: 700;"><%= number_to_currency(@min_debt_payment) %></div>
+      </div>
+      <div style="padding: 0.75rem; background: var(--bg); border-radius: 6px;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">Goal Savings</div>
+        <div style="font-weight: 700;"><%= number_to_currency(@goals_monthly) %></div>
+      </div>
+    </div>
+    <%
+      total_fixed = @recurring_total + @min_debt_payment + @goals_monthly
+      flexible = @income - total_fixed
+      fixed_pct = @income > 0 ? (total_fixed / @income * 100).round(1) : 0
+    %>
+    <div style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 0.375rem;">
+      <span>Fixed obligations: <strong><%= number_to_currency(total_fixed) %></strong> (<%= fixed_pct %>%)</span>
+      <span>Flexible: <strong style="color: var(--positive);"><%= number_to_currency(flexible) %></strong></span>
+    </div>
+    <div style="height: 0.5rem; background: var(--bg); border-radius: 3px; overflow: hidden;">
+      <div style="height: 100%; width: <%= fixed_pct %>%; background: var(--primary); opacity: 0.6; border-radius: 3px;"></div>
+    </div>
+  </div>
+</div>
+
+<%# Top Spending Categories %>
+<% if @category_spending.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">receipt_long</span> Monthly Category Breakdown</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% cat_max = @category_spending.values.first.to_f; cat_max = 1 if cat_max == 0 %>
+      <% @category_spending.first(10).each do |cat, amount| %>
+        <% pct_of_income = @income > 0 ? (amount / @income * 100).round(1) : 0 %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+          <span style="width: 8rem; font-size: 0.8125rem; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= cat %></span>
+          <div style="flex: 1; height: 1rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= (amount / cat_max * 100).round(1) %>%; background: var(--primary); opacity: 0.5; border-radius: 4px;"></div>
+          </div>
+          <span style="min-width: 5rem; text-align: right; font-size: 0.8125rem; font-weight: 600;"><%= number_to_currency(amount) %></span>
+          <span style="min-width: 2.5rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary);"><%= pct_of_income %>%</span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Paycheck Allocator", budget_allocate_path, class: "btn" %>
+  <%= link_to "Savings Projection", budget_savings_projection_path, class: "btn" %>
+  <%= link_to "Wellness Scorecard", budget_wellness_scorecard_path, class: "btn" %>
+  <%= link_to "Budget Dashboard", budget_dashboard_path, class: "btn" %>
+</div>

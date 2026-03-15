@@ -1,0 +1,209 @@
+<% content_for(:title) { "Paycheck Allocator — Budget" } %>
+
+<%
+  total_remaining = @items.select { |i| i[:remaining] > 0 }.sum { |i| i[:remaining] }
+  total_planned = @items.sum { |i| i[:planned] }
+  total_spent = @items.sum { |i| i[:spent] }
+  items_funded = @items.count { |i| i[:remaining] <= 0 }
+  items_unfunded = @items.count { |i| i[:remaining] > 0 }
+  coverage_pct = total_planned > 0 ? (total_spent / total_planned * 100).round(0) : 0
+%>
+
+<div class="page-header">
+  <h1>Paycheck Allocator</h1>
+  <div class="page-actions">
+    <%= link_to "Dashboard", budget_dashboard_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Coverage summary hero %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">To Fund</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(total_remaining) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Items</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= @items.size %></div>
+      <div style="font-size: 0.625rem; color: var(--text-secondary);">
+        <span class="positive"><%= items_funded %> funded</span> &middot; <span class="negative"><%= items_unfunded %> remaining</span>
+      </div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Coverage</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= coverage_pct %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Funds</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= @funds.size %></div>
+    </div>
+  </div>
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start;">
+  <%# Left: paycheck form %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">payments</span> Record Paycheck</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <%= form_with url: budget_apply_allocation_path, method: :post, local: true do |f| %>
+        <div class="form-group">
+          <label for="paycheck_amount">Paycheck Amount</label>
+          <input type="number" id="paycheck_amount" name="paycheck_amount" class="form-control"
+                 step="0.01" min="0" value="<%= @paycheck > 0 ? @paycheck : '' %>" placeholder="2500.00" required
+                 oninput="updateAllocation(this.value)">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label for="pay_description">Description</label>
+            <input type="text" id="pay_description" name="description" class="form-control" value="Paycheck" placeholder="Paycheck">
+          </div>
+          <div class="form-group">
+            <label for="pay_date">Date</label>
+            <input type="date" id="pay_date" name="date" class="form-control" value="<%= Date.current.to_s %>">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="pay_merchant">From</label>
+          <input type="text" id="pay_merchant" name="merchant" class="form-control" value="Employer" placeholder="Employer">
+        </div>
+
+        <%# Coverage indicator %>
+        <div id="allocation-summary" style="margin-top: 1rem; padding: 0.75rem; background: var(--bg); border-radius: var(--radius);">
+          <div style="display: flex; justify-content: space-between; font-size: 0.8125rem; margin-bottom: 0.375rem;">
+            <span style="color: var(--text-secondary);">Remaining to fund:</span>
+            <strong id="total-remaining"><%= number_to_currency(total_remaining) %></strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.8125rem;">
+            <span style="color: var(--text-secondary);">After paycheck:</span>
+            <strong id="after-paycheck" class="<%= @paycheck >= total_remaining ? 'positive' : 'negative' %>">
+              <%= @paycheck > 0 ? number_to_currency(@paycheck - total_remaining) : "—" %>
+            </strong>
+          </div>
+          <% if @paycheck > 0 %>
+            <%
+              pay_coverage = total_remaining > 0 ? (@paycheck / total_remaining * 100).clamp(0, 100).round(0) : 100
+            %>
+            <div style="height: 0.375rem; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 0.5rem;">
+              <div style="height: 100%; width: <%= pay_coverage %>%; background: <%= pay_coverage >= 100 ? 'var(--positive)' : 'var(--primary)' %>; opacity: 0.7; border-radius: 4px;"></div>
+            </div>
+          <% end %>
+        </div>
+
+        <% if @funds.any? %>
+          <h3 style="margin: 1.5rem 0 0.75rem;">Fund Contributions</h3>
+          <% @funds.each do |fund| %>
+            <%
+              f_current = fund["current_amount"].to_f
+              f_target = fund["target_amount"].to_f
+              f_pct = f_target > 0 ? (f_current / f_target * 100).round(0) : 0
+            %>
+            <div class="form-group" style="margin-bottom: 0.75rem;">
+              <div style="display: flex; align-items: center; gap: 0.75rem;">
+                <label style="min-width: 9rem; margin: 0; font-size: 0.875rem;"><%= fund["name"] %></label>
+                <input type="number" name="fund_contributions[<%= fund["id"] %>]" class="form-control"
+                       style="width: 7rem;" step="0.01" min="0" placeholder="0.00">
+              </div>
+              <% if f_target > 0 %>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem; padding-left: 9.75rem;">
+                  <div style="flex: 1; height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden;">
+                    <div style="height: 100%; width: <%= [f_pct, 100].min %>%; background: var(--primary); opacity: 0.5; border-radius: 2px;"></div>
+                  </div>
+                  <span style="font-size: 0.6875rem; color: var(--text-secondary); white-space: nowrap;"><%= number_to_currency(f_current) %> / <%= number_to_currency(f_target) %></span>
+                </div>
+              <% else %>
+                <div style="padding-left: 9.75rem; font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;">
+                  Balance: <%= number_to_currency(f_current) %>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        <% end %>
+
+        <div class="form-actions" style="margin-top: 1.5rem;">
+          <button type="submit" class="btn btn-primary">
+            <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">check</span> Record Paycheck
+          </button>
+          <%= link_to "Cancel", budget_dashboard_path, class: "btn" %>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Right: budget items breakdown %>
+  <div>
+    <% if @items.any? %>
+      <div class="card">
+        <div class="card-header">
+          <h2>Budget Coverage</h2>
+          <span style="font-size: 0.8125rem; color: var(--text-secondary);">
+            <%= items_funded %>/<%= @items.size %> funded
+          </span>
+        </div>
+        <div style="max-height: 36rem; overflow-y: auto;">
+          <table class="table" style="margin: 0; font-size: 0.8125rem;">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th style="text-align: right;">Planned</th>
+                <th style="text-align: right;">Spent</th>
+                <th style="text-align: right;">Remaining</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% current_cat = nil %>
+              <% @items.each do |item| %>
+                <% if item[:category] != current_cat %>
+                  <% current_cat = item[:category] %>
+                  <tr style="background: var(--bg);">
+                    <td colspan="4" style="font-weight: 600; font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary);"><%= current_cat %></td>
+                  </tr>
+                <% end %>
+                <%
+                  item_pct = item[:planned] > 0 ? (item[:spent] / item[:planned] * 100).round(0) : 0
+                %>
+                <tr>
+                  <td>
+                    <div><%= item[:name] %></div>
+                    <div style="height: 3px; background: var(--bg); border-radius: 2px; overflow: hidden; margin-top: 3px;">
+                      <div style="height: 100%; width: <%= [item_pct, 100].min %>%; background: <%= item_pct >= 100 ? 'var(--positive)' : 'var(--primary)' %>; opacity: 0.5; border-radius: 2px;"></div>
+                    </div>
+                  </td>
+                  <td style="text-align: right;"><%= number_to_currency(item[:planned]) %></td>
+                  <td style="text-align: right;"><%= number_to_currency(item[:spent]) %></td>
+                  <td style="text-align: right;">
+                    <% if item[:remaining] > 0 %>
+                      <span class="negative"><%= number_to_currency(item[:remaining]) %></span>
+                    <% else %>
+                      <span class="positive" style="font-size: 0.75rem;">
+                        <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px;">check_circle</span> Funded
+                      </span>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<script>
+  function updateAllocation(amount) {
+    const val = parseFloat(amount) || 0;
+    const remaining = <%= total_remaining %>;
+    const after = val - remaining;
+    const el = document.getElementById('after-paycheck');
+    if (el) {
+      el.textContent = '$' + Math.abs(after).toFixed(2);
+      if (after < 0) el.textContent = '-' + el.textContent;
+      el.className = after >= 0 ? 'positive' : 'negative';
+    }
+  }
+</script>

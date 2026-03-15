@@ -1,0 +1,367 @@
+<div class="page-header">
+  <h1>Income vs Expenses</h1>
+</div>
+
+<% if @data.is_a?(Array) && @data.any? %>
+  <% total_income = @data.sum { |d| d["income"].to_f } %>
+  <% total_expenses = @data.sum { |d| d["expenses"].to_f } %>
+  <% total_savings = @data.sum { |d| d["savings"].to_f } %>
+  <% avg_savings_rate = total_income > 0 ? ((total_savings / total_income) * 100).round(1) : 0 %>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Income</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= number_to_currency(total_income) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Expenses</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(total_expenses) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Saved</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= total_savings >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(total_savings) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Savings Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= avg_savings_rate %>%</div>
+      </div>
+    </div>
+  </div>
+
+  <%# Cash flow waterfall for most recent month %>
+  <% latest = @data.last %>
+  <% if latest %>
+    <%
+      income_val = latest["income"].to_f
+      expenses_val = latest["expenses"].to_f
+      savings_val = latest["savings"].to_f
+      max_val = [income_val, expenses_val].max
+      max_val = 1 if max_val == 0
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>Cash Flow — <%= latest["label"] %></h2>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: flex; align-items: flex-end; gap: 0.25rem; height: 180px; padding-bottom: 1.5rem; position: relative;">
+          <%# Income bar %>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%;">
+            <span style="font-size: 0.75rem; font-weight: 600; color: var(--positive); margin-bottom: 0.25rem;">
+              <%= number_to_currency(income_val) %>
+            </span>
+            <div style="flex: 1; width: 100%; display: flex; align-items: flex-end;">
+              <div style="width: 100%; height: <%= (income_val / max_val * 100).round(1) %>%; background: var(--positive); border-radius: var(--radius) var(--radius) 0 0; min-height: 4px;"></div>
+            </div>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">Income</span>
+          </div>
+          <%# Arrow %>
+          <div style="flex: 0 0 2rem; display: flex; align-items: center; justify-content: center; padding-bottom: 1.25rem;">
+            <span class="material-icons-outlined" style="color: var(--text-secondary);">arrow_forward</span>
+          </div>
+          <%# Expenses bar %>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%;">
+            <span style="font-size: 0.75rem; font-weight: 600; color: var(--negative); margin-bottom: 0.25rem;">
+              <%= number_to_currency(expenses_val) %>
+            </span>
+            <div style="flex: 1; width: 100%; display: flex; align-items: flex-end;">
+              <div style="width: 100%; height: <%= (expenses_val / max_val * 100).round(1) %>%; background: var(--negative); border-radius: var(--radius) var(--radius) 0 0; min-height: 4px;"></div>
+            </div>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">Expenses</span>
+          </div>
+          <%# Equals %>
+          <div style="flex: 0 0 2rem; display: flex; align-items: center; justify-content: center; padding-bottom: 1.25rem;">
+            <span class="material-icons-outlined" style="color: var(--text-secondary);">drag_handle</span>
+          </div>
+          <%# Savings bar %>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%;">
+            <span style="font-size: 0.75rem; font-weight: 600; color: <%= savings_val >= 0 ? 'var(--positive)' : 'var(--negative)' %>; margin-bottom: 0.25rem;">
+              <%= number_to_currency(savings_val) %>
+            </span>
+            <div style="flex: 1; width: 100%; display: flex; align-items: flex-end;">
+              <div style="width: 100%; height: <%= (savings_val.abs / max_val * 100).clamp(2, 100).round(1) %>%; background: <%= savings_val >= 0 ? 'var(--primary)' : 'var(--negative)' %>; border-radius: var(--radius) var(--radius) 0 0; min-height: 4px;"></div>
+            </div>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">Saved</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# SVG Income vs Expenses Comparison Chart %>
+  <% if @data.length >= 2 %>
+    <%
+      svg_w = 720
+      svg_h = 280
+      pad_l = 60
+      pad_r = 20
+      pad_t = 20
+      pad_b = 50
+      chart_w = svg_w - pad_l - pad_r
+      chart_h = svg_h - pad_t - pad_b
+
+      max_val_chart = @data.map { |d| [d["income"].to_f, d["expenses"].to_f] }.flatten.max
+      max_val_chart = 1 if max_val_chart == 0
+      y_step = (max_val_chart / 4.0).ceil(-2)
+      y_max = y_step * 4
+      y_max = max_val_chart * 1.1 if y_max < max_val_chart
+
+      bar_group_w = chart_w.to_f / @data.length
+      bar_w = [bar_group_w * 0.3, 30].min
+      gap = 3
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Income vs Expenses</h2></div>
+      <div style="padding: 1rem 1.25rem; overflow-x: auto;">
+        <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; max-width: <%= svg_w %>px; height: auto;">
+          <%# Grid lines and Y-axis labels %>
+          <% 5.times do |i| %>
+            <%
+              y_val = y_max * i / 4.0
+              y_pos = pad_t + chart_h - (y_val / y_max * chart_h)
+            %>
+            <line x1="<%= pad_l %>" y1="<%= y_pos.round(1) %>" x2="<%= svg_w - pad_r %>" y2="<%= y_pos.round(1) %>"
+                  stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3,3" />
+            <text x="<%= pad_l - 8 %>" y="<%= y_pos.round(1) + 4 %>" text-anchor="end"
+                  fill="var(--text-secondary)" font-size="10">
+              $<%= (y_val / 1000.0).round(1) %>k
+            </text>
+          <% end %>
+
+          <%# Bars %>
+          <% @data.each_with_index do |d, i| %>
+            <%
+              inc = d["income"].to_f
+              exp = d["expenses"].to_f
+              cx = pad_l + bar_group_w * i + bar_group_w / 2.0
+              inc_h = inc / y_max * chart_h
+              exp_h = exp / y_max * chart_h
+            %>
+            <%# Income bar %>
+            <rect x="<%= (cx - bar_w - gap / 2.0).round(1) %>" y="<%= (pad_t + chart_h - inc_h).round(1) %>"
+                  width="<%= bar_w.round(1) %>" height="<%= [inc_h, 1].max.round(1) %>"
+                  fill="var(--positive)" rx="2" opacity="0.85">
+              <title><%= d["label"] %> Income: <%= number_to_currency(inc) %></title>
+            </rect>
+            <%# Expenses bar %>
+            <rect x="<%= (cx + gap / 2.0).round(1) %>" y="<%= (pad_t + chart_h - exp_h).round(1) %>"
+                  width="<%= bar_w.round(1) %>" height="<%= [exp_h, 1].max.round(1) %>"
+                  fill="var(--negative)" rx="2" opacity="0.85">
+              <title><%= d["label"] %> Expenses: <%= number_to_currency(exp) %></title>
+            </rect>
+            <%# Savings line dot %>
+            <%
+              sav = d["savings"].to_f
+              sav_y = pad_t + chart_h - (sav.clamp(0, y_max) / y_max * chart_h)
+            %>
+            <circle cx="<%= cx.round(1) %>" cy="<%= sav_y.round(1) %>" r="3.5"
+                    fill="var(--primary)" stroke="var(--surface)" stroke-width="1.5">
+              <title><%= d["label"] %> Savings: <%= number_to_currency(sav) %></title>
+            </circle>
+            <%# Connect savings dots with line %>
+            <% if i > 0 %>
+              <%
+                prev = @data[i - 1]
+                prev_sav = prev["savings"].to_f
+                prev_cx = pad_l + bar_group_w * (i - 1) + bar_group_w / 2.0
+                prev_sav_y = pad_t + chart_h - (prev_sav.clamp(0, y_max) / y_max * chart_h)
+              %>
+              <line x1="<%= prev_cx.round(1) %>" y1="<%= prev_sav_y.round(1) %>"
+                    x2="<%= cx.round(1) %>" y2="<%= sav_y.round(1) %>"
+                    stroke="var(--primary)" stroke-width="2" stroke-dasharray="4,3" />
+            <% end %>
+            <%# X-axis label %>
+            <text x="<%= cx.round(1) %>" y="<%= svg_h - pad_b + 18 %>" text-anchor="middle"
+                  fill="var(--text-secondary)" font-size="10"
+                  <% if @data.length > 8 %>transform="rotate(-35, <%= cx.round(1) %>, <%= svg_h - pad_b + 18 %>)"<% end %>>
+              <%= d["label"].to_s.length > 7 ? d["label"].to_s.slice(0, 3) : d["label"] %>
+            </text>
+          <% end %>
+
+          <%# Axes %>
+          <line x1="<%= pad_l %>" y1="<%= pad_t %>" x2="<%= pad_l %>" y2="<%= pad_t + chart_h %>"
+                stroke="var(--border)" stroke-width="1" />
+          <line x1="<%= pad_l %>" y1="<%= pad_t + chart_h %>" x2="<%= svg_w - pad_r %>" y2="<%= pad_t + chart_h %>"
+                stroke="var(--border)" stroke-width="1" />
+        </svg>
+        <div style="display: flex; gap: 1.5rem; justify-content: center; margin-top: 0.5rem; font-size: 0.75rem;">
+          <span style="display: inline-flex; align-items: center; gap: 4px;">
+            <span style="width: 12px; height: 12px; background: var(--positive); border-radius: 2px;"></span> Income
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 4px;">
+            <span style="width: 12px; height: 12px; background: var(--negative); border-radius: 2px;"></span> Expenses
+          </span>
+          <span style="display: inline-flex; align-items: center; gap: 4px;">
+            <span style="width: 8px; height: 8px; background: var(--primary); border-radius: 50%;"></span> Savings
+          </span>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Month-over-Month Change %>
+  <% if @data.length >= 2 %>
+    <%
+      changes = @data.each_cons(2).map do |prev, curr|
+        exp_change = curr["expenses"].to_f - prev["expenses"].to_f
+        inc_change = curr["income"].to_f - prev["income"].to_f
+        { label: curr["label"], exp_change: exp_change, inc_change: inc_change,
+          exp_pct: prev["expenses"].to_f > 0 ? (exp_change / prev["expenses"].to_f * 100).round(1) : 0,
+          inc_pct: prev["income"].to_f > 0 ? (inc_change / prev["income"].to_f * 100).round(1) : 0 }
+      end
+      biggest_increase = changes.max_by { |c| c[:exp_change] }
+      biggest_decrease = changes.min_by { |c| c[:exp_change] }
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Month-over-Month Changes</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: flex; flex-wrap: wrap; gap: 1rem;">
+          <% changes.last(6).each do |c| %>
+            <div style="flex: 1; min-width: 100px; text-align: center; padding: 0.5rem; border-radius: var(--radius); background: var(--bg);">
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;"><%= c[:label] %></div>
+              <div style="font-size: 0.875rem; font-weight: 600;" class="<%= c[:exp_change] <= 0 ? 'positive' : 'negative' %>">
+                <%= c[:exp_change] <= 0 ? "↓" : "↑" %> <%= number_to_currency(c[:exp_change].abs) %>
+              </div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+                expenses (<%= c[:exp_pct] >= 0 ? "+" : "" %><%= c[:exp_pct] %>%)
+              </div>
+            </div>
+          <% end %>
+        </div>
+        <% if biggest_increase && biggest_decrease && changes.length >= 3 %>
+          <div style="margin-top: 0.75rem; font-size: 0.8125rem; color: var(--text-secondary);">
+            Biggest expense jump: <strong class="negative"><%= biggest_increase[:label] %> (+<%= number_to_currency(biggest_increase[:exp_change]) %>)</strong>
+            · Biggest drop: <strong class="positive"><%= biggest_decrease[:label] %> (<%= number_to_currency(biggest_decrease[:exp_change]) %>)</strong>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header"><h2>Monthly Savings</h2></div>
+      <div class="chart-container" data-controller="chart"
+           data-chart-type-value="bar"
+           data-chart-points-value="<%= @data.map { |d| { x: d["label"], y: d["savings"] } }.to_json %>"
+           style="height: 200px; padding: 1rem;">
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><h2>Savings Rate Trend</h2></div>
+      <div data-controller="sparkline"
+           data-sparkline-data-value="<%= @data.map { |d| d["income"].to_f > 0 ? (d["savings"].to_f / d["income"].to_f * 100).round(1) : 0 }.to_json %>"
+           data-sparkline-width-value="280"
+           data-sparkline-height-value="60"
+           data-sparkline-fill-value="true"
+           data-sparkline-color-value="var(--primary)"
+           style="padding: 1.5rem 1.25rem;">
+      </div>
+      <div style="padding: 0 1.25rem 1rem; display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary);">
+        <span><%= @data.first["label"] %></span>
+        <span><%= @data.last["label"] %></span>
+      </div>
+    </div>
+  </div>
+
+  <%# Financial Health Insights %>
+  <% if @data.length >= 3 %>
+    <%
+      recent_3 = @data.last(3)
+      avg_recent_rate = recent_3.sum { |d| d["income"].to_f > 0 ? (d["savings"].to_f / d["income"].to_f * 100) : 0 } / 3.0
+      deficit_months = @data.count { |d| d["savings"].to_f < 0 }
+      best_month = @data.max_by { |d| d["savings"].to_f }
+      worst_month = @data.min_by { |d| d["savings"].to_f }
+      expense_ratios = @data.select { |d| d["income"].to_f > 0 }.map { |d| d["expenses"].to_f / d["income"].to_f * 100 }
+      avg_expense_ratio = expense_ratios.any? ? (expense_ratios.sum / expense_ratios.length).round(1) : 0
+      trend_improving = @data.length >= 4 && @data.last(2).sum { |d| d["savings"].to_f } > @data[-4..-3].sum { |d| d["savings"].to_f }
+    %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Financial Health</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <div style="flex: 1; min-width: 200px;">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">3-Month Avg Savings Rate</div>
+            <div style="font-size: 1.5rem; font-weight: 700;" class="<%= avg_recent_rate >= 20 ? 'positive' : avg_recent_rate >= 10 ? '' : 'negative' %>">
+              <%= avg_recent_rate.round(1) %>%
+            </div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+              <%= avg_recent_rate >= 20 ? "Excellent — on track for wealth building" : avg_recent_rate >= 10 ? "Good — room to optimize" : "Needs attention — aim for 20%+" %>
+            </div>
+          </div>
+          <div style="flex: 1; min-width: 200px;">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Expense Ratio</div>
+            <div style="font-size: 1.5rem; font-weight: 700;" class="<%= avg_expense_ratio <= 70 ? 'positive' : avg_expense_ratio <= 85 ? '' : 'negative' %>">
+              <%= avg_expense_ratio %>%
+            </div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+              Average of income spent on expenses
+            </div>
+          </div>
+          <div style="flex: 1; min-width: 200px;">
+            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Trend</div>
+            <div style="font-size: 1.5rem; font-weight: 700;" class="<%= trend_improving ? 'positive' : 'negative' %>">
+              <span class="material-icons-outlined" style="vertical-align: -4px;"><%= trend_improving ? 'trending_up' : 'trending_down' %></span>
+              <%= trend_improving ? "Improving" : "Declining" %>
+            </div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+              <% if deficit_months > 0 %><%= deficit_months %> deficit month<%= deficit_months > 1 ? 's' : '' %> in range<% else %>No deficit months<% end %>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 1rem; font-size: 0.8125rem;">
+          <div style="flex: 1; padding: 0.5rem 0.75rem; border-radius: var(--radius); background: var(--bg);">
+            <span style="color: var(--text-secondary);">Best month:</span>
+            <strong class="positive"><%= best_month["label"] %></strong> — saved <%= number_to_currency(best_month["savings"]) %>
+          </div>
+          <div style="flex: 1; padding: 0.5rem 0.75rem; border-radius: var(--radius); background: var(--bg);">
+            <span style="color: var(--text-secondary);">Worst month:</span>
+            <strong class="negative"><%= worst_month["label"] %></strong> — <%= worst_month["savings"].to_f >= 0 ? "saved" : "deficit" %> <%= number_to_currency(worst_month["savings"].to_f.abs) %>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="card" style="margin-top: 1.5rem;">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th style="text-align: right;">Income</th>
+          <th style="text-align: right;">Expenses</th>
+          <th style="text-align: right;">Savings</th>
+          <th style="text-align: right;">Rate</th>
+          <th>Breakdown</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @data.each do |d| %>
+          <% rate = d["income"].to_f > 0 ? ((d["savings"].to_f / d["income"].to_f) * 100).round(1) : 0 %>
+          <% exp_pct = d["income"].to_f > 0 ? (d["expenses"].to_f / d["income"].to_f * 100).clamp(0, 100).round(1) : 0 %>
+          <tr>
+            <td><%= d["label"] %></td>
+            <td style="text-align: right;" class="positive"><%= number_to_currency(d["income"]) %></td>
+            <td style="text-align: right;" class="negative"><%= number_to_currency(d["expenses"]) %></td>
+            <td style="text-align: right;" class="<%= d["savings"].to_f >= 0 ? 'positive' : 'negative' %>">
+              <%= number_to_currency(d["savings"]) %>
+            </td>
+            <td style="text-align: right;"><%= rate %>%</td>
+            <td style="min-width: 120px;">
+              <div class="mini-bar-container">
+                <div class="mini-bar negative" style="width: <%= exp_pct %>%;"></div>
+                <% if rate > 0 %>
+                  <div class="mini-bar positive" style="width: <%= rate.clamp(0, 100 - exp_pct) %>%; position: absolute; left: <%= exp_pct %>%;"></div>
+                <% end %>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>Add transactions to see your income vs expenses breakdown.</p>
+  </div>
+<% end %>

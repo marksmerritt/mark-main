@@ -1,0 +1,351 @@
+<% content_for(:title) { "Sentiment Analysis" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #f9a825;">mood</span>
+    Notes Sentiment Analysis
+  </h1>
+  <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem;">
+    Keyword-based sentiment analysis of your note content
+  </p>
+</div>
+
+<% if @error.present? %>
+  <div class="card" style="padding: 1.25rem; margin-bottom: 1.5rem; border-left: 3px solid var(--negative);">
+    <strong>Error loading data:</strong> <%= @error %>
+  </div>
+<% end %>
+
+<%# Overall Sentiment Card %>
+<div class="card" style="margin-bottom: 1.5rem; text-align: center; padding: 2rem 1.25rem;">
+  <%
+    emoji = if @avg_sentiment > 0.15
+      "\xF0\x9F\x98\x83"
+    elsif @avg_sentiment < -0.15
+      "\xF0\x9F\x98\x9F"
+    else
+      "\xF0\x9F\x98\x90"
+    end
+    sentiment_label = if @avg_sentiment > 0.15
+      "Positive"
+    elsif @avg_sentiment < -0.15
+      "Negative"
+    else
+      "Neutral"
+    end
+    sentiment_color = if @avg_sentiment > 0.15
+      "var(--positive, #43a047)"
+    elsif @avg_sentiment < -0.15
+      "var(--negative, #e53935)"
+    else
+      "var(--text-secondary)"
+    end
+  %>
+  <div style="font-size: 3.5rem; line-height: 1;"><%= emoji %></div>
+  <div style="font-size: 1.5rem; font-weight: 700; margin-top: 0.5rem; color: <%= sentiment_color %>;"><%= sentiment_label %></div>
+  <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+    Average Sentiment Score: <strong style="color: <%= sentiment_color %>;"><%= @avg_sentiment %></strong>
+    <span style="font-size: 0.75rem;">(-1 to 1)</span>
+  </div>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notes Analyzed</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_analyzed %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Positive Notes</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive, #43a047);"><%= @positive_pct %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Negative Notes</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative, #e53935);"><%= @negative_pct %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Sentiment</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @avg_sentiment %></div>
+    </div>
+  </div>
+</div>
+
+<%# Sentiment Trend Chart %>
+<% if @sentiment_trend_avg.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Sentiment Over Time</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        trend_entries = @sentiment_trend_avg.to_a
+        chart_w = [trend_entries.count * 70 + 80, 400].max
+        chart_h = 180
+        plot_top = 20
+        plot_bottom = 150
+        plot_left = 50
+        plot_right = chart_w - 30
+        plot_mid = (plot_top + plot_bottom) / 2.0
+        y_range = plot_bottom - plot_top
+        # Map -1..1 to plot_bottom..plot_top
+      %>
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h %>" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <%# Zero line %>
+        <line x1="<%= plot_left %>" y1="<%= plot_mid %>" x2="<%= plot_right %>" y2="<%= plot_mid %>"
+              stroke="var(--border)" stroke-width="1" stroke-dasharray="4,3"/>
+        <text x="<%= plot_left - 5 %>" y="<%= plot_top + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="7">+1</text>
+        <text x="<%= plot_left - 5 %>" y="<%= plot_mid + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="7">0</text>
+        <text x="<%= plot_left - 5 %>" y="<%= plot_bottom + 4 %>" text-anchor="end" fill="var(--text-secondary)" font-size="7">-1</text>
+
+        <%# Line path %>
+        <%
+          points = trend_entries.each_with_index.map do |(month, avg), i|
+            x = plot_left + (i.to_f / [trend_entries.count - 1, 1].max) * (plot_right - plot_left)
+            y = plot_mid - (avg * (y_range / 2.0))
+            y = [[y, plot_top].max, plot_bottom].min
+            [x, y, month, avg]
+          end
+        %>
+        <% if points.count > 1 %>
+          <polyline points="<%= points.map { |x, y, _, _| "#{x.round(1)},#{y.round(1)}" }.join(' ') %>"
+                    fill="none" stroke="#f9a825" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        <% end %>
+
+        <%# Data points and labels %>
+        <% points.each do |x, y, month, avg| %>
+          <circle cx="<%= x.round(1) %>" cy="<%= y.round(1) %>" r="4"
+                  fill="<%= avg > 0 ? '#43a047' : avg < 0 ? '#e53935' : '#757575' %>" stroke="var(--card-bg, #fff)" stroke-width="1.5"/>
+          <text x="<%= x.round(1) %>" y="<%= y.round(1) - 8 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="6.5">
+            <%= avg > 0 ? '+' : '' %><%= avg.round(2) %>
+          </text>
+          <text x="<%= x.round(1) %>" y="<%= plot_bottom + 14 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="6">
+            <%= month[-5..] %>
+          </text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<%# Sentiment Distribution Histogram %>
+<% if @distribution.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Sentiment Distribution</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        sorted_dist = @distribution.sort_by { |k, _| k }
+        dist_max = sorted_dist.map { |_, v| v }.max.to_f
+        dist_max = 1 if dist_max == 0
+        bar_w = 28
+        dist_chart_w = sorted_dist.count * (bar_w + 4) + 60
+      %>
+      <svg viewBox="0 0 <%= dist_chart_w %> 140" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <% sorted_dist.each_with_index do |(bucket, count), i| %>
+          <%
+            bar_h = (count / dist_max * 100).round(1)
+            x = 30 + i * (bar_w + 4)
+            bar_color = if bucket > 0.1
+              "#43a047"
+            elsif bucket < -0.1
+              "#e53935"
+            else
+              "#757575"
+            end
+          %>
+          <rect x="<%= x %>" y="<%= 110 - bar_h %>" width="<%= bar_w %>" height="<%= bar_h %>"
+                fill="<%= bar_color %>" opacity="0.6" rx="2"/>
+          <% if count > 0 %>
+            <text x="<%= x + bar_w / 2 %>" y="<%= 110 - bar_h - 3 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="6"><%= count %></text>
+          <% end %>
+          <text x="<%= x + bar_w / 2 %>" y="125" text-anchor="middle" fill="var(--text-secondary)" font-size="5.5"><%= bucket %></text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<%# Most Positive & Most Negative Notes %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Most Positive %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #43a047;">sentiment_very_satisfied</span> Most Positive Notes</h2>
+    </div>
+    <div style="padding: 1rem;">
+      <% if @most_positive.any? %>
+        <% @most_positive.each do |n| %>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 0.8125rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <%= link_to (n["title"].presence || "Untitled"), note_path(n["id"] || 0), style: "color: var(--text); text-decoration: none;" %>
+              </div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+                +<%= n["_pos_count"] %> positive / <%= n["_neg_count"] %> negative
+              </div>
+            </div>
+            <div style="font-weight: 700; font-size: 0.875rem; color: #43a047; margin-left: 0.75rem;">
+              <%= n["_sentiment_score"] > 0 ? '+' : '' %><%= n["_sentiment_score"] %>
+            </div>
+          </div>
+        <% end %>
+      <% else %>
+        <div style="color: var(--text-secondary); font-size: 0.8125rem; padding: 0.5rem 0;">No notes to display.</div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Most Negative %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e53935;">sentiment_very_dissatisfied</span> Most Negative Notes</h2>
+    </div>
+    <div style="padding: 1rem;">
+      <% if @most_negative.any? %>
+        <% @most_negative.each do |n| %>
+          <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 0.8125rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <%= link_to (n["title"].presence || "Untitled"), note_path(n["id"] || 0), style: "color: var(--text); text-decoration: none;" %>
+              </div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+                <%= n["_pos_count"] %> positive / <%= n["_neg_count"] %> negative
+              </div>
+            </div>
+            <div style="font-weight: 700; font-size: 0.875rem; color: #e53935; margin-left: 0.75rem;">
+              <%= n["_sentiment_score"] > 0 ? '+' : '' %><%= n["_sentiment_score"] %>
+            </div>
+          </div>
+        <% end %>
+      <% else %>
+        <div style="color: var(--text-secondary); font-size: 0.8125rem; padding: 0.5rem 0;">No notes to display.</div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Mood Word Clouds %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+  <%# Positive Word Cloud %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #43a047;">add_circle</span> Positive Words Used</h2>
+    </div>
+    <div style="padding: 1.25rem; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.5rem 0.75rem; min-height: 80px;">
+      <% if @positive_words_freq.any? %>
+        <%
+          pw_max = @positive_words_freq.first[1].to_f
+          pw_min = @positive_words_freq.last[1].to_f
+          pw_range = [pw_max - pw_min, 1].max.to_f
+        %>
+        <% @positive_words_freq.shuffle.each do |word, count| %>
+          <%
+            ratio = (count - pw_min) / pw_range
+            font_size = 0.75 + ratio * 2.0
+          %>
+          <span style="font-size: <%= font_size.round(2) %>rem; font-weight: <%= ratio > 0.4 ? 700 : 500 %>; color: #43a047; opacity: <%= (0.5 + ratio * 0.5).round(2) %>; cursor: default; line-height: 1.2;"
+                title="<%= word %>: used <%= count %> times"><%= word %></span>
+        <% end %>
+      <% else %>
+        <span style="color: var(--text-secondary); font-size: 0.8125rem;">No positive words found.</span>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Negative Word Cloud %>
+  <div class="card">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e53935;">remove_circle</span> Negative Words Used</h2>
+    </div>
+    <div style="padding: 1.25rem; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 0.5rem 0.75rem; min-height: 80px;">
+      <% if @negative_words_freq.any? %>
+        <%
+          nw_max = @negative_words_freq.first[1].to_f
+          nw_min = @negative_words_freq.last[1].to_f
+          nw_range = [nw_max - nw_min, 1].max.to_f
+        %>
+        <% @negative_words_freq.shuffle.each do |word, count| %>
+          <%
+            ratio = (count - nw_min) / nw_range
+            font_size = 0.75 + ratio * 2.0
+          %>
+          <span style="font-size: <%= font_size.round(2) %>rem; font-weight: <%= ratio > 0.4 ? 700 : 500 %>; color: #e53935; opacity: <%= (0.5 + ratio * 0.5).round(2) %>; cursor: default; line-height: 1.2;"
+                title="<%= word %>: used <%= count %> times"><%= word %></span>
+        <% end %>
+      <% else %>
+        <span style="color: var(--text-secondary); font-size: 0.8125rem;">No negative words found.</span>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Sentiment by Notebook %>
+<% if @notebook_sentiment.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">book</span> Sentiment by Notebook</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @notebook_sentiment.first(12).each do |nb, data| %>
+        <%
+          bar_pct = ((data[:avg] + 1) / 2.0 * 100).round(1)
+          bar_color = if data[:avg] > 0.1
+            "#43a047"
+          elsif data[:avg] < -0.1
+            "#e53935"
+          else
+            "#757575"
+          end
+        %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+          <span style="width: 9rem; font-size: 0.8125rem; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><%= nb %></span>
+          <div style="flex: 1; height: 1.25rem; background: var(--bg); border-radius: 4px; overflow: hidden; position: relative;">
+            <%# Center marker %>
+            <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border); z-index: 1;"></div>
+            <div style="position: absolute; left: <%= [bar_pct, 50].min %>%; width: <%= (bar_pct - 50).abs %>%; top: 0; height: 100%; background: <%= bar_color %>; opacity: 0.6; border-radius: 2px;"></div>
+          </div>
+          <span style="min-width: 3.5rem; text-align: right; font-size: 0.8125rem; font-weight: 600; color: <%= bar_color %>;"><%= data[:avg] > 0 ? '+' : '' %><%= data[:avg] %></span>
+          <span style="min-width: 2rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary);"><%= data[:count] %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Sentiment by Tag %>
+<% if @tag_sentiment_avg.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">sell</span> Sentiment by Tag</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @tag_sentiment_avg.first(15).each do |tag, data| %>
+        <%
+          tag_color = if data[:avg] > 0.1
+            "#43a047"
+          elsif data[:avg] < -0.1
+            "#e53935"
+          else
+            "#757575"
+          end
+        %>
+        <div style="display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.75rem; margin: 0.125rem; border-radius: 9999px; background: var(--bg); border: 1px solid var(--border); font-size: 0.75rem;">
+          <span><%= tag %></span>
+          <span style="font-weight: 700; color: <%= tag_color %>;"><%= data[:avg] > 0 ? '+' : '' %><%= data[:avg] %></span>
+          <span style="color: var(--text-secondary); font-size: 0.625rem;">(<%= data[:count] %>)</span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Navigation %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Notes", notes_path, class: "btn" %>
+  <%= link_to "Writing Stats", writing_stats_path, class: "btn" %>
+  <%= link_to "Connections", note_links_path, class: "btn" %>
+</div>

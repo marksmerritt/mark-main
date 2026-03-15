@@ -1,0 +1,193 @@
+<% content_for(:title) { "Spending Anomalies" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--negative);">anomaly_detection</span>
+    Spending Anomaly Detector
+  </h1>
+</div>
+
+<%# Summary Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Anomalies Found</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @total_anomalies > 0 ? 'var(--negative)' : 'var(--positive)' %>;"><%= @total_anomalies %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">High Severity</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @high_severity > 0 ? 'var(--negative)' : 'var(--positive)' %>;"><%= @high_severity %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Category Spikes</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @category_spikes.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">New Merchants</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @new_merchants.count %></div>
+    </div>
+  </div>
+</div>
+
+<% if @total_anomalies == 0 && @new_merchants.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--positive); margin-bottom: 1rem;">check_circle</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No Anomalies Detected</div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.5rem;">Your spending patterns look consistent. Keep it up!</div>
+  </div>
+<% end %>
+
+<%# Large Transaction Alerts %>
+<% if @anomalies.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">warning</span> Unusual Transactions</h2>
+    </div>
+    <div style="padding: 0;">
+      <% @anomalies.sort_by { |a| -a[:amount] }.first(10).each_with_index do |a, i| %>
+        <div style="padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem;">
+          <div style="width: 2.5rem; height: 2.5rem; border-radius: 50%; background: <%= a[:severity] == :high ? 'rgba(234,67,53,0.15)' : 'rgba(251,188,4,0.15)' %>; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+            <span class="material-icons-outlined" style="font-size: 1.125rem; color: <%= a[:severity] == :high ? 'var(--negative)' : '#fbbc04' %>;"><%= a[:severity] == :high ? 'error' : 'warning' %></span>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 0.875rem;"><%= a[:title] %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              <%= a[:date] %> · <%= a[:multiplier] %>x your average · Typically <%= number_to_currency(a[:avg]) %>
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-weight: 700; color: var(--negative);"><%= number_to_currency(a[:amount]) %></div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Category Spikes %>
+<% if @category_spikes.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #fbbc04;">trending_up</span> Category Spending Spikes</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @category_spikes.first(8).each do |s| %>
+        <div style="margin-bottom: 1rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+            <span style="font-weight: 600;"><%= s[:category] %></span>
+            <div>
+              <span style="font-size: 0.8125rem; font-weight: 700; color: var(--negative);">+<%= s[:pct_increase] %>%</span>
+              <span style="font-size: 0.75rem; padding: 0.125rem 0.375rem; border-radius: 9999px; margin-left: 0.25rem; background: <%= s[:severity] == :high ? 'rgba(234,67,53,0.15)' : 'rgba(251,188,4,0.15)' %>; color: <%= s[:severity] == :high ? 'var(--negative)' : '#fbbc04' %>; font-weight: 600;"><%= s[:severity] == :high ? 'HIGH' : 'MEDIUM' %></span>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="flex: 1; height: 1rem; background: var(--bg); border-radius: 4px; overflow: hidden; position: relative;">
+              <% max_val = [s[:current], s[:avg] * 2].max %>
+              <div style="position: absolute; height: 100%; width: <%= (s[:avg] / max_val * 100).round(1) %>%; background: var(--text-secondary); opacity: 0.3; border-radius: 4px;"></div>
+              <div style="position: absolute; height: 100%; width: <%= (s[:current] / max_val * 100).round(1) %>%; background: var(--negative); opacity: 0.5; border-radius: 4px;"></div>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary); min-width: 10rem; text-align: right;">
+              <%= number_to_currency(s[:current]) %> vs avg <%= number_to_currency(s[:avg]) %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Frequency Anomalies %>
+<% if @frequency_anomalies.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">repeat</span> Frequency Spikes</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.5rem;">Merchant</th>
+            <th style="text-align: center; padding: 0.5rem;">This Month</th>
+            <th style="text-align: center; padding: 0.5rem;">Avg/Month</th>
+            <th style="text-align: right; padding: 0.5rem;">Spent This Month</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @frequency_anomalies.first(8).each do |f| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem; font-weight: 600;"><%= f[:merchant] %></td>
+              <td style="text-align: center; padding: 0.5rem; color: var(--negative); font-weight: 700;"><%= f[:current_count] %> visits</td>
+              <td style="text-align: center; padding: 0.5rem; color: var(--text-secondary);"><%= f[:avg_count] %></td>
+              <td style="text-align: right; padding: 0.5rem;"><%= number_to_currency(f[:current_total]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# New Merchants %>
+<% if @new_merchants.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">storefront</span> New Merchants (Last 30 Days)</h2>
+    </div>
+    <div style="padding: 0;">
+      <% @new_merchants.first(10).each do |m| %>
+        <div style="padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-weight: 600;"><%= m[:merchant] %></span>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.5rem;">First: <%= m[:first_date] %></span>
+          </div>
+          <div style="text-align: right;">
+            <span style="font-weight: 600;"><%= number_to_currency(m[:total]) %></span>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.25rem;">(<%= m[:count] %> txn<%= m[:count] > 1 ? 's' : '' %>)</span>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Daily Spending This Month %>
+<% if @daily_trend.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">calendar_today</span> Daily Spending This Month</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        sorted_days = @daily_trend.sort_by { |k, _| k }
+        day_max = sorted_days.map { |_, v| v }.max.to_f
+        day_max = 1 if day_max == 0
+        day_avg = sorted_days.any? ? sorted_days.map { |_, v| v }.sum / sorted_days.count : 0
+      %>
+      <svg viewBox="0 0 <%= sorted_days.count * 22 + 60 %> 160" style="width: 100%; height: auto; max-width: 100%; font-family: Inter, sans-serif;">
+        <%# Avg line %>
+        <% avg_y = 130 - day_avg / day_max * 110 %>
+        <line x1="30" y1="<%= avg_y %>" x2="<%= sorted_days.count * 22 + 50 %>" y2="<%= avg_y %>" stroke="var(--text-secondary)" stroke-width="1" stroke-dasharray="4"/>
+        <text x="<%= sorted_days.count * 22 + 52 %>" y="<%= avg_y + 3 %>" fill="var(--text-secondary)" font-size="7">avg</text>
+
+        <% sorted_days.each_with_index do |(day, amount), i| %>
+          <% bar_h = amount / day_max * 110 %>
+          <% x = 35 + i * 22 %>
+          <% is_high = amount > day_avg * 2 %>
+          <rect x="<%= x %>" y="<%= 130 - bar_h %>" width="16" height="<%= bar_h %>"
+                fill="<%= is_high ? 'var(--negative)' : 'var(--primary)' %>" opacity="<%= is_high ? 0.7 : 0.4 %>" rx="2"/>
+          <text x="<%= x + 8 %>" y="145" text-anchor="middle" fill="var(--text-secondary)" font-size="6"><%= day.split('-').last %></text>
+          <% if amount > day_avg * 1.5 %>
+            <text x="<%= x + 8 %>" y="<%= 130 - bar_h - 3 %>" text-anchor="middle" fill="var(--negative)" font-size="6">$<%= amount.round(0) %></text>
+          <% end %>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Spending Report", budget_reports_spending_path, class: "btn" %>
+  <%= link_to "Spending Heatmap", budget_spending_heatmap_path, class: "btn" %>
+  <%= link_to "Merchant Insights", budget_merchant_insights_path, class: "btn" %>
+  <%= link_to "Budget Dashboard", budget_dashboard_path, class: "btn" %>
+</div>

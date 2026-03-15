@@ -1,0 +1,153 @@
+<div class="page-header">
+  <h1>Transactions</h1>
+  <div class="page-actions">
+    <%= link_to "Export CSV", export_budget_transactions_path(params.permit(:month, :year, :type, :status, :merchant).to_h.compact_blank), class: "btn" %>
+    <%= link_to "Import CSV", import_wizard_budget_transactions_path, class: "btn" %>
+    <%= link_to "Add Transaction", new_budget_transaction_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 1rem;">
+  <%= form_with url: budget_transactions_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :month, "Month" %>
+        <%= f.select :month, (1..12).map { |m| [Date::MONTHNAMES[m], m] },
+            { selected: params[:month] || Date.current.month }, class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :year, "Year" %>
+        <%= f.number_field :year, value: params[:year] || Date.current.year, class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :type, "Type" %>
+        <%= f.select :type, [["All", ""], ["Expense", "expense"], ["Income", "income"]], { selected: params[:type] }, class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :merchant, "Merchant" %>
+        <%= f.text_field :merchant, value: params[:merchant], placeholder: "e.g. Amazon", class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Filter", class: "btn btn-primary" %>
+        <%= link_to "Clear", budget_transactions_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @transactions.is_a?(Array) && @transactions.any? %>
+  <form id="bulk-form" method="post">
+    <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+    <input type="hidden" name="month" value="<%= params[:month] || Date.current.month %>">
+    <input type="hidden" name="year" value="<%= params[:year] || Date.current.year %>">
+
+    <div id="bulk-bar" class="card" style="display: none; margin-bottom: 1rem; padding: 0.75rem 1.25rem; background: var(--primary-bg); border: 1px solid var(--primary);">
+      <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+        <strong><span id="bulk-count">0</span> selected</strong>
+        <select name="budget_item_id" id="bulk-assign-item" class="form-control" style="width: auto; min-width: 12rem;">
+          <option value="">Assign to budget item...</option>
+          <% @budget_items.each do |item| %>
+            <option value="<%= item[:id] %>"><%= item[:label] %></option>
+          <% end %>
+        </select>
+        <button type="submit" formaction="<%= bulk_assign_budget_transactions_path %>" class="btn btn-primary btn-sm"
+                onclick="if(!document.getElementById('bulk-assign-item').value){alert('Select a budget item first.');return false;}">
+          Assign Selected
+        </button>
+        <button type="submit" formaction="<%= bulk_delete_budget_transactions_path %>" class="btn btn-danger btn-sm"
+                onclick="return confirm('Delete selected transactions? This cannot be undone.')">
+          Delete Selected
+        </button>
+        <button type="button" class="btn btn-sm" onclick="toggleAllCheckboxes(false)">Clear Selection</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <table class="table">
+        <thead>
+          <tr>
+            <th style="width: 2rem;">
+              <input type="checkbox" id="select-all" onchange="toggleAllCheckboxes(this.checked)">
+            </th>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Merchant</th>
+            <th>Category</th>
+            <th style="text-align: right;">Amount</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @transactions.each do |txn| %>
+            <tr>
+              <td>
+                <input type="checkbox" name="transaction_ids[]" value="<%= txn["id"] %>" class="txn-checkbox" onchange="updateBulkBar()">
+              </td>
+              <td><%= Date.parse(txn["transaction_date"]).strftime("%b %d") rescue txn["transaction_date"] %></td>
+              <td>
+                <%= txn["description"] %>
+                <% if txn["split"] %>
+                  <span class="badge badge-primary" style="margin-left: 0.25rem;">Split (<%= txn["split_count"] %>)</span>
+                <% end %>
+                <% if txn["parent_id"] %>
+                  <span class="text-muted" style="font-size: 0.75rem; margin-left: 0.25rem;">(split item)</span>
+                <% end %>
+                <% if txn["notes"].present? %>
+                  <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: middle; color: var(--text-muted); margin-left: 0.25rem;" title="<%= txn["notes"].truncate(100) %>">sticky_note_2</span>
+                <% end %>
+              </td>
+              <td><%= txn["merchant"] %></td>
+              <td>
+                <% if txn["category_name"] %>
+                  <span class="tag"><%= txn["category_name"] %></span>
+                <% else %>
+                  <span class="text-muted">Unassigned</span>
+                <% end %>
+                <% if txn["tags"].is_a?(Array) && txn["tags"].any? %>
+                  <% txn["tags"].each do |tag| %>
+                    <span class="transaction-tag" style="background: <%= tag["color"] %>20; color: <%= tag["color"] %>; border: 1px solid <%= tag["color"] %>40;">
+                      <%= tag["name"] %>
+                      <%= link_to "x", remove_tag_budget_transaction_path(txn["id"], tag_name: tag["name"]), data: { turbo_method: :delete }, style: "color: inherit; text-decoration: none; margin-left: 2px;" %>
+                    </span>
+                  <% end %>
+                <% end %>
+              </td>
+              <td style="text-align: right;" class="<%= txn["transaction_type"] == "income" ? "positive" : "" %>">
+                <%= txn["transaction_type"] == "income" ? "+" : "-" %><%= number_to_currency(txn["amount"]) %>
+              </td>
+              <td>
+                <span class="badge badge-<%= txn["status"] == "cleared" ? "success" : "warning" %>"><%= txn["status"]&.capitalize %></span>
+              </td>
+              <td style="white-space: nowrap;">
+                <%= link_to "Edit", edit_budget_transaction_path(txn["id"]), class: "btn btn-sm" %>
+                <% if txn["split"] %>
+                  <%= link_to "Unsplit", unsplit_budget_transaction_path(txn["id"]), data: { turbo_method: :post, turbo_confirm: "Remove split?" }, class: "btn btn-sm" %>
+                <% end %>
+                <%= link_to "Delete", budget_transaction_path(txn["id"]), data: { turbo_method: :delete, turbo_confirm: "Delete?" }, class: "btn btn-sm btn-danger" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </form>
+
+  <script>
+    function toggleAllCheckboxes(checked) {
+      document.querySelectorAll('.txn-checkbox').forEach(cb => cb.checked = checked);
+      document.getElementById('select-all').checked = checked;
+      updateBulkBar();
+    }
+
+    function updateBulkBar() {
+      const checked = document.querySelectorAll('.txn-checkbox:checked');
+      document.getElementById('bulk-count').textContent = checked.length;
+      document.getElementById('bulk-bar').style.display = checked.length > 0 ? 'block' : 'none';
+    }
+  </script>
+<% else %>
+  <div class="card empty-state">
+    <p>No transactions found for this period.</p>
+  </div>
+<% end %>

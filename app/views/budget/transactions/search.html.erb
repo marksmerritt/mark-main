@@ -1,0 +1,79 @@
+<div class="page-header">
+  <h1>Search Transactions</h1>
+  <div class="page-actions">
+    <%= link_to "Back", budget_transactions_path, class: "btn" %>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <%= form_with url: search_budget_transactions_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group" style="flex: 1;">
+        <%= f.label :q, "Search by merchant name" %>
+        <%= f.text_field :q, value: @query, class: "form-control", placeholder: "Amazon, Walmart, Starbucks...", autofocus: true %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Search", class: "btn btn-primary" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @query.present? %>
+  <% if @results.any? %>
+    <p class="text-muted" style="margin-bottom: 1rem;"><%= @results.size %> transaction<%= @results.size == 1 ? "" : "s" %> found for "<%= @query %>"</p>
+
+    <% total = @results.sum { |t| t["transaction_type"] == "expense" ? t["amount"].to_f : -t["amount"].to_f } %>
+    <div class="card" style="margin-bottom: 1rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Results</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= @results.size %></div>
+        </div>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Spent</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(total) %></div>
+        </div>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Average</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(total / @results.size) %></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Description</th>
+            <th>Merchant</th>
+            <th>Category</th>
+            <th style="text-align: right;">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @results.each do |txn| %>
+            <tr>
+              <td><%= Date.parse(txn["transaction_date"]).strftime("%b %d, %Y") rescue txn["transaction_date"] %></td>
+              <td><%= txn["description"] %></td>
+              <td><strong><%= txn["merchant"] %></strong></td>
+              <td>
+                <% if txn["category_name"] %>
+                  <span class="tag"><%= txn["category_name"] %></span>
+                <% end %>
+              </td>
+              <td style="text-align: right;" class="<%= txn["transaction_type"] == "income" ? "positive" : "" %>">
+                <%= txn["transaction_type"] == "income" ? "+" : "-" %><%= number_to_currency(txn["amount"]) %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <div class="card empty-state">
+      <p>No transactions found matching "<%= @query %>".</p>
+    </div>
+  <% end %>
+<% end %>

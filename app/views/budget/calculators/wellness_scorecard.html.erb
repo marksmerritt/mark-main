@@ -1,0 +1,191 @@
+<% content_for(:title) { "Financial Wellness Scorecard" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">monitoring</span>
+    Financial Wellness Scorecard
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Dashboard", budget_dashboard_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<%# Overall Score Hero %>
+<%
+  grade_color = case @overall_grade
+                when "A" then "var(--positive)"
+                when "B" then "#1a73e8"
+                when "C" then "#f9ab00"
+                when "D" then "#e65100"
+                else "var(--negative)"
+                end
+%>
+<div class="card" style="margin-bottom: 1.5rem; padding: 2rem; text-align: center;">
+  <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">Financial Wellness Score</div>
+
+  <%# Large grade ring %>
+  <div style="margin: 0 auto; width: 140px; height: 140px; position: relative;">
+    <svg viewBox="0 0 140 140" style="transform: rotate(-90deg);">
+      <circle cx="70" cy="70" r="60" fill="none" stroke="var(--border)" stroke-width="10"/>
+      <circle cx="70" cy="70" r="60" fill="none" stroke="<%= grade_color %>" stroke-width="10"
+              stroke-dasharray="<%= (377 * @overall_score / 100.0).round(1) %> 377"
+              stroke-linecap="round"/>
+    </svg>
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+      <div style="font-size: 2.5rem; font-weight: 700; color: <%= grade_color %>; line-height: 1;"><%= @overall_grade %></div>
+      <div style="font-size: 0.875rem; font-weight: 600;"><%= @overall_score %>/100</div>
+    </div>
+  </div>
+
+  <div style="font-size: 1rem; font-weight: 600; margin-top: 1rem; color: <%= grade_color %>;">
+    <% case @overall_grade %>
+    <% when "A" %>Excellent Financial Health<% when "B" %>Strong Financial Position<% when "C" %>Room for Improvement<% when "D" %>Needs Attention<% else %>Action Required<% end %>
+  </div>
+</div>
+
+<%# Quick Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Income</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@avg_income) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Expenses</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@avg_expenses) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings Rate</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: <%= @savings_rate >= 20 ? 'var(--positive)' : @savings_rate >= 10 ? '#f9ab00' : 'var(--negative)' %>;"><%= @savings_rate %>%</div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Net Worth</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: <%= @net_worth >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@net_worth) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Emergency Fund</div>
+      <div style="font-size: 1.25rem; font-weight: 700;"><%= @emergency_months %> mo</div>
+    </div>
+  </div>
+</div>
+
+<%# Dimension Cards %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <% @dimensions.each do |dim| %>
+    <%
+      dim_color = case dim[:grade]
+                  when "A" then "var(--positive)"
+                  when "B" then "#1a73e8"
+                  when "C" then "#f9ab00"
+                  when "D" then "#e65100"
+                  else "var(--negative)"
+                  end
+    %>
+    <div class="card" style="padding: 1.25rem;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= dim_color %>;"><%= dim[:icon] %></span>
+          <strong style="font-size: 0.9375rem;"><%= dim[:name] %></strong>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= dim[:score] %>/100</span>
+          <div style="width: 28px; height: 28px; border-radius: 50%; background: <%= dim_color %>; display: flex; align-items: center; justify-content: center;">
+            <span style="font-size: 0.8125rem; font-weight: 700; color: white;"><%= dim[:grade] %></span>
+          </div>
+        </div>
+      </div>
+
+      <%# Score bar %>
+      <div style="height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin-bottom: 0.75rem;">
+        <div style="height: 100%; width: <%= dim[:score] %>%; background: <%= dim_color %>; border-radius: 3px; transition: width 0.3s;"></div>
+      </div>
+
+      <div style="font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem;"><%= dim[:detail] %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= dim[:tip] %></div>
+    </div>
+  <% end %>
+</div>
+
+<%# Radar-style visual (simple bar comparison) %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">radar</span> Score Breakdown</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% @dimensions.each do |dim| %>
+      <%
+        dim_color = case dim[:grade]
+                    when "A" then "var(--positive)"
+                    when "B" then "#1a73e8"
+                    when "C" then "#f9ab00"
+                    when "D" then "#e65100"
+                    else "var(--negative)"
+                    end
+      %>
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+        <div style="width: 120px; font-size: 0.8125rem; font-weight: 500; text-align: right; flex-shrink: 0;"><%= dim[:name] %></div>
+        <div style="flex: 1; height: 20px; background: var(--bg); border-radius: 4px; overflow: hidden; position: relative;">
+          <div style="height: 100%; width: <%= dim[:score] %>%; background: <%= dim_color %>; opacity: 0.7; border-radius: 4px; transition: width 0.3s;"></div>
+        </div>
+        <div style="width: 24px; text-align: center; font-weight: 700; font-size: 0.8125rem; color: <%= dim_color %>;"><%= dim[:grade] %></div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Action Plan %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">checklist</span> Improvement Plan</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <%
+      low_scores = @dimensions.select { |d| d[:score] < 70 }.sort_by { |d| d[:score] }
+      high_scores = @dimensions.select { |d| d[:score] >= 80 }.sort_by { |d| -d[:score] }
+    %>
+
+    <% if low_scores.any? %>
+      <h4 style="font-size: 0.8125rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.75rem;">Focus Areas</h4>
+      <% low_scores.each do |dim| %>
+        <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; background: rgba(217,48,37,0.04); border-radius: 6px; margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 1.125rem; color: #e65100; margin-top: 2px;"><%= dim[:icon] %></span>
+          <div style="font-size: 0.8125rem;">
+            <strong><%= dim[:name] %></strong> (Grade: <%= dim[:grade] %>)
+            <div style="color: var(--text-secondary); margin-top: 0.125rem;"><%= dim[:tip] %></div>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
+
+    <% if high_scores.any? %>
+      <h4 style="font-size: 0.8125rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.75rem; margin-top: 1rem;">Strengths</h4>
+      <% high_scores.each do |dim| %>
+        <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem; background: rgba(13,144,79,0.04); border-radius: 6px; margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--positive); margin-top: 2px;"><%= dim[:icon] %></span>
+          <div style="font-size: 0.8125rem;">
+            <strong><%= dim[:name] %></strong> (Grade: <%= dim[:grade] %>)
+            <div style="color: var(--text-secondary); margin-top: 0.125rem;"><%= dim[:detail] %></div>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
+
+    <% if low_scores.empty? && high_scores.any? %>
+      <div style="padding: 1rem; text-align: center; background: rgba(13,144,79,0.06); border-radius: 6px; margin-top: 0.5rem;">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--positive);">emoji_events</span>
+        <div style="font-weight: 600; margin-top: 0.5rem; color: var(--positive);">All dimensions scoring well!</div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          Keep maintaining your excellent financial habits.
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Dashboard", budget_dashboard_path, class: "btn" %>
+  <%= link_to "Emergency Fund", budget_emergency_fund_path, class: "btn" %>
+  <%= link_to "Debt Freedom", budget_debt_freedom_path, class: "btn" %>
+  <%= link_to "Net Worth", budget_reports_net_worth_path, class: "btn" %>
+  <%= link_to "Insights", budget_reports_insights_path, class: "btn" %>
+</div>

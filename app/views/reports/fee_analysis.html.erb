@@ -1,0 +1,319 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">receipt_long</span>
+    Fee & Commission Analysis
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Reports", reports_overview_path, class: "btn" %>
+  </div>
+</div>
+
+<% if @total_trades == 0 %>
+  <div class="card"><p class="empty-state">No closed trades to analyze.</p></div>
+<% else %>
+
+  <%# Summary strip %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Costs</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_costs) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Commissions</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@total_commissions) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Fees</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@total_fees) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Cost / Trade</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@cost_per_trade) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Fee Drag</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= @cost_as_pct > 10 ? 'var(--negative)' : @cost_as_pct > 5 ? '#f9ab00' : 'var(--positive)' %>;"><%= @cost_as_pct %>%</div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_trades %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Gross vs Net P&L comparison %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header"><h2>Gross vs Net P&L</h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="display: flex; gap: 2rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem;">
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Gross P&L (before costs)</div>
+          <div style="font-size: 1.375rem; font-weight: 700;" class="<%= @gross_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(@gross_pnl) %></div>
+        </div>
+        <div style="font-size: 1.5rem; color: var(--text-secondary);">-</div>
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Total Costs</div>
+          <div style="font-size: 1.375rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_costs) %></div>
+        </div>
+        <div style="font-size: 1.5rem; color: var(--text-secondary);">=</div>
+        <div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Net P&L</div>
+          <div style="font-size: 1.375rem; font-weight: 700;" class="<%= @net_pnl >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(@net_pnl) %></div>
+        </div>
+      </div>
+
+      <%# Visual bar showing cost impact %>
+      <% bar_total = @gross_pnl.abs; bar_total = 1 if bar_total == 0 %>
+      <div style="display: flex; height: 28px; border-radius: var(--radius); overflow: hidden; background: var(--bg);">
+        <% if @gross_pnl >= 0 %>
+          <% net_pct = [(@net_pnl.abs / bar_total * 100), 100].min.round(1) %>
+          <% cost_pct = [(@total_costs / bar_total * 100), 100].min.round(1) %>
+          <div style="width: <%= net_pct %>%; background: var(--positive); display: flex; align-items: center; justify-content: center; font-size: 0.6875rem; color: #fff; font-weight: 600;">
+            Net: <%= number_to_currency(@net_pnl) %>
+          </div>
+          <div style="width: <%= cost_pct %>%; background: var(--negative); display: flex; align-items: center; justify-content: center; font-size: 0.6875rem; color: #fff; font-weight: 600;">
+            Costs
+          </div>
+        <% else %>
+          <div style="width: 100%; background: var(--negative); display: flex; align-items: center; justify-content: center; font-size: 0.6875rem; color: #fff; font-weight: 600;">
+            Loss: <%= number_to_currency(@net_pnl) %> (incl. <%= number_to_currency(@total_costs) %> costs)
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Flipped trades - trades killed by fees %>
+  <% if @flipped_trades.any? %>
+    <div class="card" style="margin-bottom: 1.5rem; border-left: 3px solid var(--negative);">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: var(--negative);">warning</span>
+          Trades Killed by Fees
+        </h2>
+        <span class="badge" style="background: rgba(217,48,37,0.1); color: var(--negative);"><%= @flipped_trades.count %> trades</span>
+      </div>
+      <p style="padding: 0 1.25rem; font-size: 0.8125rem; color: var(--text-secondary); margin: 0.5rem 0;">
+        These trades were profitable before commissions and fees but ended up as losses. Total impact:
+        <strong class="negative"><%= number_to_currency(@flipped_trades.sum { |t| t["pnl"].to_f }) %></strong>
+      </p>
+      <table class="table">
+        <thead><tr><th>Date</th><th>Symbol</th><th>Gross P&L</th><th>Costs</th><th>Net P&L</th></tr></thead>
+        <tbody>
+          <% @flipped_trades.first(10).each do |t| %>
+            <% costs = t["commissions"].to_f + t["fees"].to_f %>
+            <tr>
+              <td style="font-size: 0.8125rem;"><%= t["entry_time"]&.to_s&.slice(0, 10) %></td>
+              <td style="font-weight: 600;"><%= link_to t["symbol"], trade_path(t["id"]) %></td>
+              <td class="positive" style="font-size: 0.8125rem;"><%= number_to_currency(t["pnl"].to_f + costs) %></td>
+              <td style="font-size: 0.8125rem; color: var(--negative);"><%= number_to_currency(costs) %></td>
+              <td class="negative" style="font-size: 0.8125rem; font-weight: 600;"><%= number_to_currency(t["pnl"].to_f) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+    <%# Monthly cost trend chart %>
+    <% if @monthly_costs.count >= 2 %>
+      <div class="card">
+        <div class="card-header"><h2>Monthly Cost Trend</h2></div>
+        <div style="padding: 1rem 1.25rem;">
+          <%
+            max_monthly_cost = @monthly_costs.values.map { |d| d[:commissions] + d[:fees] }.max.to_f
+            max_monthly_cost = 1 if max_monthly_cost == 0
+            chart_h = 160
+            chart_w = 100
+            bar_count = @monthly_costs.count
+            bar_gap = chart_w.to_f / bar_count
+          %>
+          <svg viewBox="0 0 <%= chart_w %> <%= chart_h + 30 %>" style="width: 100%; max-height: 200px;">
+            <% @monthly_costs.each_with_index do |(month, data), i| %>
+              <%
+                total = data[:commissions] + data[:fees]
+                bar_h = (total / max_monthly_cost * chart_h).round(1)
+                comm_h = data[:commissions] > 0 ? (data[:commissions] / total * bar_h).round(1) : 0
+                fee_h = bar_h - comm_h
+                x = i * bar_gap + bar_gap * 0.15
+                w = bar_gap * 0.7
+              %>
+              <rect x="<%= x %>" y="<%= chart_h - bar_h %>" width="<%= w %>" height="<%= comm_h %>" fill="var(--negative)" opacity="0.7" rx="1">
+                <title><%= month %>: Commissions <%= number_to_currency(data[:commissions]) %></title>
+              </rect>
+              <rect x="<%= x %>" y="<%= chart_h - fee_h %>" width="<%= w %>" height="<%= fee_h %>" fill="#f9ab00" opacity="0.7" rx="1">
+                <title><%= month %>: Fees <%= number_to_currency(data[:fees]) %></title>
+              </rect>
+              <text x="<%= x + w / 2 %>" y="<%= chart_h + 12 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="5">
+                <%= month.slice(5, 2) %>/<%= month.slice(2, 2) %>
+              </text>
+              <text x="<%= x + w / 2 %>" y="<%= chart_h - bar_h - 3 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="4">
+                $<%= total.round(0) %>
+              </text>
+            <% end %>
+          </svg>
+          <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 0.5rem; font-size: 0.6875rem;">
+            <span><span style="display: inline-block; width: 10px; height: 10px; background: var(--negative); opacity: 0.7; border-radius: 2px;"></span> Commissions</span>
+            <span><span style="display: inline-block; width: 10px; height: 10px; background: #f9ab00; opacity: 0.7; border-radius: 2px;"></span> Fees</span>
+          </div>
+        </div>
+      </div>
+    <% end %>
+
+    <%# Win vs Loss cost comparison %>
+    <div class="card">
+      <div class="card-header"><h2>Cost Comparison</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <div style="margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.8125rem; font-weight: 600;">Avg Cost on Wins</span>
+            <span style="font-size: 0.875rem; font-weight: 700;"><%= number_to_currency(@win_avg_cost) %></span>
+          </div>
+          <div style="height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <% max_avg = [@win_avg_cost, @loss_avg_cost].max; max_avg = 1 if max_avg == 0 %>
+            <div style="height: 100%; width: <%= (@win_avg_cost / max_avg * 100).round(0) %>%; background: var(--positive); border-radius: 4px;"></div>
+          </div>
+        </div>
+        <div style="margin-bottom: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.8125rem; font-weight: 600;">Avg Cost on Losses</span>
+            <span style="font-size: 0.875rem; font-weight: 700;"><%= number_to_currency(@loss_avg_cost) %></span>
+          </div>
+          <div style="height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden;">
+            <div style="height: 100%; width: <%= (@loss_avg_cost / max_avg * 100).round(0) %>%; background: var(--negative); border-radius: 4px;"></div>
+          </div>
+        </div>
+
+        <%# Cost by size bucket %>
+        <% if @cost_by_size.any? %>
+          <div style="border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem;">
+            <h4 style="margin: 0 0 0.75rem; font-size: 0.875rem;">Cost by Position Size</h4>
+            <% @cost_by_size.each do |bucket, data| %>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.375rem 0; font-size: 0.8125rem;">
+                <span><strong><%= bucket %></strong> shares</span>
+                <span><%= data[:trades] %> trades</span>
+                <span style="font-weight: 600;"><%= number_to_currency(data[:avg_cost]) %>/trade</span>
+              </div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Cost by Symbol table %>
+  <% if @cost_by_symbol.any? %>
+    <div class="card">
+      <div class="card-header"><h2>Cost by Symbol</h2></div>
+      <div style="overflow-x: auto;">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th style="text-align: right;">Trades</th>
+              <th style="text-align: right;">Commissions</th>
+              <th style="text-align: right;">Fees</th>
+              <th style="text-align: right;">Total Cost</th>
+              <th style="text-align: right;">Cost/Trade</th>
+              <th style="text-align: right;">Fee Drag</th>
+              <th style="text-align: right;">Gross P&L</th>
+              <th style="text-align: right;">Net P&L</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% max_sym_cost = @cost_by_symbol.values.first&.dig(:total_cost).to_f; max_sym_cost = 1 if max_sym_cost == 0 %>
+            <% @cost_by_symbol.each do |sym, data| %>
+              <tr>
+                <td style="font-weight: 600;"><%= sym %></td>
+                <td style="text-align: right;"><%= data[:trades] %></td>
+                <td style="text-align: right; font-size: 0.8125rem;"><%= number_to_currency(data[:commissions]) %></td>
+                <td style="text-align: right; font-size: 0.8125rem;"><%= number_to_currency(data[:fees]) %></td>
+                <td style="text-align: right; font-weight: 600;">
+                  <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+                    <div style="width: 60px; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden;">
+                      <div style="height: 100%; width: <%= (data[:total_cost] / max_sym_cost * 100).round(0) %>%; background: var(--negative); border-radius: 3px;"></div>
+                    </div>
+                    <%= number_to_currency(data[:total_cost]) %>
+                  </div>
+                </td>
+                <td style="text-align: right; font-size: 0.8125rem;"><%= number_to_currency(data[:cost_per_trade]) %></td>
+                <td style="text-align: right; font-size: 0.8125rem; color: <%= data[:fee_drag] > 10 ? 'var(--negative)' : data[:fee_drag] > 5 ? '#f9ab00' : 'var(--positive)' %>;">
+                  <%= data[:fee_drag] %>%
+                </td>
+                <td style="text-align: right; font-size: 0.8125rem;" class="<%= data[:gross_pnl] >= 0 ? 'positive' : 'negative' %>">
+                  <%= number_to_currency(data[:gross_pnl]) %>
+                </td>
+                <td style="text-align: right; font-weight: 600;" class="<%= data[:pnl] >= 0 ? 'positive' : 'negative' %>">
+                  <%= number_to_currency(data[:pnl]) %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Insights %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header"><h2>
+      <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">lightbulb</span>
+      Insights
+    </h2></div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+        <% if @cost_per_trade > 0 %>
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); border-left: 3px solid var(--primary);">
+            <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.25rem;">Break-Even Threshold</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              Each trade needs to earn at least <strong><%= number_to_currency(@cost_per_trade) %></strong> just to cover costs.
+              Over <%= @total_trades %> trades, you spent <strong><%= number_to_currency(@total_costs) %></strong> on fees.
+            </div>
+          </div>
+        <% end %>
+
+        <% if @flipped_trades.any? %>
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); border-left: 3px solid var(--negative);">
+            <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.25rem;">Fee-Killed Trades</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              <strong><%= @flipped_trades.count %></strong> trades (<%= (@flipped_trades.count.to_f / @total_trades * 100).round(1) %>%) were profitable before fees but turned into losses.
+              Impact: <strong class="negative"><%= number_to_currency(@flipped_trades.sum { |t| t["pnl"].to_f }) %></strong>
+            </div>
+          </div>
+        <% end %>
+
+        <% most_expensive_sym = @cost_by_symbol.first %>
+        <% if most_expensive_sym %>
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); border-left: 3px solid #f9ab00;">
+            <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.25rem;">Most Expensive Symbol</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              <strong><%= most_expensive_sym[0] %></strong> costs you the most at <strong><%= number_to_currency(most_expensive_sym[1][:total_cost]) %></strong>
+              across <%= most_expensive_sym[1][:trades] %> trades
+              (<%= number_to_currency(most_expensive_sym[1][:cost_per_trade]) %>/trade).
+            </div>
+          </div>
+        <% end %>
+
+        <% if @cost_as_pct > 0 %>
+          <div style="padding: 0.75rem; background: var(--bg); border-radius: var(--radius); border-left: 3px solid <%= @cost_as_pct > 10 ? 'var(--negative)' : @cost_as_pct > 5 ? '#f9ab00' : 'var(--positive)' %>;">
+            <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.25rem;">Fee Drag Rating</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              <% if @cost_as_pct <= 3 %>
+                Excellent. Fees consume only <strong><%= @cost_as_pct %>%</strong> of gross P&L. Your cost structure is very efficient.
+              <% elsif @cost_as_pct <= 5 %>
+                Good. Fees consume <strong><%= @cost_as_pct %>%</strong> of gross P&L. Room for slight improvement.
+              <% elsif @cost_as_pct <= 10 %>
+                Moderate. Fees consume <strong><%= @cost_as_pct %>%</strong> of gross P&L. Consider reducing trade frequency or switching brokers.
+              <% else %>
+                High. Fees consume <strong><%= @cost_as_pct %>%</strong> of gross P&L. Costs are significantly impacting your returns.
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>

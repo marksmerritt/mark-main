@@ -1,0 +1,282 @@
+<% content_for(:title) { "Morning Briefing" } %>
+
+<%
+  score_pct = @readiness_score / 100.0
+  circumference = 2 * Math::PI * 54
+  dash_offset = circumference * (1 - score_pct)
+%>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #f9ab00;">wb_sunny</span>
+    <%= @greeting %>
+  </h1>
+  <div class="page-actions">
+    <span style="font-size: 0.875rem; color: var(--text-secondary);"><%= Date.current.strftime("%A, %B %d, %Y") %></span>
+  </div>
+</div>
+
+<%# ── Readiness Score ── %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 2rem; text-align: center;">
+  <div style="display: inline-block; position: relative; width: 140px; height: 140px;">
+    <svg viewBox="0 0 120 120" width="140" height="140">
+      <circle cx="60" cy="60" r="54" fill="none" stroke="var(--border)" stroke-width="8" />
+      <circle cx="60" cy="60" r="54" fill="none" stroke="<%= @readiness_color %>" stroke-width="8"
+              stroke-dasharray="<%= circumference %>" stroke-dashoffset="<%= dash_offset %>"
+              stroke-linecap="round" transform="rotate(-90 60 60)"
+              style="transition: stroke-dashoffset 1s ease;" />
+    </svg>
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center;">
+      <div style="font-size: 2rem; font-weight: 800; color: <%= @readiness_color %>;"><%= @readiness_score %></div>
+      <div style="font-size: 0.625rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Readiness</div>
+    </div>
+  </div>
+  <div style="margin-top: 0.75rem; font-size: 1rem; font-weight: 600; color: <%= @readiness_color %>;"><%= @readiness_label %></div>
+  <div style="margin-top: 0.25rem; font-size: 0.75rem; color: var(--text-secondary);">
+    Based on streak health, journal consistency, win rate, and budget status
+  </div>
+</div>
+
+<%# ── Yesterday's Recap ── %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2>
+      <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);">history</span>
+      Yesterday's Recap
+    </h2>
+  </div>
+  <% if @yesterday_trades.any? || @yesterday_spending > 0 %>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+      <% if api_token.present? %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">P&L</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: <%= @yesterday_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= number_to_currency(@yesterday_pnl) %>
+          </div>
+        </div>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Result</div>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= @yesterday_result %></div>
+        </div>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+          <div style="font-size: 1.25rem; font-weight: 700;">
+            <span class="positive"><%= @yesterday_wins %>W</span> / <span class="negative"><%= @yesterday_losses %>L</span>
+          </div>
+        </div>
+      <% end %>
+      <% if budget_api_token.present? %>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Spending</div>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@yesterday_spending) %></div>
+        </div>
+      <% end %>
+    </div>
+  <% else %>
+    <div style="padding: 1.5rem; text-align: center; color: var(--text-secondary); font-size: 0.875rem;">
+      <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -6px;">event_busy</span>
+      No trading or spending data from yesterday.
+    </div>
+  <% end %>
+</div>
+
+<%# ── Today's Focus ── %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2>
+      <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #f9ab00;">lightbulb</span>
+      Today's Focus
+    </h2>
+    <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @focus_items.count %> items</span>
+  </div>
+  <% @focus_items.each do |item| %>
+    <div style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border);">
+      <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= item[:color] %>; margin-top: 1px;"><%= item[:icon] %></span>
+      <div style="flex: 1; font-size: 0.875rem; line-height: 1.5;"><%= item[:text] %></div>
+    </div>
+  <% end %>
+</div>
+
+<%# ── Financial Snapshot ── %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2>
+      <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);">account_balance</span>
+      Financial Snapshot
+    </h2>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+    <% if api_token.present? %>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Week-to-Date</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: <%= @wtd_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @wtd_pnl >= 0 ? "+" : "" %><%= number_to_currency(@wtd_pnl) %>
+        </div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Month-to-Date</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: <%= @mtd_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @mtd_pnl >= 0 ? "+" : "" %><%= number_to_currency(@mtd_pnl) %>
+        </div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: <%= @win_rate >= 50 ? 'var(--positive)' : (@win_rate > 0 ? 'var(--negative)' : 'var(--text-secondary)') %>;">
+          <%= @win_rate > 0 ? "#{@win_rate.round(1)}%" : "--" %>
+          <% if @win_rate_trend == :improving %>
+            <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--positive); vertical-align: -2px;">trending_up</span>
+          <% elsif @win_rate_trend == :declining %>
+            <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--negative); vertical-align: -2px;">trending_down</span>
+          <% end %>
+        </div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Streak</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: <%= @streak_type == 'win' ? 'var(--positive)' : (@streak_type == 'loss' ? 'var(--negative)' : 'var(--text-secondary)') %>;">
+          <% if @streak_count > 0 %>
+            <%= @streak_count %><%= @streak_type == "win" ? "W" : "L" %>
+          <% else %>
+            --
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+    <% if budget_api_token.present? %>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Budget Left</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: <%= @budget_remaining >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= number_to_currency(@budget_remaining) %>
+        </div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Today's Spend</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(@today_spending) %></div>
+      </div>
+    <% end %>
+  </div>
+  <% if @open_positions_count > 0 %>
+    <div style="padding: 0.625rem 1.25rem; border-top: 1px solid var(--border); font-size: 0.8125rem; display: flex; align-items: center; gap: 0.5rem;">
+      <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--primary);">show_chart</span>
+      <span><strong><%= @open_positions_count %></strong> open position<%= @open_positions_count != 1 ? "s" : "" %></span>
+      <% if @watchlist_symbols.any? %>
+        <span style="color: var(--text-secondary); margin-left: auto;">Recent: <%= @watchlist_symbols.join(", ") %></span>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+
+<%# ── Continue Where You Left Off ── %>
+<% if @continue_items.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);">replay</span>
+        Continue Where You Left Off
+      </h2>
+    </div>
+    <% @continue_items.each do |item| %>
+      <a href="<%= item[:path] %>" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border); text-decoration: none; color: inherit; transition: background 0.15s;" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='transparent'">
+        <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= item[:color] %>;"><%= item[:icon] %></span>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 0.875rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><%= item[:title] %></div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= item[:subtitle] %></div>
+        </div>
+        <span class="material-icons-outlined" style="font-size: 1rem; color: var(--text-secondary);">chevron_right</span>
+      </a>
+    <% end %>
+  </div>
+<% end %>
+
+<%# ── Upcoming Bills ── %>
+<%
+  soon_bills = @upcoming_bills.select { |b|
+    due = Date.parse(b["next_date"] || b["next_due_date"]) rescue nil
+    due && (due - Date.current).to_i.between?(0, 3)
+  }
+%>
+<% if soon_bills.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e53935;">receipt</span>
+        Upcoming Bills
+      </h2>
+    </div>
+    <% soon_bills.each do |bill| %>
+      <%
+        bill_due = Date.parse(bill["next_date"] || bill["next_due_date"]) rescue nil
+        days_until = bill_due ? (bill_due - Date.current).to_i : nil
+      %>
+      <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+        <span class="material-icons-outlined" style="font-size: 1rem; color: <%= days_until == 0 ? 'var(--negative)' : 'var(--primary)' %>;">receipt</span>
+        <div style="flex: 1;">
+          <div style="font-size: 0.875rem; font-weight: 500;"><%= bill["description"] || bill["name"] %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+            <%= days_until == 0 ? "Due today" : "Due in #{days_until} day#{'s' if days_until != 1}" %>
+          </div>
+        </div>
+        <span style="font-weight: 700;"><%= number_to_currency(bill["amount"]) %></span>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# ── Quick Actions ── %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2>
+      <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);">bolt</span>
+      Quick Actions
+    </h2>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; padding: 1rem 1.25rem;">
+    <%= link_to new_trade_path, style: "display: flex; flex-direction: column; align-items: center; gap: 0.375rem; padding: 1rem; border-radius: 8px; background: var(--bg); text-decoration: none; color: inherit; transition: transform 0.15s, box-shadow 0.15s;", onmouseover: "this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'", onmouseout: "this.style.transform='none'; this.style.boxShadow='none'" do %>
+      <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary);">add_circle_outline</span>
+      <span style="font-size: 0.8125rem; font-weight: 600;">New Trade</span>
+    <% end %>
+
+    <%= link_to new_journal_entry_path, style: "display: flex; flex-direction: column; align-items: center; gap: 0.375rem; padding: 1rem; border-radius: 8px; background: var(--bg); text-decoration: none; color: inherit; transition: transform 0.15s, box-shadow 0.15s;", onmouseover: "this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'", onmouseout: "this.style.transform='none'; this.style.boxShadow='none'" do %>
+      <span class="material-icons-outlined" style="font-size: 1.5rem; color: #ff8f00;">auto_stories</span>
+      <span style="font-size: 0.8125rem; font-weight: 600;">Journal Entry</span>
+    <% end %>
+
+    <%= link_to new_budget_transaction_path, style: "display: flex; flex-direction: column; align-items: center; gap: 0.375rem; padding: 1rem; border-radius: 8px; background: var(--bg); text-decoration: none; color: inherit; transition: transform 0.15s, box-shadow 0.15s;", onmouseover: "this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'", onmouseout: "this.style.transform='none'; this.style.boxShadow='none'" do %>
+      <span class="material-icons-outlined" style="font-size: 1.5rem; color: #0d904f;">payments</span>
+      <span style="font-size: 0.8125rem; font-weight: 600;">Log Expense</span>
+    <% end %>
+
+    <%= link_to new_note_path, style: "display: flex; flex-direction: column; align-items: center; gap: 0.375rem; padding: 1rem; border-radius: 8px; background: var(--bg); text-decoration: none; color: inherit; transition: transform 0.15s, box-shadow 0.15s;", onmouseover: "this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'", onmouseout: "this.style.transform='none'; this.style.boxShadow='none'" do %>
+      <span class="material-icons-outlined" style="font-size: 1.5rem; color: #9c27b0;">note_add</span>
+      <span style="font-size: 0.8125rem; font-weight: 600;">New Note</span>
+    <% end %>
+  </div>
+</div>
+
+<%# ── Motivational Quote ── %>
+<div style="margin-bottom: 1.5rem; padding: 1.5rem 2rem; border-left: 4px solid var(--primary); background: var(--surface); border-radius: 8px;">
+  <div style="font-size: 1rem; font-style: italic; line-height: 1.6; color: var(--text);">
+    "<%= @quote[:text] %>"
+  </div>
+  <div style="margin-top: 0.75rem; font-size: 0.8125rem; color: var(--text-secondary); font-weight: 600;">
+    &mdash; <%= @quote[:author] %>
+  </div>
+</div>
+
+<%# ── No Data State ── %>
+<% unless api_token.present? || notes_api_token.present? || budget_api_token.present? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem;">wb_sunny</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Connect your APIs</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">
+      Configure API tokens in <%= link_to "Settings", settings_path %> to see your morning briefing.
+    </div>
+  </div>
+<% end %>
+
+<%# ── Footer Links ── %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Dashboard", root_path, class: "btn btn-sm" %>
+  <%= link_to "Daily Review", daily_review_path, class: "btn btn-sm" %>
+  <%= link_to "Financial Pulse", financial_pulse_path, class: "btn btn-sm" %>
+  <%= link_to "Weekly Planner", weekly_planner_path, class: "btn btn-sm" %>
+</div>

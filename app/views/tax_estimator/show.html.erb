@@ -1,0 +1,174 @@
+<% content_for(:title) { "Tax Estimator #{@year}" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #ff5722;">calculate</span>
+    Trading Tax Estimator
+  </h1>
+  <div class="page-actions">
+    <%= link_to "← #{@year - 1}", tax_estimator_path(year: @year - 1), class: "btn btn-sm" %>
+    <% if @year < Date.current.year %>
+      <%= link_to "#{@year + 1} →", tax_estimator_path(year: @year + 1), class: "btn btn-sm" %>
+    <% end %>
+  </div>
+</div>
+
+<%# Inputs %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+  <%= form_tag tax_estimator_path, method: :get, style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; align-items: end;" do %>
+    <input type="hidden" name="year" value="<%= @year %>">
+    <div>
+      <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Filing Status</label>
+      <select name="filing_status" class="form-control" style="font-size: 0.875rem;">
+        <% [["Single", "single"], ["Married Filing Jointly", "married"], ["Head of Household", "head_of_household"]].each do |label, val| %>
+          <option value="<%= val %>" <%= val == @filing_status ? "selected" : "" %>><%= label %></option>
+        <% end %>
+      </select>
+    </div>
+    <div>
+      <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Other Income</label>
+      <input type="number" name="other_income" value="<%= @other_income.round(0) %>" step="1000" class="form-control" style="font-size: 0.875rem;">
+    </div>
+    <div>
+      <label style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; display: block; margin-bottom: 0.25rem;">Deductions</label>
+      <input type="number" name="deductions" value="<%= @deductions.round(0) %>" step="100" class="form-control" style="font-size: 0.875rem;">
+    </div>
+    <div>
+      <button type="submit" class="btn btn-primary" style="width: 100%;">Estimate</button>
+    </div>
+  <% end %>
+</div>
+
+<%# Tax Summary %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trading P&L</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @total_trading_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <%= @total_trading_pnl >= 0 ? '+' : '' %><%= number_to_currency(@total_trading_pnl) %>
+      </div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Estimated Tax</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@estimated_total_tax) %></div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Effective Rate</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @effective_rate %>%</div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">After-Tax P&L</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @after_tax_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+        <%= number_to_currency(@after_tax_pnl) %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Gains Breakdown %>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+  <div class="card" style="padding: 1.25rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Short-Term Gains</div>
+    <div style="font-size: 1.375rem; font-weight: 700; color: <%= @short_term_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+      <%= number_to_currency(@short_term_pnl) %>
+    </div>
+    <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @short_term.count %> trades · Taxed as ordinary income</div>
+    <div style="font-size: 0.875rem; font-weight: 600; margin-top: 0.5rem; color: var(--negative);">
+      Tax: ~<%= number_to_currency(@marginal_trading_tax) %>
+    </div>
+  </div>
+  <div class="card" style="padding: 1.25rem; text-align: center;">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Long-Term Gains</div>
+    <div style="font-size: 1.375rem; font-weight: 700; color: <%= @long_term_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+      <%= number_to_currency(@long_term_pnl) %>
+    </div>
+    <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @long_term.count %> trades · Preferential rate</div>
+    <div style="font-size: 0.875rem; font-weight: 600; margin-top: 0.5rem; color: var(--negative);">
+      Tax: ~<%= number_to_currency(@lt_tax) %>
+    </div>
+  </div>
+</div>
+
+<%# Loss Deduction Info %>
+<% if @net_gains < 0 %>
+  <div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem; border-left: 4px solid var(--primary);">
+    <div style="font-weight: 600;">Capital Loss Deduction</div>
+    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+      You can deduct up to <strong><%= number_to_currency(@loss_deduction) %></strong> against ordinary income.
+      <% if @carryover_loss > 0 %>
+        Remaining <strong><%= number_to_currency(@carryover_loss) %></strong> carries forward to future years.
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Wash Sale Warnings %>
+<% if @wash_sale_warnings.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #ff5722;">gavel</span> Potential Wash Sales (<%= @wash_sale_warnings.count %>)</h2>
+    </div>
+    <div style="padding: 0.75rem 1.25rem; font-size: 0.75rem; color: var(--text-secondary); border-bottom: 1px solid var(--border);">
+      Wash sale rules disallow loss deductions if you buy the same security within 30 days before or after selling at a loss.
+    </div>
+    <div style="padding: 0;">
+      <% @wash_sale_warnings.first(10).each do |w| %>
+        <div style="padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-weight: 600;"><%= w[:symbol] %></span>
+            <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.5rem;"><%= w[:date] %></span>
+          </div>
+          <span style="font-weight: 700; color: var(--negative);"><%= number_to_currency(w[:loss]) %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Monthly P&L Table %>
+<% if @monthly_pnl.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">calendar_month</span> Monthly Breakdown</h2>
+    </div>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.625rem 1rem;">Month</th>
+            <th style="text-align: right; padding: 0.625rem;">Short-Term</th>
+            <th style="text-align: right; padding: 0.625rem;">Long-Term</th>
+            <th style="text-align: right; padding: 0.625rem;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @monthly_pnl.sort_by { |k, _| k }.each do |month, data| %>
+            <% total = data[:short] + data[:long] %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem 1rem;"><%= month %></td>
+              <td style="text-align: right; padding: 0.5rem; color: <%= data[:short] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(data[:short]) %></td>
+              <td style="text-align: right; padding: 0.5rem; color: <%= data[:long] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(data[:long]) %></td>
+              <td style="text-align: right; padding: 0.5rem; font-weight: 700; color: <%= total >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(total) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Additional Info %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1rem 1.25rem;">
+  <div style="font-size: 0.75rem; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">info</span>
+    <strong>Disclaimer:</strong> This is an estimate for planning purposes only. It does not account for state taxes, AMT, NIIT, or all tax situations.
+    Total trading fees of <strong><%= number_to_currency(@total_fees) %></strong> may be deductible — consult a tax professional.
+    Based on <%= @trades.count %> closed trades in <%= @year %>.
+  </div>
+</div>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Fee Analysis", reports_fee_analysis_path, class: "btn" %>
+  <%= link_to "Account Statement", data_export_account_statement_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+</div>

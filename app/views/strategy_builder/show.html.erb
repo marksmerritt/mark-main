@@ -1,0 +1,513 @@
+<% content_for(:title) { "Strategy Builder" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">architecture</span>
+    Strategy Builder
+  </h1>
+</div>
+
+<% if @trades.blank? || @trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem; color: var(--primary);">architecture</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Not enough trading data</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades with P&amp;L to analyze strategy patterns and build strategies.</div>
+  </div>
+<% else %>
+
+  <%# ── Overview Stats Strip ── %>
+  <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);"><%= @total_trades %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Total Trades</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @overall_win_rate >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @overall_win_rate %>%</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Win Rate</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @overall_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@overall_pnl) %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Total P&amp;L</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @overall_avg_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@overall_avg_pnl) %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Avg P&amp;L</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);"><%= @templates.count %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Strategy Templates</div>
+    </div>
+  </div>
+
+  <%# ── Top Performing Strategies ── %>
+  <% if @top_combos.any? %>
+    <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid var(--positive);">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--positive);">star</span>
+          Top Performing Strategies
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Your top 5 multi-dimensional strategy combinations ranked by expectancy.
+        </div>
+        <div style="display: grid; gap: 0.75rem;">
+          <% @top_combos.each_with_index do |combo, idx| %>
+            <div style="display: flex; gap: 1rem; align-items: flex-start; padding: 1rem; background: var(--bg); border-radius: 0.5rem; border-left: 4px solid var(--positive);">
+              <div style="min-width: 2rem; height: 2rem; border-radius: 50%; background: var(--positive); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.875rem;"><%= idx + 1 %></div>
+              <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 0.9375rem;"><%= combo[:name] %></div>
+                <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= combo[:combo_desc] %></div>
+                <div style="display: flex; gap: 1.5rem; margin-top: 0.5rem; font-size: 0.8125rem; flex-wrap: wrap;">
+                  <span><strong style="color: var(--positive);"><%= combo[:win_rate] %>%</strong> win rate</span>
+                  <span><strong style="color: <%= combo[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(combo[:avg_pnl]) %></strong> avg P&amp;L</span>
+                  <span><strong><%= combo[:trade_count] %></strong> trades</span>
+                  <span><strong style="color: var(--primary);"><%= number_to_currency(combo[:expectancy]) %></strong> expectancy</span>
+                  <span>PF: <strong><%= combo[:profit_factor] %></strong></span>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Strategy Performance Matrix ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);">grid_on</span>
+        Strategy Performance Matrix
+      </h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;" id="strategyMatrix">
+        <thead>
+          <tr>
+            <th style="padding: 0.5rem; text-align: left; border-bottom: 2px solid var(--border); cursor: pointer; white-space: nowrap;" onclick="sortTable(0)">Dimension</th>
+            <th style="padding: 0.5rem; text-align: left; border-bottom: 2px solid var(--border); cursor: pointer; white-space: nowrap;" onclick="sortTable(1)">Name</th>
+            <th style="padding: 0.5rem; text-align: right; border-bottom: 2px solid var(--border); cursor: pointer; white-space: nowrap;" onclick="sortTable(2)"># Trades</th>
+            <th style="padding: 0.5rem; text-align: right; border-bottom: 2px solid var(--border); cursor: pointer; white-space: nowrap;" onclick="sortTable(3)">Win Rate</th>
+            <th style="padding: 0.5rem; text-align: right; border-bottom: 2px solid var(--border); cursor: pointer; white-space: nowrap;" onclick="sortTable(4)">Avg P&amp;L</th>
+            <th style="padding: 0.5rem; text-align: right; border-bottom: 2px solid var(--border); cursor: pointer; white-space: nowrap;" onclick="sortTable(5)">Total P&amp;L</th>
+            <th style="padding: 0.5rem; text-align: right; border-bottom: 2px solid var(--border); cursor: pointer; white-space: nowrap;" onclick="sortTable(6)">Profit Factor</th>
+            <th style="padding: 0.5rem; text-align: right; border-bottom: 2px solid var(--border); cursor: pointer; white-space: nowrap;" onclick="sortTable(7)">Expectancy</th>
+            <th style="padding: 0.5rem; text-align: right; border-bottom: 2px solid var(--border); cursor: pointer; white-space: nowrap;" onclick="sortTable(8)">Hold Time</th>
+            <th style="padding: 0.5rem; text-align: right; border-bottom: 2px solid var(--border); cursor: pointer; white-space: nowrap;" onclick="sortTable(9)">Max DD</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @matrix.each do |row| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);"><%= row[:dimension] %></td>
+              <td style="padding: 0.5rem; font-weight: 600;"><%= row[:name] %></td>
+              <td style="padding: 0.5rem; text-align: right;" data-sort="<%= row[:trade_count] %>"><%= row[:trade_count] %></td>
+              <td style="padding: 0.5rem; text-align: right; color: <%= row[:win_rate] >= 55 ? 'var(--positive)' : row[:win_rate] < 45 ? 'var(--negative)' : 'inherit' %>;" data-sort="<%= row[:win_rate] %>"><%= row[:win_rate] %>%</td>
+              <td style="padding: 0.5rem; text-align: right; color: <%= row[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;" data-sort="<%= row[:avg_pnl] %>"><%= number_to_currency(row[:avg_pnl]) %></td>
+              <td style="padding: 0.5rem; text-align: right; font-weight: 600; color: <%= row[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;" data-sort="<%= row[:total_pnl] %>"><%= number_to_currency(row[:total_pnl]) %></td>
+              <td style="padding: 0.5rem; text-align: right;" data-sort="<%= row[:profit_factor] %>"><%= row[:profit_factor] %></td>
+              <td style="padding: 0.5rem; text-align: right; font-weight: 700; color: <%= row[:expectancy] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;" data-sort="<%= row[:expectancy] %>"><%= number_to_currency(row[:expectancy]) %></td>
+              <td style="padding: 0.5rem; text-align: right; font-size: 0.75rem;" data-sort="<%= row[:avg_hold_minutes] || 0 %>"><%= format_hold_time(row[:avg_hold_minutes]) %></td>
+              <td style="padding: 0.5rem; text-align: right; color: var(--negative);" data-sort="<%= row[:max_drawdown] %>"><%= row[:max_drawdown] > 0 ? number_to_currency(-row[:max_drawdown]) : '--' %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# ── Dimension Cards with Mini Bar Charts ── %>
+  <% dimension_icons = {
+    "By Symbol" => "sell",
+    "By Time" => "schedule",
+    "By Side" => "swap_vert",
+    "By Setup" => "build",
+    "By Tag" => "label",
+    "By Asset Class" => "category"
+  } %>
+
+  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+    <% @dimensions.each do |dim_name, stats_list| %>
+      <% next if stats_list.empty? %>
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);"><%= dimension_icons[dim_name] || "insights" %></span>
+            <%= dim_name %>
+          </h2>
+        </div>
+        <div style="padding: 1.25rem;">
+          <% max_total = stats_list.map { |s| s[:total_pnl].abs }.max || 1 %>
+          <% stats_list.first(8).each do |s| %>
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+              <div style="min-width: 5.5rem; font-size: 0.8125rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="<%= s[:name] %>"><%= s[:name] %></div>
+              <div style="flex: 1; display: flex; align-items: center; height: 1.25rem;">
+                <% bar_width = max_total > 0 ? ((s[:total_pnl].abs / max_total) * 100).round(1) : 0 %>
+                <div style="width: <%= [bar_width, 100].min %>%; height: 100%; background: <%= s[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.25; border-radius: 3px; min-width: 2px;"></div>
+              </div>
+              <div style="min-width: 4rem; text-align: right; font-size: 0.75rem;">
+                <span style="font-weight: 700; color: <%= s[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(s[:total_pnl]) %></span>
+              </div>
+              <div style="min-width: 3rem; text-align: right; font-size: 0.75rem;">
+                <span style="color: <%= s[:win_rate] >= 55 ? 'var(--positive)' : s[:win_rate] < 45 ? 'var(--negative)' : 'var(--text-secondary)' %>;"><%= s[:win_rate] %>%</span>
+              </div>
+              <div style="min-width: 2rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary);"><%= s[:trade_count] %></div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <%# ── Strategy Templates ── %>
+  <% if @templates.any? %>
+    <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid var(--primary);">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--primary);">auto_fix_high</span>
+          Strategy Templates
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Pre-built strategy suggestions based on your trading history. Click to see projected stats.
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+          <% @templates.each do |template| %>
+            <details class="card" style="margin: 0; border-left: 4px solid <%= template[:color] %>; background: var(--surface);">
+              <summary style="padding: 1rem; cursor: pointer; list-style: none; user-select: none;">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                  <span class="material-icons-outlined" style="font-size: 1.5rem; color: <%= template[:color] %>;"><%= template[:icon] %></span>
+                  <div>
+                    <div style="font-weight: 700; font-size: 0.9375rem;"><%= template[:name] %></div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= template[:description] %></div>
+                  </div>
+                </div>
+              </summary>
+              <div style="padding: 0 1rem 1rem;">
+                <div style="border-top: 1px solid var(--border); padding-top: 0.75rem;">
+                  <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 0.5rem; text-transform: uppercase;">Rule: <%= template[:rule] %></div>
+                  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; font-size: 0.8125rem;">
+                    <div>
+                      <div style="color: var(--text-secondary); font-size: 0.6875rem;">Win Rate</div>
+                      <div style="font-weight: 700; color: <%= template[:stats][:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= template[:stats][:win_rate] %>%</div>
+                    </div>
+                    <div>
+                      <div style="color: var(--text-secondary); font-size: 0.6875rem;">Avg P&amp;L</div>
+                      <div style="font-weight: 700; color: <%= template[:stats][:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(template[:stats][:avg_pnl]) %></div>
+                    </div>
+                    <div>
+                      <div style="color: var(--text-secondary); font-size: 0.6875rem;">Expectancy</div>
+                      <div style="font-weight: 700; color: <%= template[:stats][:expectancy] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(template[:stats][:expectancy]) %></div>
+                    </div>
+                    <div>
+                      <div style="color: var(--text-secondary); font-size: 0.6875rem;">Trades</div>
+                      <div style="font-weight: 700;"><%= template[:stats][:trade_count] %></div>
+                    </div>
+                    <div>
+                      <div style="color: var(--text-secondary); font-size: 0.6875rem;">Profit Factor</div>
+                      <div style="font-weight: 700;"><%= template[:stats][:profit_factor] %></div>
+                    </div>
+                    <div>
+                      <div style="color: var(--text-secondary); font-size: 0.6875rem;">Total P&amp;L</div>
+                      <div style="font-weight: 700; color: <%= template[:stats][:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(template[:stats][:total_pnl]) %></div>
+                    </div>
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-top: 0.5rem; font-size: 0.8125rem;">
+                    <div>
+                      <div style="color: var(--text-secondary); font-size: 0.6875rem;">Best Trade</div>
+                      <div style="font-weight: 600; color: var(--positive);"><%= number_to_currency(template[:stats][:best_trade_pnl]) %></div>
+                    </div>
+                    <div>
+                      <div style="color: var(--text-secondary); font-size: 0.6875rem;">Worst Trade</div>
+                      <div style="font-weight: 600; color: var(--negative);"><%= number_to_currency(template[:stats][:worst_trade_pnl]) %></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </details>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Build Your Strategy ── %>
+  <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #1976d2;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1976d2;">construction</span>
+        Build Your Strategy
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Combine filters to see projected stats based on your historical data. Select any combination of symbol, side, and time window.
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1rem;">
+        <div>
+          <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Symbol</label>
+          <select id="filterSymbol" onchange="filterStrategy()" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--surface); color: var(--text); font-size: 0.8125rem;">
+            <option value="">All Symbols</option>
+            <% @symbols.each do |s| %>
+              <option value="<%= s %>"><%= s %></option>
+            <% end %>
+          </select>
+        </div>
+        <div>
+          <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Side</label>
+          <select id="filterSide" onchange="filterStrategy()" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--surface); color: var(--text); font-size: 0.8125rem;">
+            <option value="">All Sides</option>
+            <% @sides.each do |s| %>
+              <option value="<%= s %>"><%= s %></option>
+            <% end %>
+          </select>
+        </div>
+        <div>
+          <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Time of Day</label>
+          <select id="filterTime" onchange="filterStrategy()" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--surface); color: var(--text); font-size: 0.8125rem;">
+            <option value="">All Times</option>
+            <% @times.each do |t| %>
+              <option value="<%= t %>"><%= t %></option>
+            <% end %>
+          </select>
+        </div>
+        <div>
+          <label style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 0.25rem;">Setup</label>
+          <select id="filterSetup" onchange="filterStrategy()" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 0.375rem; background: var(--surface); color: var(--text); font-size: 0.8125rem;">
+            <option value="">All Setups</option>
+            <% @setups.each do |s| %>
+              <option value="<%= s %>"><%= s %></option>
+            <% end %>
+          </select>
+        </div>
+      </div>
+      <div id="strategyResults" style="display: none; padding: 1rem; background: var(--bg); border-radius: 0.5rem; border: 1px solid var(--border);">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <span class="material-icons-outlined" style="font-size: 1rem; color: var(--primary);">analytics</span>
+          <span style="font-weight: 700; font-size: 0.9375rem;" id="strategyLabel">Projected Stats</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.75rem;">
+          <div style="text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Trades</div>
+            <div style="font-weight: 700; font-size: 1.125rem;" id="statTrades">--</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Win Rate</div>
+            <div style="font-weight: 700; font-size: 1.125rem;" id="statWinRate">--</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg P&amp;L</div>
+            <div style="font-weight: 700; font-size: 1.125rem;" id="statAvgPnl">--</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Total P&amp;L</div>
+            <div style="font-weight: 700; font-size: 1.125rem;" id="statTotalPnl">--</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Expectancy</div>
+            <div style="font-weight: 700; font-size: 1.125rem;" id="statExpectancy">--</div>
+          </div>
+          <div style="text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Profit Factor</div>
+            <div style="font-weight: 700; font-size: 1.125rem;" id="statPF">--</div>
+          </div>
+        </div>
+      </div>
+      <div id="strategyEmpty" style="display: none; padding: 1rem; text-align: center; color: var(--text-secondary); font-size: 0.875rem;">
+        No trades match the selected filters.
+      </div>
+    </div>
+  </div>
+
+  <%# ── What to Avoid ── %>
+  <% if @worst_combos.any? %>
+    <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid var(--negative);">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: var(--negative);">dangerous</span>
+          What to Avoid
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          These strategy combinations have negative expectancy. Consider eliminating them from your playbook.
+        </div>
+        <% @worst_combos.each do |combo| %>
+          <div style="display: flex; align-items: center; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border);">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--negative);">block</span>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 600; font-size: 0.875rem;"><%= combo[:name] %></div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= combo[:combo_desc] %></div>
+            </div>
+            <div style="text-align: right; min-width: 3.5rem;">
+              <div style="font-weight: 700; font-size: 0.875rem; color: var(--negative);"><%= combo[:win_rate] %>%</div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">win rate</div>
+            </div>
+            <div style="text-align: right; min-width: 5rem;">
+              <div style="font-weight: 700; font-size: 0.875rem; color: var(--negative);"><%= number_to_currency(combo[:expectancy]) %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">expectancy</div>
+            </div>
+            <div style="text-align: right; min-width: 5rem;">
+              <div style="font-weight: 700; font-size: 0.875rem; color: var(--negative);"><%= number_to_currency(combo[:total_pnl]) %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">total P&amp;L</div>
+            </div>
+            <div style="text-align: center; min-width: 2.5rem;">
+              <div style="font-weight: 600; font-size: 0.875rem;"><%= combo[:trade_count] %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">trades</div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+<% end %>
+
+<%# ── Bottom Nav ── %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to reports_index_path, class: "btn" do %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">hub</span> Reports Hub<% end %>
+  <%= link_to edge_finder_path, class: "btn" do %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">gps_fixed</span> Edge Finder<% end %>
+  <%= link_to account_summary_path, class: "btn" do %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">account_balance</span> Account Summary<% end %>
+</div>
+
+<script>
+  // ── Table Sorting ──
+  let sortDirection = {};
+  function sortTable(colIndex) {
+    const table = document.getElementById("strategyMatrix");
+    const tbody = table.querySelector("tbody");
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    const dir = sortDirection[colIndex] === "asc" ? "desc" : "asc";
+    sortDirection[colIndex] = dir;
+
+    rows.sort((a, b) => {
+      const cellA = a.cells[colIndex];
+      const cellB = b.cells[colIndex];
+      let valA = cellA.dataset.sort !== undefined ? parseFloat(cellA.dataset.sort) : cellA.textContent.trim();
+      let valB = cellB.dataset.sort !== undefined ? parseFloat(cellB.dataset.sort) : cellB.textContent.trim();
+
+      if (typeof valA === "number" && typeof valB === "number") {
+        return dir === "asc" ? valA - valB : valB - valA;
+      }
+      valA = String(valA).toLowerCase();
+      valB = String(valB).toLowerCase();
+      return dir === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+    });
+
+    rows.forEach(row => tbody.appendChild(row));
+  }
+
+  // ── Build Your Strategy Filter ──
+  const allTrades = <%= raw @trades.map { |t|
+    {
+      symbol: (t["symbol"] || "").upcase,
+      side: (t["side"] || t["direction"] || "").downcase,
+      entry_time: t["entry_time"].to_s,
+      pnl: t["pnl"].to_f,
+      setup: t["playbook_name"] || t["setup"] || ""
+    }
+  }.to_json %>;
+
+  function classifyTime(entryTime) {
+    if (!entryTime) return "";
+    try {
+      const d = new Date(entryTime);
+      const h = d.getHours();
+      if (h < 11) return "Morning (pre-11am)";
+      if (h < 14) return "Midday (11am-2pm)";
+      return "Afternoon (2pm+)";
+    } catch { return ""; }
+  }
+
+  function classifySide(side) {
+    if (!side) return "";
+    side = side.toLowerCase();
+    if (side.includes("long") || side.includes("buy")) return "Long";
+    if (side.includes("short") || side.includes("sell")) return "Short";
+    return "";
+  }
+
+  function filterStrategy() {
+    const sym = document.getElementById("filterSymbol").value;
+    const side = document.getElementById("filterSide").value;
+    const time = document.getElementById("filterTime").value;
+    const setup = document.getElementById("filterSetup").value;
+    const resultsDiv = document.getElementById("strategyResults");
+    const emptyDiv = document.getElementById("strategyEmpty");
+
+    let filtered = allTrades;
+    if (sym) filtered = filtered.filter(t => t.symbol === sym);
+    if (side) filtered = filtered.filter(t => classifySide(t.side) === side);
+    if (time) filtered = filtered.filter(t => classifyTime(t.entry_time) === time);
+    if (setup) filtered = filtered.filter(t => t.setup === setup);
+
+    if (!sym && !side && !time && !setup) {
+      resultsDiv.style.display = "none";
+      emptyDiv.style.display = "none";
+      return;
+    }
+
+    if (filtered.length === 0) {
+      resultsDiv.style.display = "none";
+      emptyDiv.style.display = "block";
+      return;
+    }
+
+    emptyDiv.style.display = "none";
+    resultsDiv.style.display = "block";
+
+    const count = filtered.length;
+    const wins = filtered.filter(t => t.pnl > 0);
+    const losses = filtered.filter(t => t.pnl <= 0);
+    const winRate = count > 0 ? (wins.length / count * 100).toFixed(1) : 0;
+    const totalPnl = filtered.reduce((s, t) => s + t.pnl, 0);
+    const avgPnl = count > 0 ? totalPnl / count : 0;
+    const avgWin = wins.length > 0 ? wins.reduce((s, t) => s + t.pnl, 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((s, t) => s + t.pnl, 0) / losses.length) : 0;
+    const expectancy = (avgWin * (winRate / 100)) - (avgLoss * ((100 - winRate) / 100));
+    const grossWins = wins.reduce((s, t) => s + t.pnl, 0);
+    const grossLosses = Math.abs(losses.reduce((s, t) => s + t.pnl, 0));
+    const pf = grossLosses > 0 ? (grossWins / grossLosses).toFixed(2) : grossWins > 0 ? "999" : "0";
+
+    const fmtCurrency = n => (n >= 0 ? "$" : "-$") + Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+    const parts = [];
+    if (sym) parts.push(sym);
+    if (side) parts.push(side);
+    if (time) parts.push(time);
+    if (setup) parts.push(setup);
+    document.getElementById("strategyLabel").textContent = parts.join(" + ") + " (" + count + " trades)";
+
+    document.getElementById("statTrades").textContent = count;
+    document.getElementById("statWinRate").textContent = winRate + "%";
+    document.getElementById("statWinRate").style.color = winRate >= 50 ? "var(--positive)" : "var(--negative)";
+    document.getElementById("statAvgPnl").textContent = fmtCurrency(avgPnl);
+    document.getElementById("statAvgPnl").style.color = avgPnl >= 0 ? "var(--positive)" : "var(--negative)";
+    document.getElementById("statTotalPnl").textContent = fmtCurrency(totalPnl);
+    document.getElementById("statTotalPnl").style.color = totalPnl >= 0 ? "var(--positive)" : "var(--negative)";
+    document.getElementById("statExpectancy").textContent = fmtCurrency(expectancy);
+    document.getElementById("statExpectancy").style.color = expectancy >= 0 ? "var(--positive)" : "var(--negative)";
+    document.getElementById("statPF").textContent = pf;
+  }
+</script>
+
+<style>
+  details.card > summary { list-style: none; }
+  details.card > summary::-webkit-details-marker { display: none; }
+  #strategyMatrix th:hover { background: var(--bg); }
+  #strategyMatrix th::after { content: " \2195"; font-size: 0.625rem; color: var(--text-secondary); }
+  @media (max-width: 768px) {
+    div[style*="grid-template-columns: repeat(5"] { grid-template-columns: repeat(2, 1fr) !important; }
+    div[style*="grid-template-columns: repeat(2, 1fr)"][style*="margin-bottom: 1.5rem"] { grid-template-columns: 1fr !important; }
+    div[style*="grid-template-columns: repeat(4, 1fr)"][style*="margin-bottom: 1rem"] { grid-template-columns: repeat(2, 1fr) !important; }
+    div[style*="grid-template-columns: repeat(6, 1fr)"] { grid-template-columns: repeat(3, 1fr) !important; }
+  }
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>

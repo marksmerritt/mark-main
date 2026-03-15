@@ -1,0 +1,266 @@
+<%
+  ch = @challenge
+  ch_status = ch["status"] || "active"
+  ch_pct = ch["percentage_complete"].to_f
+  ch_days_total = ch["days_total"].to_i
+  ch_days_elapsed = ch["days_elapsed"].to_i
+  ch_days_remaining = ch["days_remaining"].to_i
+  ch_target = ch["target_amount"].to_f
+  ch_current = ch["current_amount"].to_f
+  ch_progress_pct = ch["progress_percentage"].to_f
+  ch_has_target = ch_target > 0
+
+  ch_start = Date.parse(ch["start_date"]) rescue nil
+  ch_end = Date.parse(ch["end_date"]) rescue nil
+
+  # Status styling
+  ch_status_colors = { "active" => "var(--primary)", "completed" => "var(--positive)", "failed" => "var(--negative)", "abandoned" => "var(--text-secondary)" }
+  ch_status_icons = { "active" => "play_circle", "completed" => "emoji_events", "failed" => "cancel", "abandoned" => "remove_circle" }
+  ch_color = ch_status_colors[ch_status] || "var(--text-secondary)"
+  ch_icon = ch_status_icons[ch_status] || "help"
+
+  # Pace analysis
+  if ch_has_target && ch_days_elapsed > 0 && ch_days_total > 0
+    ch_daily_needed = ch_days_remaining > 0 ? ((ch_target - ch_current) / ch_days_remaining).round(2) : 0
+    ch_daily_pace = (ch_current / ch_days_elapsed).round(2)
+    ch_on_track = ch_daily_pace >= (ch_target / ch_days_total)
+    ch_projected = (ch_daily_pace * ch_days_total).round(2)
+    ch_projected_pct = ch_target > 0 ? (ch_projected / ch_target * 100).round(0) : 0
+  end
+%>
+
+<div class="page-header">
+  <h1><%= ch["name"] %></h1>
+  <div class="page-actions">
+    <% if ch_status == "active" %>
+      <%= link_to evaluate_budget_challenge_path(ch["id"]), data: { turbo_method: :post }, class: "btn btn-primary" do %>
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">check_circle</span> Evaluate
+      <% end %>
+      <%= link_to "Abandon", abandon_budget_challenge_path(ch["id"]), data: { turbo_method: :post, turbo_confirm: "Abandon this challenge?" }, class: "btn btn-danger" %>
+    <% end %>
+    <%= link_to "Back", budget_challenges_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Hero card %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: stretch; flex-wrap: wrap;">
+    <%# Status & progress gauge %>
+    <div style="flex: 0 0 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; border-right: 1px solid var(--border);">
+      <%
+        cg_r = 50; cg_cx = 60; cg_cy = 60
+        cg_circum = 2 * Math::PI * cg_r
+        cg_val = ch_has_target ? ch_progress_pct : ch_pct
+        cg_filled = cg_circum * [cg_val, 100].min / 100.0
+        cg_color = cg_val >= 100 ? "var(--positive)" : cg_val >= 50 ? "var(--primary)" : ch_color
+      %>
+      <svg width="120" height="120" viewBox="0 0 120 120">
+        <circle cx="<%= cg_cx %>" cy="<%= cg_cy %>" r="<%= cg_r %>" fill="none" stroke="var(--border)" stroke-width="8" />
+        <circle cx="<%= cg_cx %>" cy="<%= cg_cy %>" r="<%= cg_r %>" fill="none" stroke="<%= cg_color %>" stroke-width="8"
+                stroke-dasharray="<%= cg_filled.round(1) %> <%= cg_circum.round(1) %>"
+                stroke-linecap="round" transform="rotate(-90 <%= cg_cx %> <%= cg_cy %>)" />
+        <text x="<%= cg_cx %>" y="<%= cg_cy - 4 %>" text-anchor="middle" font-size="20" font-weight="700" fill="<%= cg_color %>"><%= cg_val.round(0) %>%</text>
+        <text x="<%= cg_cx %>" y="<%= cg_cy + 12 %>" text-anchor="middle" font-size="8" fill="var(--text-secondary)">
+          <%= ch_has_target ? "of target" : "complete" %>
+        </text>
+      </svg>
+      <div style="display: flex; align-items: center; gap: 0.375rem; margin-top: 0.25rem;">
+        <span class="material-icons-outlined" style="font-size: 1rem; color: <%= ch_color %>;"><%= ch_icon %></span>
+        <span class="badge badge-<%= ch_status == "active" ? "primary" : (ch_status == "completed" ? "success" : "danger") %>">
+          <%= ch_status.capitalize %>
+        </span>
+      </div>
+    </div>
+
+    <%# Key metrics %>
+    <div style="flex: 1; min-width: 280px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0;">
+      <div style="padding: 1.25rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Days Remaining</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= ch_days_remaining %></div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary);">of <%= ch_days_total %> days total</div>
+      </div>
+      <div style="padding: 1.25rem; border-bottom: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Time Elapsed</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= ch_pct.round(0) %>%</div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= ch_days_elapsed %> days in</div>
+      </div>
+      <% if ch_has_target %>
+        <div style="padding: 1.25rem; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Target</div>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(ch_target) %></div>
+        </div>
+        <div style="padding: 1.25rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Current</div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(ch_current) %></div>
+          <% if ch_target > ch_current %>
+            <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= number_to_currency(ch_target - ch_current) %> to go</div>
+          <% end %>
+        </div>
+      <% else %>
+        <div style="padding: 1.25rem; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Type</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= ch["challenge_type"]&.titleize %></div>
+        </div>
+        <div style="padding: 1.25rem;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Duration</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= ch_days_total %> days</div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Timeline bar %>
+  <div style="padding: 0.75rem 1.25rem 1rem; border-top: 1px solid var(--border);">
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.375rem;">Timeline</div>
+    <div style="position: relative; height: 1.5rem; background: var(--bg); border-radius: 0.75rem; overflow: hidden;">
+      <div style="height: 100%; width: <%= [ch_pct, 100].min %>%; background: <%= cg_color %>; opacity: 0.7; border-radius: 0.75rem;
+                  display: flex; align-items: center; justify-content: center;">
+        <% if ch_pct >= 15 %>
+          <span style="font-size: 0.6875rem; font-weight: 600; color: white;"><%= ch_pct.round(0) %>%</span>
+        <% end %>
+      </div>
+      <%# Today marker %>
+      <% if ch_pct > 0 && ch_pct < 100 %>
+        <div style="position: absolute; left: <%= ch_pct %>%; top: -2px; bottom: -2px; width: 2px; background: var(--text);"></div>
+      <% end %>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-top: 0.25rem; font-size: 0.625rem; color: var(--text-secondary);">
+      <span><%= ch_start&.strftime("%b %d, %Y") || ch["start_date"] %></span>
+      <span><%= ch_end&.strftime("%b %d, %Y") || ch["end_date"] %></span>
+    </div>
+  </div>
+</div>
+
+<%# Pace analysis card %>
+<% if ch_has_target && ch_days_elapsed > 0 && ch_days_total > 0 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">speed</span> Pace Analysis</h2>
+      <% if ch_on_track %>
+        <span class="badge badge-success">On Track</span>
+      <% else %>
+        <span class="badge badge-danger">Behind Pace</span>
+      <% end %>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; margin-bottom: 0.75rem;">
+        <div style="text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Daily Pace</div>
+          <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(ch_daily_pace) %></div>
+        </div>
+        <% if ch_days_remaining > 0 %>
+          <div style="text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Needed/Day</div>
+            <div style="font-size: 1.125rem; font-weight: 700; color: <%= ch_daily_needed > ch_daily_pace ? 'var(--negative)' : 'var(--positive)' %>;">
+              <%= number_to_currency(ch_daily_needed) %>
+            </div>
+          </div>
+        <% end %>
+        <div style="text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Projected Total</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: <%= ch_on_track ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= number_to_currency(ch_projected) %>
+          </div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Projected %</div>
+          <div style="font-size: 1.125rem; font-weight: 700; color: <%= ch_projected_pct >= 100 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= ch_projected_pct %>%
+          </div>
+        </div>
+      </div>
+
+      <%# Projected vs target bar %>
+      <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">Projected vs Target</div>
+      <div style="position: relative; height: 0.625rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+        <div style="height: 100%; width: <%= [ch_projected_pct, 150].min * 100 / 150.0 %>%; background: <%= ch_on_track ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.6; border-radius: 4px;"></div>
+      </div>
+      <div style="position: relative; margin-top: 0.125rem;">
+        <%# Target marker at 100% %>
+        <div style="position: absolute; left: <%= (100.0 / 150 * 100).round(1) %>%; transform: translateX(-50%);">
+          <div style="width: 1px; height: 8px; background: var(--text); margin: 0 auto;"></div>
+          <div style="font-size: 0.5625rem; color: var(--text-secondary); text-align: center;">Target</div>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Day-by-day countdown (for active challenges) %>
+<% if ch_status == "active" && ch_days_remaining > 0 && ch_days_remaining <= 14 %>
+  <div class="card" style="margin-bottom: 1.5rem; border-left: 3px solid <%= ch_days_remaining <= 3 ? 'var(--negative)' : 'var(--primary)' %>;">
+    <div style="padding: 0.75rem 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
+      <span class="material-icons-outlined" style="font-size: 1.5rem; color: <%= ch_days_remaining <= 3 ? 'var(--negative)' : 'var(--primary)' %>;">
+        <%= ch_days_remaining <= 3 ? "alarm" : "hourglass_bottom" %>
+      </span>
+      <div>
+        <div style="font-size: 1rem; font-weight: 700;">
+          <%= ch_days_remaining %> day<%= ch_days_remaining == 1 ? "" : "s" %> left!
+        </div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+          <% if ch_has_target && ch_target > ch_current %>
+            Need <%= number_to_currency(ch_target - ch_current) %> more to reach your goal.
+            <% if ch_days_remaining > 0 %>
+              That's <%= number_to_currency((ch_target - ch_current) / ch_days_remaining) %>/day.
+            <% end %>
+          <% else %>
+            Keep going — the finish line is in sight!
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<div class="content-grid">
+  <div class="card">
+    <div class="card-header"><h2>Details</h2></div>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <span class="detail-label">Type</span>
+        <span class="detail-value"><%= ch["challenge_type"]&.titleize %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Duration</span>
+        <span class="detail-value"><%= ch_days_total %> days</span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Start Date</span>
+        <span class="detail-value"><%= ch_start&.strftime("%b %d, %Y") || "—" %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">End Date</span>
+        <span class="detail-value"><%= ch_end&.strftime("%b %d, %Y") || "—" %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Days Elapsed</span>
+        <span class="detail-value"><%= ch_days_elapsed %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Status</span>
+        <span class="detail-value">
+          <span class="badge badge-<%= ch_status == "active" ? "primary" : (ch_status == "completed" ? "success" : "danger") %>">
+            <%= ch_status.capitalize %>
+          </span>
+        </span>
+      </div>
+      <% if ch_has_target %>
+        <div class="detail-item">
+          <span class="detail-label">Target Amount</span>
+          <span class="detail-value"><%= number_to_currency(ch_target) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Current Amount</span>
+          <span class="detail-value positive"><%= number_to_currency(ch_current) %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <% if ch["notes"].present? %>
+    <div class="card">
+      <div class="card-header"><h2>Notes</h2></div>
+      <div class="text-content"><%= simple_format(ch["notes"]) %></div>
+    </div>
+  <% end %>
+</div>

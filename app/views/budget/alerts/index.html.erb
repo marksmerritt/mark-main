@@ -1,0 +1,88 @@
+<div class="page-header">
+  <h1>Alerts & Notifications</h1>
+  <div class="page-actions">
+    <% if @unread_count > 0 %>
+      <%= link_to "Mark All Read", mark_read_budget_alerts_path, data: { turbo_method: :post }, class: "btn" %>
+    <% end %>
+    <% if @alerts.any? { |a| a["read"] } %>
+      <%= link_to "Clear Read", clear_budget_alerts_path, data: { turbo_method: :delete, turbo_confirm: "Clear all read alerts?" }, class: "btn" %>
+    <% end %>
+  </div>
+</div>
+
+<%
+  a_danger = @alerts.count { |a| a["severity"] == "danger" && !a["read"] }
+  a_warning = @alerts.count { |a| a["severity"] == "warning" && !a["read"] }
+%>
+<% if @alerts.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Unread</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= @unread_count > 0 ? 'var(--negative)' : 'var(--positive)' %>;"><%= @unread_count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @alerts.size %></div>
+      </div>
+      <% if a_danger > 0 %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Critical</div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= a_danger %></div>
+        </div>
+      <% end %>
+      <% if a_warning > 0 %>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Warnings</div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: #f9ab00;"><%= a_warning %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<% if @alerts.any? %>
+  <div class="alerts-list">
+    <% @alerts.each do |alert| %>
+      <div class="alert-card alert-<%= alert["severity"] %> <%= 'alert-unread' unless alert["read"] %>">
+        <div class="alert-card-icon">
+          <span class="material-icons-outlined">
+            <%= case alert["severity"]
+                when "danger" then "error"
+                when "warning" then "warning"
+                when "success" then "check_circle"
+                else "info"
+                end %>
+          </span>
+        </div>
+        <div class="alert-card-content">
+          <div class="alert-card-title">
+            <%= alert["title"] %>
+            <% unless alert["read"] %>
+              <span class="badge badge-primary" style="margin-left: 0.5rem;">New</span>
+            <% end %>
+          </div>
+          <div class="alert-card-message"><%= alert["message"] %></div>
+          <div class="alert-card-meta">
+            <span class="text-muted"><%= time_ago_in_words(Time.parse(alert["created_at"])) %> ago</span>
+            <span class="tag"><%= alert["alert_type"].humanize %></span>
+          </div>
+        </div>
+        <div class="alert-card-actions">
+          <% unless alert["read"] %>
+            <%= link_to mark_read_budget_alert_path(alert["id"]), data: { turbo_method: :post }, class: "btn btn-sm", title: "Mark read" do %>
+              <span class="material-icons-outlined" style="font-size: 1.125rem;">done</span>
+            <% end %>
+          <% end %>
+          <%= link_to budget_alert_path(alert["id"]), data: { turbo_method: :delete }, class: "btn btn-sm", title: "Dismiss" do %>
+            <span class="material-icons-outlined" style="font-size: 1.125rem;">close</span>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No alerts. You're all caught up!</p>
+  </div>
+<% end %>

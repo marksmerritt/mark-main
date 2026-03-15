@@ -1,0 +1,168 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">timeline</span>
+    Activity Timeline
+  </h1>
+</div>
+
+<%# Filter bar %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; gap: 0.5rem; padding: 0.75rem 1.25rem; flex-wrap: wrap;">
+    <%= link_to "All", timeline_path, class: "btn btn-sm #{@filter == 'all' ? 'btn-primary' : ''}" %>
+    <%= link_to "Trades", timeline_path(filter: "trades"), class: "btn btn-sm #{@filter == 'trades' ? 'btn-primary' : ''}" %>
+    <%= link_to "Journal", timeline_path(filter: "journal"), class: "btn btn-sm #{@filter == 'journal' ? 'btn-primary' : ''}" %>
+    <%= link_to "Notes", timeline_path(filter: "notes"), class: "btn btn-sm #{@filter == 'notes' ? 'btn-primary' : ''}" %>
+    <%= link_to "Budget", timeline_path(filter: "budget"), class: "btn btn-sm #{@filter == 'budget' ? 'btn-primary' : ''}" %>
+  </div>
+</div>
+
+<%# Summary strip %>
+<% if @items.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Activity</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @items.count %></div>
+      </div>
+      <% if @trade_count > 0 %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= @trade_count %></div>
+        </div>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trade P&L</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @trade_pnl >= 0 ? 'positive' : 'negative' %>">
+            <%= @trade_pnl >= 0 ? "" : "-" %>$<%= "%.2f" % @trade_pnl.abs %>
+          </div>
+        </div>
+      <% end %>
+      <% if @note_count > 0 %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notes</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= @note_count %></div>
+        </div>
+      <% end %>
+      <% if @journal_count > 0 %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Journal</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= @journal_count %></div>
+        </div>
+      <% end %>
+      <% if @txn_count > 0 %>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Transactions</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= @txn_count %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Timeline %>
+<% if @grouped.any? %>
+  <div style="position: relative; padding-left: 2rem;">
+    <%# Vertical line %>
+    <div style="position: absolute; left: 0.9375rem; top: 0; bottom: 0; width: 2px; background: var(--border);"></div>
+
+    <% @grouped.each do |date, items| %>
+      <%
+        parsed_date = Date.parse(date) rescue nil
+        label = if parsed_date == Date.current
+                  "Today"
+                elsif parsed_date == Date.current - 1
+                  "Yesterday"
+                elsif parsed_date && parsed_date >= Date.current.beginning_of_week
+                  parsed_date.strftime("%A")
+                else
+                  parsed_date&.strftime("%b %-d, %Y") || date
+                end
+      %>
+
+      <%# Date header %>
+      <div style="position: relative; margin-bottom: 0.5rem; margin-top: 1.5rem;">
+        <div style="position: absolute; left: -2rem; top: 50%; transform: translateY(-50%); width: 12px; height: 12px;
+                    background: var(--surface); border: 2px solid var(--primary); border-radius: 50%;"></div>
+        <div style="font-size: 0.875rem; font-weight: 700; color: var(--text); padding: 0.25rem 0;">
+          <%= label %>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary); font-weight: 400; margin-left: 0.5rem;">
+            <%= items.count %> item<%= items.count == 1 ? "" : "s" %>
+          </span>
+        </div>
+      </div>
+
+      <%# Items for this date %>
+      <% items.each do |item| %>
+        <%
+          type_config = {
+            "trade" => { bg: "rgba(26,115,232,0.06)", border: "var(--primary)", label: "Trade" },
+            "journal" => { bg: "rgba(13,144,79,0.06)", border: "var(--positive)", label: "Journal" },
+            "note" => { bg: "rgba(92,107,192,0.06)", border: "#5c6bc0", label: "Note" },
+            "transaction" => { bg: "rgba(249,171,0,0.06)", border: "#f9ab00", label: "Transaction" }
+          }
+          config = type_config[item[:type]] || type_config["note"]
+        %>
+        <div style="position: relative; margin-bottom: 0.5rem;">
+          <%# Timeline dot %>
+          <div style="position: absolute; left: -2rem; top: 0.875rem; transform: translateY(-50%); width: 8px; height: 8px;
+                      background: <%= config[:border] %>; border-radius: 50%;"></div>
+
+          <div class="card" style="border-left: 3px solid <%= config[:border] %>; margin-bottom: 0;">
+            <div style="padding: 0.75rem 1rem; display: flex; align-items: flex-start; gap: 0.75rem;">
+              <%# Icon %>
+              <div style="width: 32px; height: 32px; border-radius: 50%; background: <%= config[:bg] %>;
+                          display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span class="material-icons-outlined" style="font-size: 1rem; color: <%= item[:color] || config[:border] %>;"><%= item[:icon] %></span>
+              </div>
+
+              <%# Content %>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+                  <a href="<%= item[:url] %>" style="font-size: 0.875rem; font-weight: 600; text-decoration: none; color: var(--text);">
+                    <%= item[:title] %>
+                  </a>
+                  <span style="font-size: 0.5625rem; padding: 0.125rem 0.375rem; border-radius: 3px; background: <%= config[:bg] %>; color: <%= config[:border] %>; font-weight: 600; text-transform: uppercase;">
+                    <%= config[:label] %>
+                  </span>
+                  <% if item[:meta].present? %>
+                    <span style="font-size: 0.6875rem; color: var(--text-secondary);"><%= item[:meta] %></span>
+                  <% end %>
+                </div>
+
+                <% if item[:subtitle].present? %>
+                  <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= item[:subtitle] %></div>
+                <% end %>
+
+                <% if item[:tags].present? && item[:tags].any? %>
+                  <div style="display: flex; gap: 0.25rem; margin-top: 0.375rem; flex-wrap: wrap;">
+                    <% item[:tags].first(4).each do |tag| %>
+                      <span style="font-size: 0.5625rem; padding: 0.0625rem 0.375rem; border-radius: 3px; background: var(--bg); color: var(--text-secondary);"><%= tag %></span>
+                    <% end %>
+                  </div>
+                <% end %>
+              </div>
+
+              <%# Value / time %>
+              <div style="text-align: right; flex-shrink: 0;">
+                <% if item[:value_label].present? %>
+                  <div style="font-size: 0.875rem; font-weight: 700;" class="<%= item[:value].to_f >= 0 ? 'positive' : 'negative' %>">
+                    <%= item[:value_label] %>
+                  </div>
+                <% end %>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+                  <% time_str = item[:timestamp].to_s %>
+                  <% if time_str.length > 10 %>
+                    <%= time_str.slice(11, 5) %>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card">
+    <p class="empty-state">No activity found. Start trading, writing notes, or logging transactions to see your timeline.</p>
+  </div>
+<% end %>

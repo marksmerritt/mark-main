@@ -1,0 +1,365 @@
+<% content_for(:title) { "Note Maintenance" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #607d8b;">build</span>
+    Note Maintenance
+  </h1>
+  <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem;">
+    Library health analysis and cleanup recommendations
+  </p>
+</div>
+
+<%# Health Score Ring %>
+<div style="display: flex; justify-content: center; margin-bottom: 1.5rem;">
+  <div class="card" style="padding: 1.5rem 2.5rem; text-align: center; display: inline-block;">
+    <%
+      ring_color = case @health_score
+                   when 80..100 then "#4caf50"
+                   when 60..79  then "#ff9800"
+                   when 40..59  then "#f57c00"
+                   else              "#e53935"
+                   end
+      circumference = 2 * Math::PI * 54
+      dash_offset = circumference * (1 - @health_score / 100.0)
+    %>
+    <svg width="140" height="140" viewBox="0 0 120 120">
+      <circle cx="60" cy="60" r="54" fill="none" stroke="var(--border)" stroke-width="8"/>
+      <circle cx="60" cy="60" r="54" fill="none" stroke="<%= ring_color %>" stroke-width="8"
+              stroke-dasharray="<%= circumference.round(1) %>"
+              stroke-dashoffset="<%= dash_offset.round(1) %>"
+              stroke-linecap="round"
+              transform="rotate(-90 60 60)"/>
+      <text x="60" y="55" text-anchor="middle" fill="var(--text)" font-size="28" font-weight="700"><%= @health_score %></text>
+      <text x="60" y="73" text-anchor="middle" fill="<%= ring_color %>" font-size="16" font-weight="600"><%= @health_grade %></text>
+    </svg>
+    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">Library Health Score</div>
+  </div>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Notes</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @notes.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Stale Notes</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @stale_notes.any? ? '#f57c00' : 'var(--text)' %>;"><%= @stale_notes.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Untagged</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @untagged_notes.any? ? '#7b1fa2' : 'var(--text)' %>;"><%= @untagged_notes.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Uncategorized</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @uncategorized_notes.any? ? '#1565c0' : 'var(--text)' %>;"><%= @uncategorized_notes.count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Health Score</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @health_score >= 80 ? 'var(--positive)' : (@health_score >= 60 ? '#ff9800' : 'var(--negative)') %>;"><%= @health_score %>/100</div>
+    </div>
+  </div>
+</div>
+
+<%# Cleanup Suggestions %>
+<% if @cleanup_suggestions.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">checklist</span> Cleanup Suggestions</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 0.75rem;">
+        <% @cleanup_suggestions.each do |suggestion| %>
+          <a href="#<%= suggestion[:anchor] %>" style="text-decoration: none; color: inherit;">
+            <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; background: var(--surface); display: flex; align-items: center; gap: 0.75rem; transition: border-color 0.2s;"
+                 onmouseover="this.style.borderColor='<%= suggestion[:color] %>'" onmouseout="this.style.borderColor='var(--border)'">
+              <span class="material-icons-outlined" style="font-size: 1.5rem; color: <%= suggestion[:color] %>;"><%= suggestion[:icon] %></span>
+              <div style="flex: 1;">
+                <div style="font-size: 0.8125rem; font-weight: 600;"><%= suggestion[:label] %></div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= suggestion[:count] %> note<%= suggestion[:count] != 1 ? 's' : '' %></div>
+              </div>
+              <span style="font-size: 0.6875rem; color: <%= suggestion[:color] %>; font-weight: 600;"><%= suggestion[:link_text] %></span>
+            </div>
+          </a>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Stale Notes %>
+<% if @stale_notes.any? %>
+  <div id="stale" class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #607d8b;">update</span> Stale Notes <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">(<%= @stale_notes.count %> not updated in 90+ days)</span></h2>
+    </div>
+    <div style="padding: 0; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="background: var(--bg);">
+            <th style="padding: 0.625rem 1rem; text-align: left; font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; color: var(--text-secondary);">Title</th>
+            <th style="padding: 0.625rem 1rem; text-align: left; font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; color: var(--text-secondary);">Last Updated</th>
+            <th style="padding: 0.625rem 1rem; text-align: right; font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; color: var(--text-secondary);">Days Stale</th>
+            <th style="padding: 0.625rem 1rem; text-align: left; font-weight: 600; font-size: 0.6875rem; text-transform: uppercase; color: var(--text-secondary);">Notebook</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @stale_notes.first(25).each do |note| %>
+            <tr style="border-top: 1px solid var(--border);">
+              <td style="padding: 0.625rem 1rem;">
+                <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--primary); text-decoration: none; font-weight: 500;" %>
+              </td>
+              <td style="padding: 0.625rem 1rem; color: var(--text-secondary);">
+                <%= Date.parse(note["updated_at"] || note["created_at"] || "").strftime("%b %d, %Y") rescue "Unknown" %>
+              </td>
+              <td style="padding: 0.625rem 1rem; text-align: right;">
+                <span style="color: <%= note["_days_stale"].to_i > 180 ? '#e53935' : '#f57c00' %>; font-weight: 600;">
+                  <%= note["_days_stale"] %>d
+                </span>
+              </td>
+              <td style="padding: 0.625rem 1rem; color: var(--text-secondary);">
+                <%= note.dig("notebook", "name") || "—" %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+      <% if @stale_notes.count > 25 %>
+        <div style="padding: 0.75rem 1rem; font-size: 0.75rem; color: var(--text-secondary); border-top: 1px solid var(--border);">
+          ...and <%= @stale_notes.count - 25 %> more stale notes
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Empty Notes %>
+<% if @empty_notes.any? %>
+  <div id="empty" class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #f57c00;">edit_note</span> Empty / Near-Empty Notes <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">(<%= @empty_notes.count %> with fewer than 10 words)</span></h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @empty_notes.first(20).each do |note| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+          <span class="material-icons-outlined" style="font-size: 1rem; color: #f57c00;">description</span>
+          <div style="flex: 1;">
+            <%= link_to (note["title"].presence || "Untitled"), edit_note_path(note["id"]), style: "color: var(--primary); text-decoration: none; font-weight: 500; font-size: 0.875rem;" %>
+          </div>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary);"><%= note["_word_count"] %> word<%= note["_word_count"] != 1 ? 's' : '' %></span>
+          <%= link_to "Edit", edit_note_path(note["id"]), style: "font-size: 0.6875rem; color: var(--primary); text-decoration: none; font-weight: 600;" %>
+        </div>
+      <% end %>
+      <% if @empty_notes.count > 20 %>
+        <div style="padding: 0.5rem 0; font-size: 0.75rem; color: var(--text-secondary);">
+          ...and <%= @empty_notes.count - 20 %> more empty notes
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Untitled Notes %>
+<% if @untitled_notes.any? %>
+  <div id="untitled" class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e53935;">title</span> Untitled Notes <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">(<%= @untitled_notes.count %>)</span></h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @untitled_notes.first(20).each do |note| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+          <span class="material-icons-outlined" style="font-size: 1rem; color: #e53935;">warning</span>
+          <div style="flex: 1;">
+            <span style="font-size: 0.875rem; color: var(--text-secondary); font-style: italic;">
+              <%= (note["content"] || note["body"] || "").to_s.truncate(80) %>
+            </span>
+          </div>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary);"><%= note["_word_count"] %> words</span>
+          <%= link_to "Edit", edit_note_path(note["id"]), style: "font-size: 0.6875rem; color: var(--primary); text-decoration: none; font-weight: 600;" %>
+        </div>
+      <% end %>
+      <% if @untitled_notes.count > 20 %>
+        <div style="padding: 0.5rem 0; font-size: 0.75rem; color: var(--text-secondary);">
+          ...and <%= @untitled_notes.count - 20 %> more
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Potential Duplicates %>
+<% if @duplicate_pairs.any? %>
+  <div id="duplicates" class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e91e63;">file_copy</span> Potential Duplicates <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">(<%= @duplicate_pairs.count %> pairs)</span></h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @duplicate_pairs.each do |pair| %>
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 0.75rem; background: var(--surface);">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: #e91e63; color: white; font-weight: 600;"><%= pair[:overlap] %>% match</span>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr auto 1fr; gap: 0.75rem; align-items: center;">
+            <div>
+              <%= link_to (pair[:note_a]["title"].presence || "Untitled"), note_path(pair[:note_a]["id"]), style: "color: var(--primary); text-decoration: none; font-weight: 500; font-size: 0.875rem;" %>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= pair[:note_a]["_word_count"] %> words</div>
+            </div>
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: var(--text-secondary);">compare_arrows</span>
+            <div>
+              <%= link_to (pair[:note_b]["title"].presence || "Untitled"), note_path(pair[:note_b]["id"]), style: "color: var(--primary); text-decoration: none; font-weight: 500; font-size: 0.875rem;" %>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= pair[:note_b]["_word_count"] %> words</div>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Untagged Notes %>
+<% if @untagged_notes.any? %>
+  <div id="untagged" class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #7b1fa2;">sell</span> Untagged Notes <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">(<%= @untagged_notes.count %>)</span></h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @untagged_notes.first(25).each do |note| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+          <span class="material-icons-outlined" style="font-size: 1rem; color: #7b1fa2;">label_off</span>
+          <div style="flex: 1;">
+            <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--primary); text-decoration: none; font-weight: 500; font-size: 0.875rem;" %>
+            <% if note.dig("notebook", "name").present? %>
+              <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.5rem;"><%= note.dig("notebook", "name") %></span>
+            <% end %>
+          </div>
+          <%# Quick-tag suggestion based on notebook or content keywords %>
+          <%
+            suggested_tag = note.dig("notebook", "name")
+            unless suggested_tag.present?
+              content_words = (note["content"] || note["body"] || "").to_s.downcase.gsub(/[^a-z0-9\s]/, "").split(/\s+/)
+              content_words.reject! { |w| w.length < 4 || %w[this that with from have been will would could should into about their them what which when where].include?(w) }
+              freq = Hash.new(0)
+              content_words.each { |w| freq[w] += 1 }
+              suggested_tag = freq.sort_by { |_, c| -c }.first&.first
+            end
+          %>
+          <% if suggested_tag.present? %>
+            <span style="font-size: 0.625rem; padding: 0.125rem 0.5rem; border-radius: 9999px; background: var(--bg); border: 1px solid var(--border); color: var(--text-secondary);">
+              Suggest: <%= suggested_tag %>
+            </span>
+          <% end %>
+          <%= link_to "Edit", edit_note_path(note["id"]), style: "font-size: 0.6875rem; color: var(--primary); text-decoration: none; font-weight: 600;" %>
+        </div>
+      <% end %>
+      <% if @untagged_notes.count > 25 %>
+        <div style="padding: 0.5rem 0; font-size: 0.75rem; color: var(--text-secondary);">
+          ...and <%= @untagged_notes.count - 25 %> more untagged notes
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Uncategorized Notes %>
+<% if @uncategorized_notes.any? %>
+  <div id="uncategorized" class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1565c0;">folder_open</span> Uncategorized Notes <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">(<%= @uncategorized_notes.count %> not in any notebook)</span></h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @uncategorized_notes.first(25).each do |note| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+          <span class="material-icons-outlined" style="font-size: 1rem; color: #1565c0;">draft</span>
+          <div style="flex: 1;">
+            <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--primary); text-decoration: none; font-weight: 500; font-size: 0.875rem;" %>
+          </div>
+          <span style="font-size: 0.6875rem; color: var(--text-secondary);"><%= note["_word_count"] %> words</span>
+          <% tags = (note["tags"] || []).map { |t| t.is_a?(Hash) ? t["name"] : t.to_s }.compact %>
+          <% if tags.any? %>
+            <span style="font-size: 0.625rem; color: var(--text-secondary);">
+              <%= tags.first(3).join(", ") %>
+            </span>
+          <% end %>
+        </div>
+      <% end %>
+      <% if @uncategorized_notes.count > 25 %>
+        <div style="padding: 0.5rem 0; font-size: 0.75rem; color: var(--text-secondary);">
+          ...and <%= @uncategorized_notes.count - 25 %> more
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Large Notes %>
+<% if @large_notes.any? %>
+  <div id="large" class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #00838f;">call_split</span> Large Notes <span style="font-size: 0.75rem; font-weight: 400; color: var(--text-secondary);">(<%= @large_notes.count %> over 2,000 words)</span></h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @large_notes.first(15).each do |note| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+          <span class="material-icons-outlined" style="font-size: 1rem; color: #00838f;">article</span>
+          <div style="flex: 1;">
+            <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--primary); text-decoration: none; font-weight: 500; font-size: 0.875rem;" %>
+            <% if note.dig("notebook", "name").present? %>
+              <span style="font-size: 0.6875rem; color: var(--text-secondary); margin-left: 0.5rem;"><%= note.dig("notebook", "name") %></span>
+            <% end %>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.8125rem; font-weight: 600; color: #00838f;"><%= number_with_delimiter(note["_word_count"]) %> words</div>
+            <div style="font-size: 0.625rem; color: var(--text-secondary);">Could be ~<%= (note["_word_count"].to_i / 500.0).ceil %> smaller notes</div>
+          </div>
+        </div>
+      <% end %>
+      <% if @large_notes.count > 15 %>
+        <div style="padding: 0.5rem 0; font-size: 0.75rem; color: var(--text-secondary);">
+          ...and <%= @large_notes.count - 15 %> more large notes
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Storage Stats %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">storage</span> Storage Stats</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem;">
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Characters</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= number_with_delimiter(@total_chars) %></div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Words</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= number_with_delimiter(@total_words) %></div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Words/Note</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @notes.any? ? (@total_words / @notes.count) : 0 %></div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Est. Storage</div>
+        <div style="font-size: 1.25rem; font-weight: 700;">
+          <%= @estimated_storage_mb >= 1 ? "#{@estimated_storage_mb} MB" : "#{@estimated_storage_kb} KB" %>
+        </div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notebooks</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @notebooks.count %></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Bottom Navigation %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Notes", notes_path, class: "btn" %>
+  <%= link_to "Connections", note_links_path, class: "btn" %>
+  <%= link_to "Writing Stats", writing_stats_path, class: "btn" %>
+</div>

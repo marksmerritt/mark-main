@@ -1,0 +1,283 @@
+<% content_for(:title) { "Money Calendar" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #388e3c;">event_note</span>
+    Money Calendar
+  </h1>
+  <div class="page-actions">
+    <%= link_to "\u2190 #{@prev_month.strftime('%b %Y')}", budget_money_calendar_path(month: @prev_month.month, year: @prev_month.year), class: "btn btn-sm" %>
+    <span style="font-weight: 600; font-size: 1rem; padding: 0 0.75rem;"><%= @target_date.strftime("%B %Y") %></span>
+    <% if @show_next %>
+      <%= link_to "#{@next_month.strftime('%b %Y')} \u2192", budget_money_calendar_path(month: @next_month.month, year: @next_month.year), class: "btn btn-sm" %>
+    <% end %>
+  </div>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Spent</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@total_spent) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Income</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@total_income) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">No-Spend Days</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive);"><%= @no_spend_days %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Day</div>
+      <div style="font-size: 1rem; font-weight: 700; color: var(--positive);"><%= @best_day[:date].strftime("%b %d") %></div>
+      <div style="font-size: 0.75rem; color: var(--positive);"><%= number_to_currency(@best_day[:net]) %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Day</div>
+      <div style="font-size: 1rem; font-weight: 700; color: var(--negative);"><%= @worst_day[:date].strftime("%b %d") %></div>
+      <div style="font-size: 0.75rem; color: var(--negative);"><%= number_to_currency(@worst_day[:net]) %></div>
+    </div>
+  </div>
+</div>
+
+<%# Calendar Grid %>
+<%
+  cal_start = @month_start - @month_start.wday.days
+  cal_end = @month_end + (6 - @month_end.wday).days
+  today = Date.current
+  weeks = []
+  current_week = []
+  (cal_start..cal_end).each do |d|
+    current_week << d
+    if current_week.size == 7
+      weeks << current_week
+      current_week = []
+    end
+  end
+%>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">calendar_month</span> Daily Overview</h2>
+  </div>
+  <div style="padding: 1rem; overflow-x: auto;">
+    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; min-width: 600px;">
+      <%# Day headers %>
+      <% %w[Sun Mon Tue Wed Thu Fri Sat].each do |day_name| %>
+        <div style="padding: 0.5rem; text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;">
+          <%= day_name %>
+        </div>
+      <% end %>
+
+      <%# Calendar cells %>
+      <% weeks.each_with_index do |week, week_idx| %>
+        <% week.each do |day| %>
+          <%
+            in_month = day.month == @target_date.month && day.year == @target_date.year
+            data = @daily_data[day]
+            is_today = day == today
+            has_income = data && data[:income] > 0
+            has_expense = data && data[:expenses] > 0
+            net = data ? data[:net] : 0
+            is_bill = data && data[:is_bill]
+
+            if !in_month
+              bg = "transparent"
+              border_color = "transparent"
+            elsif is_today
+              bg = "rgba(25, 118, 210, 0.08)"
+              border_color = "#1976d2"
+            elsif has_income && !has_expense
+              bg = "rgba(46, 125, 50, 0.08)"
+              border_color = "var(--border)"
+            elsif has_expense
+              intensity = (data[:expenses] / @max_expense).clamp(0, 1)
+              opacity = (0.04 + intensity * 0.12).round(3)
+              bg = "rgba(211, 47, 47, #{opacity})"
+              border_color = "var(--border)"
+            else
+              bg = "var(--bg)"
+              border_color = "var(--border)"
+            end
+          %>
+          <div style="min-height: 5rem; padding: 0.375rem; border: 1px solid <%= border_color %>; border-radius: 4px; background: <%= bg %>;<%= is_today ? ' box-shadow: inset 0 0 0 2px #1976d2;' : '' %><%= in_month ? '' : ' opacity: 0.3;' %>">
+            <% if in_month %>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+                <span style="font-size: 0.8125rem; font-weight: <%= is_today ? '700' : '500' %>; color: <%= is_today ? '#1976d2' : 'var(--text-primary)' %>;"><%= day.day %></span>
+                <% if is_bill %>
+                  <span class="material-icons-outlined" style="font-size: 0.75rem; color: #e65100;" title="Bill due">receipt</span>
+                <% end %>
+                <% if has_income %>
+                  <span class="material-icons-outlined" style="font-size: 0.75rem; color: #388e3c;" title="Income received">arrow_downward</span>
+                <% end %>
+              </div>
+              <% if has_expense %>
+                <div style="font-size: 0.6875rem; color: var(--negative); font-weight: 600;">-<%= number_to_currency(data[:expenses]) %></div>
+              <% end %>
+              <% if has_income %>
+                <div style="font-size: 0.6875rem; color: var(--positive); font-weight: 600;">+<%= number_to_currency(data[:income]) %></div>
+              <% end %>
+              <% if has_expense || has_income %>
+                <div style="font-size: 0.625rem; color: <%= net >= 0 ? 'var(--positive)' : 'var(--negative)' %>; margin-top: 0.125rem; font-weight: 500;">
+                  net: <%= number_to_currency(net) %>
+                </div>
+              <% elsif data %>
+                <div style="font-size: 0.625rem; color: var(--positive); margin-top: 0.5rem; text-align: center; opacity: 0.7;">no spend</div>
+              <% end %>
+            <% else %>
+              <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= day.day %></span>
+            <% end %>
+          </div>
+        <% end %>
+
+        <%# Weekly summary row %>
+        <%
+          week_data = week.select { |d| d.month == @target_date.month && d.year == @target_date.year }
+          if week_data.any?
+            w_expenses = week_data.sum { |d| @daily_data[d] ? @daily_data[d][:expenses] : 0 }
+            w_income = week_data.sum { |d| @daily_data[d] ? @daily_data[d][:income] : 0 }
+            w_net = w_income - w_expenses
+          end
+        %>
+        <% if week_data.any? %>
+          <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 1rem; padding: 0.25rem 0.5rem; font-size: 0.6875rem; color: var(--text-secondary); border-bottom: 1px solid var(--border); margin-bottom: 0.25rem;">
+            <span>Week <%= week_idx + 1 %>:</span>
+            <span style="color: var(--negative);">Spent: <%= number_to_currency(w_expenses) %></span>
+            <% if w_income > 0 %>
+              <span style="color: var(--positive);">Earned: <%= number_to_currency(w_income) %></span>
+            <% end %>
+            <span style="font-weight: 600; color: <%= w_net >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">Net: <%= number_to_currency(w_net) %></span>
+          </div>
+        <% end %>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# Running Balance Sparkline %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Running Balance</h2>
+  </div>
+  <div style="padding: 1.25rem; overflow-x: auto;">
+    <%
+      balance_values = @running_balance.values
+      bal_min = [balance_values.min.to_f, 0].min
+      bal_max = [balance_values.max.to_f, 0].max
+      bal_range = bal_max - bal_min
+      bal_range = 1 if bal_range == 0
+      svg_w = 700
+      svg_h = 160
+      padding_top = 20
+      padding_bottom = 30
+      chart_h = svg_h - padding_top - padding_bottom
+      days_count = balance_values.size
+      step_x = days_count > 1 ? (svg_w - 60).to_f / (days_count - 1) : 0
+    %>
+    <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+      <%# Zero line %>
+      <% zero_y = padding_top + ((bal_max - 0) / bal_range * chart_h) %>
+      <line x1="30" y1="<%= zero_y.round(1) %>" x2="<%= svg_w - 10 %>" y2="<%= zero_y.round(1) %>" stroke="var(--text-secondary)" stroke-width="0.5" stroke-dasharray="4"/>
+      <text x="26" y="<%= zero_y.round(1) + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="8">$0</text>
+
+      <%# Balance line %>
+      <%
+        points = []
+        @running_balance.each_with_index do |(day, bal), i|
+          x = 30 + i * step_x
+          y = padding_top + ((bal_max - bal) / bal_range * chart_h)
+          points << "#{x.round(1)},#{y.round(1)}"
+        end
+      %>
+      <polyline points="<%= points.join(' ') %>" fill="none" stroke="#388e3c" stroke-width="2" stroke-linejoin="round"/>
+
+      <%# Fill area %>
+      <% if points.any? %>
+        <%
+          first_x = 30
+          last_x = 30 + (days_count - 1) * step_x
+          fill_points = points.dup
+          fill_points << "#{last_x.round(1)},#{zero_y.round(1)}"
+          fill_points << "#{first_x.round(1)},#{zero_y.round(1)}"
+        %>
+        <polygon points="<%= fill_points.join(' ') %>" fill="#388e3c" opacity="0.1"/>
+      <% end %>
+
+      <%# Day labels (every 5 days) %>
+      <% @running_balance.each_with_index do |(day, bal), i| %>
+        <% if day.day == 1 || day.day % 5 == 0 || day == @month_end %>
+          <% x = 30 + i * step_x %>
+          <text x="<%= x.round(1) %>" y="<%= svg_h - 5 %>" text-anchor="middle" fill="var(--text-secondary)" font-size="8"><%= day.day %></text>
+        <% end %>
+      <% end %>
+
+      <%# End balance label %>
+      <%
+        last_bal = balance_values.last.to_f
+        last_y = padding_top + ((bal_max - last_bal) / bal_range * chart_h)
+        last_x_pos = 30 + (days_count - 1) * step_x
+      %>
+      <circle cx="<%= last_x_pos.round(1) %>" cy="<%= last_y.round(1) %>" r="3" fill="#388e3c"/>
+      <text x="<%= last_x_pos.round(1) %>" y="<%= [last_y.round(1) - 6, padding_top].max %>" text-anchor="middle" fill="#388e3c" font-size="9" font-weight="600">
+        <%= number_to_currency(last_bal) %>
+      </text>
+    </svg>
+  </div>
+</div>
+
+<%# Day-of-Week Averages %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">view_week</span> Average Spending by Day of Week</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% max_dow = @dow_averages.map { |d| d[:avg] }.max.to_f; max_dow = 1 if max_dow == 0 %>
+    <% @dow_averages.each do |d| %>
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span style="width: 2rem; font-size: 0.8125rem; font-weight: 500; text-align: right;"><%= d[:day] %></span>
+        <div style="flex: 1; height: 1.25rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: <%= (d[:avg] / max_dow * 100).round(1) %>%; background: var(--negative); opacity: 0.6; border-radius: 4px;"></div>
+        </div>
+        <span style="min-width: 4rem; text-align: right; font-size: 0.8125rem; font-weight: 600;"><%= number_to_currency(d[:avg]) %></span>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Weekly Totals Summary %>
+<% if @weekly_totals.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">date_range</span> Weekly Totals</h2>
+    </div>
+    <div style="padding: 0;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.75rem 1rem; text-align: left;">Week</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Spent</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Earned</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Net</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @weekly_totals.each_with_index do |w, i| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.625rem 1rem;"><%= w[:start].strftime("%b %d") %> - <%= w[:finish].strftime("%b %d") %></td>
+              <td style="padding: 0.625rem 1rem; text-align: right; color: var(--negative);"><%= number_to_currency(w[:expenses]) %></td>
+              <td style="padding: 0.625rem 1rem; text-align: right; color: var(--positive);"><%= number_to_currency(w[:income]) %></td>
+              <td style="padding: 0.625rem 1rem; text-align: right; font-weight: 600; color: <%= w[:net] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(w[:net]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Dashboard", budget_dashboard_path, class: "btn" %>
+  <%= link_to "Financial Calendar", budget_financial_calendar_path, class: "btn" %>
+  <%= link_to "Spending Report", budget_reports_spending_path, class: "btn" %>
+</div>

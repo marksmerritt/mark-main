@@ -1,5 +1,10 @@
 <div class="page-header">
   <h1>Equity Curve</h1>
+  <div class="page-actions">
+    <button onclick="window.print()" class="btn" title="Print">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">print</span> Print
+    </button>
+  </div>
 </div>
 
 <div class="card">
@@ -21,27 +26,176 @@
   <% end %>
 </div>
 
-<div class="card">
-  <% if @equity_data.is_a?(Array) && @equity_data.any? %>
+<% if @equity_data.is_a?(Array) && @equity_data.any? %>
+  <%
+    pnl_values = @equity_data.map { |p| p["cumulative_pnl"].to_f }
+    final_pnl = pnl_values.last
+    peak = 0
+    max_dd = 0
+    drawdown_series = @equity_data.map do |p|
+      val = p["cumulative_pnl"].to_f
+      peak = [peak, val].max
+      dd = peak > 0 ? ((peak - val) / peak * 100) : 0
+      max_dd = [max_dd, dd].max
+      { "x" => p["date"], "y" => -dd.round(2) }
+    end
+  %>
+
+  <%
+    # Compute daily P&L from cumulative
+    daily_pnls = pnl_values.each_cons(2).map { |a, b| b - a }
+    daily_pnls.unshift(pnl_values.first) if pnl_values.any?
+    avg_daily = daily_pnls.any? ? (daily_pnls.sum / daily_pnls.count) : 0
+    std_daily = if daily_pnls.count > 1
+      variance = daily_pnls.sum { |d| (d - avg_daily) ** 2 } / (daily_pnls.count - 1)
+      Math.sqrt(variance)
+    else
+      0
+    end
+    # Sharpe (annualized, 252 trading days)
+    sharpe = std_daily > 0 ? ((avg_daily / std_daily) * Math.sqrt(252)).round(2) : 0
+    # Sortino (using only downside deviation)
+    downside = daily_pnls.select { |d| d < 0 }
+    downside_dev = if downside.count > 1
+      dv = downside.sum { |d| d ** 2 } / downside.count
+      Math.sqrt(dv)
+    else
+      0
+    end
+    sortino = downside_dev > 0 ? ((avg_daily / downside_dev) * Math.sqrt(252)).round(2) : 0
+    # Max drawdown in $ terms
+    peak_val = 0
+    max_dd_dollars = 0
+    pnl_values.each do |val|
+      peak_val = [peak_val, val].max
+      dd_dollars = peak_val - val
+      max_dd_dollars = [max_dd_dollars, dd_dollars].max
+    end
+    # Recovery factor
+    recovery_factor = max_dd_dollars > 0 ? (final_pnl / max_dd_dollars).round(2) : 0
+    # Win/loss days
+    green_days = daily_pnls.count { |d| d > 0 }
+    red_days = daily_pnls.count { |d| d < 0 }
+  %>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Final P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(final_pnl) %>"><%= number_to_currency(final_pnl) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Peak P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= number_to_currency(pnl_values.max) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Max Drawdown</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= max_dd.round(1) %>% (<%= number_to_currency(max_dd_dollars) %>)</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Sharpe Ratio</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= sharpe >= 1 ? 'positive' : sharpe >= 0 ? '' : 'negative' %>"><%= sharpe %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Sortino Ratio</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= sortino >= 1 ? 'positive' : sortino >= 0 ? '' : 'negative' %>"><%= sortino %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Recovery Factor</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= recovery_factor %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Green/Red Days</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><span class="positive"><%= green_days %></span> / <span class="negative"><%= red_days %></span></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Daily P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(avg_daily) %>"><%= number_to_currency(avg_daily.round(2)) %></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Cumulative P&L</h2>
+    </div>
+    <div class="chart-container"
+         data-controller="chart"
+         data-chart-type-value="line"
+         data-chart-points-value="<%= @equity_data.map { |p| { x: p["date"], y: p["cumulative_pnl"] } }.to_json %>">
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Drawdown</h2>
+    </div>
+    <div class="chart-container"
+         data-controller="chart"
+         data-chart-type-value="line"
+         data-chart-points-value="<%= drawdown_series.to_json %>">
+    </div>
+  </div>
+
+  <% if @symbol_curves.present? && @symbol_curves.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Equity by Symbol</h2>
+        <span class="text-muted">Top <%= @symbol_curves.count %> most traded</span>
+      </div>
+      <div class="symbol-curves-grid">
+        <% @symbol_curves.each do |symbol, data| %>
+          <div class="symbol-curve-item">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <strong><%= symbol %></strong>
+              <span class="<%= pnl_class(data[:running]) %>" style="font-weight: 600;">
+                <%= number_to_currency(data[:running]) %>
+              </span>
+            </div>
+            <% if data[:dates].length >= 2 %>
+              <div style="height: 80px;"
+                   data-controller="chart"
+                   data-chart-type-value="line"
+                   data-chart-points-value="<%= data[:dates].map { |d| { x: d[:date], y: d[:cumulative] } }.to_json %>">
+              </div>
+            <% else %>
+              <span class="text-muted" style="font-size: 0.8125rem;"><%= data[:dates].count %> trade</span>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Data</h2>
+    </div>
     <table class="table">
       <thead>
         <tr>
           <th>Date</th>
           <th style="text-align: right;">Cumulative P&L</th>
+          <th style="text-align: right;">Drawdown</th>
         </tr>
       </thead>
       <tbody>
-        <% @equity_data.each do |point| %>
+        <% @equity_data.each_with_index do |point, i| %>
           <tr>
             <td><%= point["date"] %></td>
-            <td style="text-align: right;" class="<%= point["cumulative_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
+            <td style="text-align: right;" class="<%= pnl_class(point["cumulative_pnl"]) %>">
               <%= number_to_currency(point["cumulative_pnl"]) %>
+            </td>
+            <td style="text-align: right;" class="negative">
+              <%= drawdown_series[i][:y] %>%
             </td>
           </tr>
         <% end %>
       </tbody>
     </table>
-  <% else %>
-    <p class="empty-state">No data available.</p>
-  <% end %>
-</div>
+  </div>
+<% else %>
+  <div class="card empty-state">
+    <p>No data available.</p>
+  </div>
+<% end %>

@@ -1,0 +1,293 @@
+<%
+  b = @budget
+  b_income = b["income"].to_f
+  b_planned = b["total_planned"].to_f
+  b_spent = b["total_spent"].to_f
+  b_remaining = b["remaining"].to_f
+  b_cats = b["budget_categories"].is_a?(Array) ? b["budget_categories"] : []
+  b_spent_pct = b_income > 0 ? (b_spent / b_income * 100).round(0) : 0
+  b_planned_pct = b_income > 0 ? (b_planned / b_income * 100).round(0) : 0
+  b_unallocated = b_income - b_planned
+  b_cats_over = b_cats.count { |c| c["percentage_used"].to_f > 100 }
+  b_cats_warning = b_cats.count { |c| c["percentage_used"].to_f >= 80 && c["percentage_used"].to_f <= 100 }
+%>
+
+<div class="page-header">
+  <h1><%= b["display_name"] || "Budget" %></h1>
+  <div class="page-actions">
+    <%= zero_based_indicator(b) %>
+    <%= link_to edit_budget_budget_path(b["id"]), class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">edit</span> Edit
+    <% end %>
+    <%= link_to "Delete", budget_budget_path(b["id"]), data: { turbo_method: :delete, turbo_confirm: "Delete this budget?" }, class: "btn btn-danger" %>
+    <%= link_to "Back", budget_budgets_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Budget hero %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: stretch; flex-wrap: wrap;">
+    <%# Spending gauge %>
+    <div style="flex: 0 0 160px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.25rem; border-right: 1px solid var(--border);">
+      <%
+        bg_r = 45; bg_cx = 55; bg_cy = 50
+        bg_circum = Math::PI * bg_r
+        bg_val = [b_spent_pct, 100].min
+        bg_filled = bg_circum * bg_val / 100.0
+        bg_color = b_spent_pct > 100 ? "var(--negative)" : b_spent_pct >= 80 ? "#f9ab00" : "var(--positive)"
+      %>
+      <svg width="110" height="65" viewBox="0 0 110 65">
+        <path d="M <%= bg_cx - bg_r %> <%= bg_cy %> A <%= bg_r %> <%= bg_r %> 0 1 1 <%= bg_cx + bg_r %> <%= bg_cy %>"
+              fill="none" stroke="var(--border)" stroke-width="8" stroke-linecap="round" />
+        <path d="M <%= bg_cx - bg_r %> <%= bg_cy %> A <%= bg_r %> <%= bg_r %> 0 1 1 <%= bg_cx + bg_r %> <%= bg_cy %>"
+              fill="none" stroke="<%= bg_color %>" stroke-width="8" stroke-linecap="round"
+              stroke-dasharray="<%= bg_filled.round(1) %> <%= bg_circum.round(1) %>" />
+        <text x="<%= bg_cx %>" y="<%= bg_cy - 8 %>" text-anchor="middle" font-size="16" font-weight="700" fill="<%= bg_color %>"><%= b_spent_pct %>%</text>
+        <text x="<%= bg_cx %>" y="<%= bg_cy + 4 %>" text-anchor="middle" font-size="7" fill="var(--text-secondary)">spent</text>
+      </svg>
+    </div>
+
+    <%# Key metrics %>
+    <div style="flex: 1; min-width: 280px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0;">
+      <div style="padding: 1rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Income</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(b_income) %></div>
+      </div>
+      <div style="padding: 1rem; border-bottom: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Planned</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(b_planned) %></div>
+        <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= b_planned_pct %>% of income</div>
+      </div>
+      <div style="padding: 1rem; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Spent</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(b_spent) %></div>
+      </div>
+      <div style="padding: 1rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Remaining</div>
+        <div style="font-size: 1.25rem; font-weight: 700;" class="<%= b_remaining >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(b_remaining) %></div>
+      </div>
+    </div>
+  </div>
+
+  <%# Budget allocation bar %>
+  <div style="padding: 0.75rem 1.25rem 1rem; border-top: 1px solid var(--border);">
+    <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+      <span>Budget Allocation</span>
+      <span>
+        <% if b_unallocated > 0 %>
+          <%= number_to_currency(b_unallocated) %> unallocated
+        <% elsif b_unallocated < 0 %>
+          <span style="color: var(--negative);"><%= number_to_currency(b_unallocated.abs) %> over-allocated</span>
+        <% else %>
+          Fully allocated
+        <% end %>
+      </span>
+    </div>
+    <div style="height: 0.625rem; background: var(--bg); border-radius: 4px; overflow: hidden; display: flex;">
+      <div style="width: <%= [b_spent_pct, 100].min %>%; height: 100%; background: var(--negative); opacity: 0.6;"></div>
+      <% plan_unspent = b_planned_pct - b_spent_pct %>
+      <% if plan_unspent > 0 %>
+        <div style="width: <%= [plan_unspent, 100 - b_spent_pct].min %>%; height: 100%; background: var(--primary); opacity: 0.3;"></div>
+      <% end %>
+    </div>
+    <div style="display: flex; gap: 1rem; margin-top: 0.375rem; font-size: 0.625rem; color: var(--text-secondary);">
+      <span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--negative); opacity: 0.6; vertical-align: middle; margin-right: 3px;"></span>Spent</span>
+      <span><span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--primary); opacity: 0.3; vertical-align: middle; margin-right: 3px;"></span>Planned (unspent)</span>
+      <% if b_cats_over > 0 %>
+        <span style="color: var(--negative);"><%= b_cats_over %> categor<%= b_cats_over == 1 ? "y" : "ies" %> over budget</span>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<% if @budget["budget_categories"].present? %>
+  <% cats_with_spending = @budget["budget_categories"].select { |c| c["actual_spent"].to_f > 0 } %>
+  <% if cats_with_spending.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Spending by Category</h2></div>
+      <div class="chart-container" data-controller="chart"
+           data-chart-type-value="bar"
+           data-chart-labels-value="<%= cats_with_spending.map { |c| c["name"] }.to_json %>"
+           data-chart-data-value="<%= cats_with_spending.map { |c| c["actual_spent"] }.to_json %>"
+           data-chart-color-value="var(--primary)"
+           style="height: 250px; padding: 1rem;">
+        <canvas data-chart-target="canvas"></canvas>
+      </div>
+    </div>
+  <% end %>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+    <h2 style="margin: 0;">Categories</h2>
+    <div style="display: flex; gap: 0.5rem;">
+      <button onclick="document.getElementById('add-category-form').style.display = document.getElementById('add-category-form').style.display === 'none' ? 'block' : 'none'; return false;" class="btn btn-sm btn-primary">
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">add</span> Add Category
+      </button>
+      <%= link_to "Rollover", rollover_preview_budget_budget_path(@budget["id"]), class: "btn btn-sm" %>
+      <%= link_to "Copy Budget", "#", class: "btn btn-sm", id: "copy-budget-btn", onclick: "document.getElementById('copy-form').style.display = document.getElementById('copy-form').style.display === 'none' ? 'block' : 'none'; return false;" %>
+    </div>
+  </div>
+
+  <div id="add-category-form" class="card" style="display: none; margin-bottom: 1rem;">
+    <%= form_with url: budget_budget_budget_categories_path(@budget["id"]), method: :post, class: "filter-form" do |f| %>
+      <div class="filter-row">
+        <div class="form-group" style="flex: 2;">
+          <%= f.label "budget_category[name]", "Category Name" %>
+          <%= f.text_field "budget_category[name]", class: "form-control", placeholder: "e.g. Housing, Transportation" %>
+        </div>
+        <div class="form-group" style="flex: 1;">
+          <%= f.label "budget_category[planned_amount]", "Planned Amount" %>
+          <%= f.number_field "budget_category[planned_amount]", class: "form-control", step: "0.01", min: "0", placeholder: "0.00" %>
+        </div>
+        <div class="form-group form-actions-inline">
+          <%= f.submit "Add Category", class: "btn btn-primary" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <div id="copy-form" class="card" style="display: none; margin-bottom: 1rem;">
+    <%= form_with url: copy_budget_budget_path(@budget["id"]), method: :post, class: "filter-form" do |f| %>
+      <div class="filter-row">
+        <div class="form-group">
+          <%= f.label :target_month, "Copy to Month" %>
+          <%= f.select :target_month, (1..12).map { |m| [Date::MONTHNAMES[m], m] },
+              { selected: Date.current.next_month.month }, class: "form-control" %>
+        </div>
+        <div class="form-group">
+          <%= f.label :target_year, "Year" %>
+          <%= f.number_field :target_year, value: Date.current.next_month.year, class: "form-control" %>
+        </div>
+        <div class="form-group form-actions-inline">
+          <%= f.submit "Copy", class: "btn btn-primary" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <% @budget["budget_categories"].each do |cat| %>
+    <% cat_id = cat["id"] %>
+    <div class="card" style="margin-bottom: 1rem;">
+      <div class="card-header">
+        <h2><%= cat["name"] %></h2>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <span class="text-muted"><%= number_to_currency(cat["actual_spent"]) %> / <%= number_to_currency(cat["planned_amount"]) %></span>
+          <span class="badge <%= budget_progress_class(cat["percentage_used"]) %>"><%= cat["percentage_used"] %>%</span>
+          <button onclick="document.getElementById('edit-cat-<%= cat_id %>').style.display = document.getElementById('edit-cat-<%= cat_id %>').style.display === 'none' ? 'block' : 'none'; return false;"
+                  class="btn-icon" title="Edit category">
+            <span class="material-icons-outlined" style="font-size: 1rem;">edit</span>
+          </button>
+          <%= link_to budget_budget_budget_category_path(@budget["id"], cat_id),
+                data: { turbo_method: :delete, turbo_confirm: "Delete category '#{cat["name"]}'? This will remove all items in it." },
+                class: "btn-icon", title: "Delete category" do %>
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--negative);">delete</span>
+          <% end %>
+        </div>
+      </div>
+
+      <%# Inline edit category form %>
+      <div id="edit-cat-<%= cat_id %>" style="display: none; padding: 0.75rem 1.25rem; background: var(--bg); border-bottom: 1px solid var(--border);">
+        <%= form_with url: budget_budget_budget_category_path(@budget["id"], cat_id), method: :patch do |f| %>
+          <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+            <div style="flex: 2;">
+              <label style="font-size: 0.6875rem; color: var(--text-secondary);">Name</label>
+              <%= f.text_field "budget_category[name]", value: cat["name"], class: "form-control", style: "font-size: 0.8125rem;" %>
+            </div>
+            <div style="flex: 1;">
+              <label style="font-size: 0.6875rem; color: var(--text-secondary);">Planned</label>
+              <%= f.number_field "budget_category[planned_amount]", value: cat["planned_amount"], class: "form-control", step: "0.01", style: "font-size: 0.8125rem;" %>
+            </div>
+            <%= f.submit "Save", class: "btn btn-sm btn-primary" %>
+            <button type="button" onclick="document.getElementById('edit-cat-<%= cat_id %>').style.display='none'" class="btn btn-sm">Cancel</button>
+          </div>
+        <% end %>
+      </div>
+
+      <div class="budget-progress-bar" style="margin: 0 1.25rem;">
+        <div class="budget-progress-fill <%= budget_progress_class(cat["percentage_used"]) %>"
+             style="width: <%= [cat["percentage_used"].to_f, 100].min %>%"></div>
+      </div>
+
+      <% items = cat["budget_items"].is_a?(Array) ? cat["budget_items"] : [] %>
+      <% if items.any? %>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th style="text-align: right;">Planned</th>
+              <th style="text-align: right;">Spent</th>
+              <th style="text-align: right;">Remaining</th>
+              <th style="width: 80px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% items.each do |item| %>
+              <tr id="item-row-<%= item["id"] %>">
+                <td><%= item["name"] %></td>
+                <td style="text-align: right;"><%= number_to_currency(item["planned_amount"]) %></td>
+                <td style="text-align: right;"><%= number_to_currency(item["actual_spent"]) %></td>
+                <td style="text-align: right;" class="<%= item["remaining_amount"].to_f < 0 ? 'negative' : '' %>">
+                  <%= number_to_currency(item["remaining_amount"]) %>
+                </td>
+                <td style="text-align: right; white-space: nowrap;">
+                  <button onclick="document.getElementById('edit-item-<%= item["id"] %>').style.display = document.getElementById('edit-item-<%= item["id"] %>').style.display === 'none' ? 'table-row' : 'none'; return false;"
+                          class="btn-icon" title="Edit item" style="padding: 0.125rem;">
+                    <span class="material-icons-outlined" style="font-size: 0.875rem;">edit</span>
+                  </button>
+                  <%= link_to budget_budget_budget_category_budget_item_path(@budget["id"], cat_id, item["id"]),
+                        data: { turbo_method: :delete, turbo_confirm: "Delete '#{item["name"]}'?" },
+                        class: "btn-icon", title: "Delete item", style: "padding: 0.125rem;" do %>
+                    <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--negative);">delete</span>
+                  <% end %>
+                </td>
+              </tr>
+              <tr id="edit-item-<%= item["id"] %>" style="display: none;">
+                <td colspan="5" style="background: var(--bg);">
+                  <%= form_with url: budget_budget_budget_category_budget_item_path(@budget["id"], cat_id, item["id"]), method: :patch do |f| %>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                      <div style="flex: 2;">
+                        <%= f.text_field "budget_item[name]", value: item["name"], class: "form-control", style: "font-size: 0.8125rem;" %>
+                      </div>
+                      <div style="flex: 1;">
+                        <%= f.number_field "budget_item[planned_amount]", value: item["planned_amount"], class: "form-control", step: "0.01", style: "font-size: 0.8125rem;" %>
+                      </div>
+                      <%= f.submit "Save", class: "btn btn-sm btn-primary" %>
+                      <button type="button" onclick="document.getElementById('edit-item-<%= item["id"] %>').style.display='none'" class="btn btn-sm">Cancel</button>
+                    </div>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% end %>
+
+      <%# Add item form %>
+      <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border);">
+        <button onclick="document.getElementById('add-item-<%= cat_id %>').style.display = document.getElementById('add-item-<%= cat_id %>').style.display === 'none' ? 'block' : 'none'; return false;"
+                style="font-size: 0.8125rem; color: var(--primary); background: none; border: none; cursor: pointer; display: flex; align-items: center; gap: 0.25rem; padding: 0;">
+          <span class="material-icons-outlined" style="font-size: 1rem;">add_circle_outline</span> Add Item
+        </button>
+        <div id="add-item-<%= cat_id %>" style="display: none; margin-top: 0.5rem;">
+          <%= form_with url: budget_budget_budget_category_budget_items_path(@budget["id"], cat_id), method: :post do |f| %>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <div style="flex: 2;">
+                <%= f.text_field "budget_item[name]", class: "form-control", style: "font-size: 0.8125rem;", placeholder: "Item name" %>
+              </div>
+              <div style="flex: 1;">
+                <%= f.number_field "budget_item[planned_amount]", class: "form-control", step: "0.01", style: "font-size: 0.8125rem;", placeholder: "0.00" %>
+              </div>
+              <%= f.submit "Add", class: "btn btn-sm btn-primary" %>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+<% end %>
+
+<% if @budget["notes"].present? %>
+  <div class="card">
+    <div class="card-header"><h2>Notes</h2></div>
+    <div class="text-content"><%= simple_format(@budget["notes"]) %></div>
+  </div>
+<% end %>

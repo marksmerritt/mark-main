@@ -1,0 +1,343 @@
+<% content_for(:title) { "Symbol Comparison" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">compare</span>
+    Symbol Performance Comparison
+  </h1>
+</div>
+
+<%# Symbol Selector %>
+<div class="card" style="margin-bottom: 1.5rem; padding: 1.25rem;">
+  <%= form_tag symbol_comparison_path, method: :get do %>
+    <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">Select Symbols to Compare (up to 8)</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 0.375rem; margin-bottom: 0.75rem;">
+      <% @available_symbols.each do |sym| %>
+        <label style="cursor: pointer;">
+          <input type="checkbox" name="symbols[]" value="<%= sym %>" <%= @symbols.include?(sym) ? "checked" : "" %> style="display: none;">
+          <span class="preset-chip<%= @symbols.include?(sym) ? ' active' : '' %>"><%= sym %></span>
+        </label>
+      <% end %>
+    </div>
+    <button type="submit" class="btn btn-primary btn-sm">Compare</button>
+  <% end %>
+</div>
+
+<% if @symbol_data.any? %>
+  <%
+    colors = ["#4285f4", "#ea4335", "#34a853", "#fbbc04", "#9c27b0", "#00bcd4", "#ff5722", "#607d8b"]
+    sym_colors = @symbols.each_with_index.map { |s, i| [s, colors[i % colors.length]] }.to_h
+  %>
+
+  <%# Performance Summary Strip %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0;">
+      <% @symbol_data.each_with_index do |(sym, data), i| %>
+        <div style="padding: 1rem; text-align: center;<%= i < @symbol_data.count - 1 ? ' border-right: 1px solid var(--border);' : '' %>">
+          <div style="font-size: 0.875rem; font-weight: 700; color: <%= sym_colors[sym] %>;"><%= sym %></div>
+          <div style="font-size: 1.25rem; font-weight: 700; color: <%= data[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= data[:total_pnl] >= 0 ? '+' : '' %><%= number_to_currency(data[:total_pnl]) %>
+          </div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= data[:count] %> trades · <%= data[:win_rate] %>% WR</div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Side-by-Side Metrics Table %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">table_chart</span> Head-to-Head Metrics</h2>
+    </div>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.625rem 1rem;">Metric</th>
+            <% @symbol_data.each do |sym, _| %>
+              <th style="text-align: right; padding: 0.625rem 0.75rem; color: <%= sym_colors[sym] %>;"><%= sym %></th>
+            <% end %>
+          </tr>
+        </thead>
+        <tbody>
+          <%
+            metrics = [
+              { label: "Total P&L", key: :total_pnl, format: :currency, best: :max },
+              { label: "Avg P&L", key: :avg_pnl, format: :currency, best: :max },
+              { label: "Win Rate", key: :win_rate, format: :pct, best: :max },
+              { label: "Profit Factor", key: :profit_factor, format: :number, best: :max },
+              { label: "Trade Count", key: :count, format: :integer, best: :max },
+              { label: "Avg Return %", key: :avg_return, format: :pct, best: :max },
+              { label: "Best Trade", key: :best_trade, format: :currency, best: :max },
+              { label: "Worst Trade", key: :worst_trade, format: :currency, best: :max },
+              { label: "Avg Win", key: :avg_win, format: :currency, best: :max },
+              { label: "Avg Loss", key: :avg_loss, format: :currency, best: :max },
+              { label: "Win Streak", key: :max_win_streak, format: :integer, best: :max },
+              { label: "Loss Streak", key: :max_loss_streak, format: :integer, best: :min },
+              { label: "Long P&L", key: :long_pnl, format: :currency, best: :max },
+              { label: "Short P&L", key: :short_pnl, format: :currency, best: :max }
+            ]
+          %>
+          <% metrics.each do |m| %>
+            <%
+              values = @symbol_data.map { |_, d| d[m[:key]].to_f }
+              best_val = m[:best] == :max ? values.max : values.min
+            %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem 1rem; color: var(--text-secondary);"><%= m[:label] %></td>
+              <% @symbol_data.each do |_, data| %>
+                <%
+                  val = data[m[:key]].to_f
+                  is_best = val == best_val && @symbol_data.count > 1
+                  formatted = case m[:format]
+                              when :currency then number_to_currency(val)
+                              when :pct then "#{val}%"
+                              when :number then val.to_s
+                              when :integer then val.to_i.to_s
+                              end
+                %>
+                <td style="text-align: right; padding: 0.5rem 0.75rem; font-weight: <%= is_best ? '700' : '400' %>;<%= is_best ? ' background: rgba(52, 168, 83, 0.08);' : '' %>">
+                  <% if m[:format] == :currency %>
+                    <span style="color: <%= val >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= formatted %></span>
+                  <% else %>
+                    <%= formatted %>
+                  <% end %>
+                  <% if is_best %><span style="font-size: 0.5rem; color: var(--positive); margin-left: 2px;">&#9733;</span><% end %>
+                </td>
+              <% end %>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# P&L Bar Chart %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">bar_chart</span> Total P&L Comparison</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <%
+        pnl_max = @symbol_data.values.map { |d| d[:total_pnl].abs }.max.to_f
+        pnl_max = 1 if pnl_max == 0
+      %>
+      <% @ranked_by_pnl.each do |sym, data| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+          <span style="width: 3rem; font-weight: 700; text-align: right; color: <%= sym_colors[sym] %>;"><%= sym %></span>
+          <div style="flex: 1; height: 1.5rem; position: relative;">
+            <% bar_width = (data[:total_pnl].abs / pnl_max * 100).round(1) %>
+            <% if data[:total_pnl] >= 0 %>
+              <div style="position: absolute; left: 50%; height: 100%; width: <%= bar_width / 2 %>%; background: var(--positive); opacity: 0.6; border-radius: 0 4px 4px 0;"></div>
+            <% else %>
+              <div style="position: absolute; right: 50%; height: 100%; width: <%= bar_width / 2 %>%; background: var(--negative); opacity: 0.6; border-radius: 4px 0 0 4px;"></div>
+            <% end %>
+            <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: var(--border);"></div>
+          </div>
+          <span style="min-width: 5rem; text-align: right; font-size: 0.8125rem; font-weight: 600; color: <%= data[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= data[:total_pnl] >= 0 ? '+' : '' %><%= number_to_currency(data[:total_pnl]) %>
+          </span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Equity Curves %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Equity Curves</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        all_curves = @symbol_data.values.map { |d| d[:equity_curve] }
+        ec_max = all_curves.flatten.max.to_f
+        ec_min = all_curves.flatten.min.to_f
+        ec_range = [(ec_max - ec_min).abs, 1].max
+        max_points = all_curves.map(&:length).max || 1
+        chart_w = 650
+        chart_h = 250
+      %>
+      <svg viewBox="0 0 <%= chart_w + 70 %> <%= chart_h + 30 %>" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <%# Zero line %>
+        <% zero_y = chart_h - (0 - ec_min) / ec_range * (chart_h - 20) %>
+        <line x1="55" y1="<%= zero_y %>" x2="<%= chart_w + 60 %>" y2="<%= zero_y %>" stroke="var(--border)" stroke-width="1" stroke-dasharray="4"/>
+        <text x="50" y="<%= zero_y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="7">$0</text>
+
+        <%# Grid %>
+        <% 4.times do |i| %>
+          <% val = ec_min + ec_range * (i + 1) / 4.0 %>
+          <% y = chart_h - (val - ec_min) / ec_range * (chart_h - 20) %>
+          <line x1="55" y1="<%= y %>" x2="<%= chart_w + 60 %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5"/>
+          <text x="50" y="<%= y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="7"><%= val >= 1000 || val <= -1000 ? "$#{(val/1000).round(1)}k" : "$#{val.round(0)}" %></text>
+        <% end %>
+
+        <%# Curves %>
+        <% @symbol_data.each do |sym, data| %>
+          <% next if data[:equity_curve].empty? %>
+          <%
+            x_scale = (chart_w - 10).to_f / [max_points - 1, 1].max
+            points = data[:equity_curve].each_with_index.map { |val, i|
+              x = 60 + i * x_scale
+              y = chart_h - (val - ec_min) / ec_range * (chart_h - 20)
+              "#{x.round(1)},#{y.round(1)}"
+            }.join(" ")
+          %>
+          <polyline points="<%= points %>" fill="none" stroke="<%= sym_colors[sym] %>" stroke-width="2"/>
+          <% last_val = data[:equity_curve].last %>
+          <% last_x = 60 + (data[:equity_curve].length - 1) * x_scale %>
+          <% last_y = chart_h - (last_val - ec_min) / ec_range * (chart_h - 20) %>
+          <circle cx="<%= last_x.round(1) %>" cy="<%= last_y.round(1) %>" r="3" fill="<%= sym_colors[sym] %>"/>
+        <% end %>
+
+        <%# Legend %>
+        <% @symbol_data.each_with_index do |(sym, _), i| %>
+          <line x1="<%= 60 + i * 80 %>" y1="<%= chart_h + 22 %>" x2="<%= 60 + i * 80 + 15 %>" y2="<%= chart_h + 22 %>"
+                stroke="<%= sym_colors[sym] %>" stroke-width="2"/>
+          <text x="<%= 60 + i * 80 + 20 %>" y="<%= chart_h + 25 %>" fill="var(--text-secondary)" font-size="8"><%= sym %></text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+
+  <%# Win Rate Comparison %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">pie_chart</span> Win Rate & Trade Volume</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @symbol_data.each do |sym, data| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+          <span style="width: 3rem; font-weight: 700; text-align: right; color: <%= sym_colors[sym] %>;"><%= sym %></span>
+          <div style="flex: 1; height: 1.25rem; background: var(--bg); border-radius: 4px; overflow: hidden; display: flex;">
+            <div style="width: <%= data[:win_rate] %>%; background: var(--positive); opacity: 0.6;"></div>
+            <div style="width: <%= 100 - data[:win_rate] %>%; background: var(--negative); opacity: 0.3;"></div>
+          </div>
+          <span style="min-width: 6rem; text-align: right; font-size: 0.8125rem;">
+            <span style="font-weight: 600;"><%= data[:win_rate] %>%</span>
+            <span style="color: var(--text-secondary); font-size: 0.6875rem;">(<%= data[:wins] %>W/<%= data[:losses] %>L)</span>
+          </span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Side Breakdown %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">swap_vert</span> Long vs Short Performance</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="text-align: left; padding: 0.5rem;">Symbol</th>
+            <th style="text-align: center; padding: 0.5rem;">Long Trades</th>
+            <th style="text-align: right; padding: 0.5rem;">Long P&L</th>
+            <th style="text-align: center; padding: 0.5rem;">Short Trades</th>
+            <th style="text-align: right; padding: 0.5rem;">Short P&L</th>
+            <th style="text-align: center; padding: 0.5rem;">Better Side</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @symbol_data.each do |sym, data| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.5rem; font-weight: 700; color: <%= sym_colors[sym] %>;"><%= sym %></td>
+              <td style="text-align: center; padding: 0.5rem;"><%= data[:long_count] %></td>
+              <td style="text-align: right; padding: 0.5rem; color: <%= data[:long_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(data[:long_pnl]) %></td>
+              <td style="text-align: center; padding: 0.5rem;"><%= data[:short_count] %></td>
+              <td style="text-align: right; padding: 0.5rem; color: <%= data[:short_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(data[:short_pnl]) %></td>
+              <td style="text-align: center; padding: 0.5rem; font-weight: 600;">
+                <% if data[:long_count] == 0 && data[:short_count] == 0 %>—
+                <% elsif data[:long_pnl] > data[:short_pnl] %>
+                  <span style="color: var(--positive);">Long</span>
+                <% elsif data[:short_pnl] > data[:long_pnl] %>
+                  <span style="color: var(--primary);">Short</span>
+                <% else %>Even<% end %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <%# Verdict %>
+  <% if @symbol_data.count >= 2 %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">insights</span> Key Insights</h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% if @best_symbol %>
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1rem;">
+            <span class="material-icons-outlined" style="color: var(--positive);">emoji_events</span>
+            <div style="font-size: 0.875rem;">
+              <strong style="color: <%= sym_colors[@best_symbol[0]] %>;"><%= @best_symbol[0] %></strong> is your most profitable symbol with
+              <strong style="color: var(--positive);"><%= number_to_currency(@best_symbol[1][:total_pnl]) %></strong> total P&L
+              across <%= @best_symbol[1][:count] %> trades.
+            </div>
+          </div>
+        <% end %>
+
+        <% if @worst_symbol && @worst_symbol[1][:total_pnl] < 0 %>
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1rem;">
+            <span class="material-icons-outlined" style="color: var(--negative);">warning</span>
+            <div style="font-size: 0.875rem;">
+              <strong style="color: <%= sym_colors[@worst_symbol[0]] %>;"><%= @worst_symbol[0] %></strong> is your least profitable with
+              <strong style="color: var(--negative);"><%= number_to_currency(@worst_symbol[1][:total_pnl]) %></strong>.
+              Consider reducing position sizes or reviewing your edge here.
+            </div>
+          </div>
+        <% end %>
+
+        <% highest_wr = @ranked_by_win_rate.first %>
+        <% if highest_wr && highest_wr[1][:win_rate] > 0 %>
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem; margin-bottom: 1rem;">
+            <span class="material-icons-outlined" style="color: var(--primary);">target</span>
+            <div style="font-size: 0.875rem;">
+              Highest win rate: <strong style="color: <%= sym_colors[highest_wr[0]] %>;"><%= highest_wr[0] %></strong> at <strong><%= highest_wr[1][:win_rate] %>%</strong>
+              (<%= highest_wr[1][:wins] %>/<%= highest_wr[1][:count] %> trades).
+            </div>
+          </div>
+        <% end %>
+
+        <% most_traded = @ranked_by_count.first %>
+        <% if most_traded %>
+          <div style="display: flex; align-items: flex-start; gap: 0.75rem;">
+            <span class="material-icons-outlined" style="color: var(--text-secondary);">repeat</span>
+            <div style="font-size: 0.875rem;">
+              Most traded: <strong style="color: <%= sym_colors[most_traded[0]] %>;"><%= most_traded[0] %></strong> with
+              <strong><%= most_traded[1][:count] %></strong> trades.
+              <% if most_traded[1][:profit_factor] > 0 %>
+                Profit factor: <strong><%= most_traded[1][:profit_factor] %></strong>.
+              <% end %>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem;">compare</span>
+    <div style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.5rem;">Select symbols to compare</div>
+    <div style="font-size: 0.875rem;">Choose 2-8 symbols from the list above to see a side-by-side performance comparison.</div>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "By Symbol Report", reports_by_symbol_path, class: "btn" %>
+  <%= link_to "Trade Comparison", comparison_path, class: "btn" %>
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+</div>
+
+<style>
+  .preset-chip { display: inline-block; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; }
+  .preset-chip:hover { border-color: var(--primary); }
+  input:checked + .preset-chip, .preset-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>

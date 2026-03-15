@@ -1,0 +1,181 @@
+<% content_for(:title) { "Market Session Timer" } %>
+
+<div data-controller="market-session">
+  <div class="page-header">
+    <h1>
+      <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">schedule</span>
+      Market Session Timer
+    </h1>
+    <div class="page-actions">
+      <%= link_to "Pre-Market", pre_market_path, class: "btn" %>
+      <%= link_to "Dashboard", root_path, class: "btn" %>
+    </div>
+  </div>
+
+  <%# Live Clock & Market Status Banner %>
+  <div class="card" style="margin-bottom: 1.5rem; overflow: hidden;">
+    <div style="display: flex; flex-wrap: wrap; align-items: center;">
+      <%# Clock Section %>
+      <div style="flex: 1; min-width: 240px; padding: 2rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">
+          Eastern Time (ET)
+        </div>
+        <div data-market-session-target="clock" style="font-size: 3rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.02em;">
+          --:--:--
+        </div>
+        <div data-market-session-target="date" style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+          ---
+        </div>
+      </div>
+
+      <%# Status Section %>
+      <div data-market-session-target="status" style="flex: 1; min-width: 240px; padding: 2rem; text-align: center; border-left: 1px solid var(--border); background: var(--surface);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem;">
+          US Regular Session
+        </div>
+        <div data-market-session-target="statusLabel" style="font-size: 1.5rem; font-weight: 700;">
+          Loading...
+        </div>
+        <div data-market-session-target="statusDetail" style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.375rem;">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# 24-Hour Timeline %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">timeline</span> 24-Hour Timeline (ET)</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div data-market-session-target="timeline" style="position: relative; height: 120px;">
+        <%# Hour labels %>
+        <div style="display: flex; justify-content: space-between; font-size: 0.5625rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+          <% (0..23).each do |h| %>
+            <% if h % 3 == 0 %>
+              <span style="width: 0; text-align: center;"><%= h == 0 ? '12a' : h < 12 ? "#{h}a" : h == 12 ? '12p' : "#{h-12}p" %></span>
+            <% end %>
+          <% end %>
+        </div>
+
+        <%# Session bars %>
+        <div style="position: relative; height: 80px; background: var(--border); border-radius: 6px; overflow: visible;">
+          <% @sessions.each_with_index do |session, i| %>
+            <%
+              open_pct = (session[:open_hour] * 60 + session[:open_min]) / 1440.0 * 100
+              if session[:crosses_midnight]
+                close_pct = (session[:close_hour] * 60 + session[:close_min]) / 1440.0 * 100
+                width_pct = (100 - open_pct) + close_pct
+              else
+                close_pct = (session[:close_hour] * 60 + session[:close_min]) / 1440.0 * 100
+                width_pct = close_pct - open_pct
+              end
+              top_offset = i * 13
+            %>
+            <% if session[:crosses_midnight] %>
+              <%# First segment: open to midnight %>
+              <div style="position: absolute; left: <%= open_pct %>%; width: <%= 100 - open_pct %>%; top: <%= top_offset %>px; height: 11px; background: <%= session[:color] %>; opacity: 0.6; border-radius: 2px;" title="<%= session[:name] %>"></div>
+              <%# Second segment: midnight to close %>
+              <div style="position: absolute; left: 0; width: <%= close_pct %>%; top: <%= top_offset %>px; height: 11px; background: <%= session[:color] %>; opacity: 0.6; border-radius: 2px;" title="<%= session[:name] %>"></div>
+            <% else %>
+              <div style="position: absolute; left: <%= open_pct %>%; width: <%= width_pct %>%; top: <%= top_offset %>px; height: 11px; background: <%= session[:color] %>; opacity: 0.6; border-radius: 2px;" title="<%= session[:name] %>"></div>
+            <% end %>
+          <% end %>
+
+          <%# Current time marker - updated by Stimulus %>
+          <div data-market-session-target="timeMarker" style="position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text); z-index: 10; transition: left 1s linear;">
+            <div style="position: absolute; top: -8px; left: -4px; width: 10px; height: 10px; background: var(--text); border-radius: 50%;"></div>
+          </div>
+        </div>
+
+        <%# Legend %>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 0.5rem; font-size: 0.6875rem;">
+          <% @sessions.each do |session| %>
+            <div style="display: flex; align-items: center; gap: 0.25rem;">
+              <span style="display: inline-block; width: 10px; height: 10px; background: <%= session[:color] %>; border-radius: 2px; opacity: 0.6;"></span>
+              <span style="color: var(--text-secondary);"><%= session[:flag] %> <%= session[:name] %></span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# Session Cards Grid %>
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <% @sessions.each_with_index do |session, i| %>
+      <div class="card" data-market-session-target="session" data-session-index="<%= i %>"
+           data-open-hour="<%= session[:open_hour] %>" data-open-min="<%= session[:open_min] %>"
+           data-close-hour="<%= session[:close_hour] %>" data-close-min="<%= session[:close_min] %>"
+           data-crosses-midnight="<%= session[:crosses_midnight] %>"
+           style="border-left: 4px solid <%= session[:color] %>; transition: box-shadow 0.3s;">
+        <div style="padding: 1.25rem;">
+          <%# Header row %>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <div>
+              <span style="font-size: 1.25rem; margin-right: 0.25rem;"><%= session[:flag] %></span>
+              <span style="font-size: 1rem; font-weight: 600;"><%= session[:name] %></span>
+            </div>
+            <div data-market-session-target="sessionStatus" data-status-index="<%= i %>" style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem; font-weight: 600;">
+              <span style="width: 8px; height: 8px; border-radius: 50%; background: var(--text-secondary);"></span>
+              <span>Loading...</span>
+            </div>
+          </div>
+
+          <%# Hours %>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">schedule</span>
+            <%
+              open_h = session[:open_hour]
+              open_m = session[:open_min]
+              close_h = session[:close_hour]
+              close_m = session[:close_min]
+              open_ampm = open_h >= 12 ? 'PM' : 'AM'
+              close_ampm = close_h >= 12 ? 'PM' : 'AM'
+              open_display = "#{ open_h == 0 ? 12 : (open_h > 12 ? open_h - 12 : open_h) }:#{ '%02d' % open_m } #{open_ampm}"
+              close_display = "#{ close_h == 0 ? 12 : (close_h > 12 ? close_h - 12 : close_h) }:#{ '%02d' % close_m } #{close_ampm}"
+            %>
+            <%= open_display %> &ndash; <%= close_display %> ET
+            <% if session[:crosses_midnight] %>
+              <span style="font-size: 0.6875rem; opacity: 0.7;">(next day)</span>
+            <% end %>
+          </div>
+
+          <%# Countdown %>
+          <div data-market-session-target="countdown" data-countdown-index="<%= i %>" style="font-size: 0.9375rem; font-weight: 600; font-variant-numeric: tabular-nums; margin-bottom: 0.75rem;">
+            &mdash;
+          </div>
+
+          <%# Progress bar %>
+          <div style="height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;">
+            <div data-market-session-target="progress" data-progress-index="<%= i %>" style="width: 0%; height: 100%; background: <%= session[:color] %>; border-radius: 3px; transition: width 1s linear;"></div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Key Times Today %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #f57c00;">event_note</span> Key Times Today</h2>
+    </div>
+    <div style="padding: 0;">
+      <% @key_times.each_with_index do |kt, i| %>
+        <div data-market-session-target="keyTime" style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border); font-size: 0.8125rem;<%= ' border-bottom: none;' if i == @key_times.length - 1 %>">
+          <span class="material-icons-outlined" style="font-size: 1.125rem; color: var(--text-secondary);"><%= kt[:icon] %></span>
+          <span style="font-weight: 600; font-variant-numeric: tabular-nums; min-width: 100px;"><%= kt[:time] %></span>
+          <span style="color: var(--text-secondary); flex: 1;"><%= kt[:label] %></span>
+          <span data-market-session-target="keyTimeStatus" style="font-size: 0.6875rem; font-weight: 600;"></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Quick Links %>
+  <div style="text-align: center; margin-top: 1.5rem;">
+    <%= link_to "Pre-Market", pre_market_path, class: "btn" %>
+    <%= link_to "Dashboard", root_path, class: "btn" %>
+    <%= link_to "Risk Dashboard", risk_dashboard_path, class: "btn" %>
+  </div>
+</div>

@@ -1,0 +1,405 @@
+<% content_for(:title) { "Financial Calendar" } %>
+
+<%
+  prev_month = @start_date - 1.month
+  next_month = @start_date + 1.month
+  today = Date.current
+  today_in_month = today.month == @month && today.year == @year
+%>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="vertical-align: middle; margin-right: 0.25rem;">calendar_month</span>
+    Financial Calendar
+  </h1>
+  <div class="page-actions">
+    <% unless @month == today.month && @year == today.year %>
+      <%= link_to budget_financial_calendar_path, class: "btn btn-sm" do %>
+        <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">today</span> Today
+      <% end %>
+    <% end %>
+    <%= link_to "Calendar", budget_calendar_path(month: @month, year: @year), class: "btn btn-sm" %>
+    <%= link_to "Dashboard", budget_dashboard_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<%# ---- Summary Strip ---- %>
+<div class="card" style="margin-bottom: 1.25rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0;">
+    <div style="padding: 1rem 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: middle; color: var(--positive, #22c55e);">arrow_downward</span>
+        Income
+      </div>
+      <div style="font-size: 1.375rem; font-weight: 700; color: var(--positive, #22c55e); margin-top: 0.25rem;">
+        <%= number_to_currency(@monthly_summary[:total_income]) %>
+      </div>
+    </div>
+    <div style="padding: 1rem 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: middle; color: var(--negative, #ef4444);">arrow_upward</span>
+        Expenses
+      </div>
+      <div style="font-size: 1.375rem; font-weight: 700; color: var(--negative, #ef4444); margin-top: 0.25rem;">
+        <%= number_to_currency(@monthly_summary[:total_expenses]) %>
+      </div>
+    </div>
+    <div style="padding: 1rem 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: middle; color: var(--primary, #6366f1);">receipt_long</span>
+        Scheduled Bills
+      </div>
+      <div style="font-size: 1.375rem; font-weight: 700; color: var(--primary, #6366f1); margin-top: 0.25rem;">
+        <%= number_to_currency(@monthly_summary[:total_bills]) %>
+      </div>
+    </div>
+    <div style="padding: 1rem 1.25rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: middle;">account_balance</span>
+        Net
+      </div>
+      <div style="font-size: 1.375rem; font-weight: 700; margin-top: 0.25rem; color: <%= @monthly_summary[:net] >= 0 ? 'var(--positive, #22c55e)' : 'var(--negative, #ef4444)' %>;">
+        <%= number_to_currency(@monthly_summary[:net]) %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# ---- Month Navigation + Legend ---- %>
+<div class="card" style="margin-bottom: 1.25rem;">
+  <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+    <%= link_to budget_financial_calendar_path(month: prev_month.month, year: prev_month.year), class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 1.25rem;">chevron_left</span>
+    <% end %>
+    <h2 style="margin: 0; font-size: 1.25rem;"><%= @start_date.strftime("%B %Y") %></h2>
+    <%= link_to budget_financial_calendar_path(month: next_month.month, year: next_month.year), class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 1.25rem;">chevron_right</span>
+    <% end %>
+  </div>
+
+  <%# Legend %>
+  <div style="padding: 0.5rem 1.25rem; display: flex; gap: 1.25rem; flex-wrap: wrap; font-size: 0.8rem; border-bottom: 1px solid var(--border);">
+    <span style="display: inline-flex; align-items: center; gap: 0.25rem;">
+      <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--positive, #22c55e); display: inline-block;"></span> Income
+    </span>
+    <span style="display: inline-flex; align-items: center; gap: 0.25rem;">
+      <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--negative, #ef4444); display: inline-block;"></span> Expense
+    </span>
+    <span style="display: inline-flex; align-items: center; gap: 0.25rem;">
+      <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--primary, #6366f1); display: inline-block;"></span> Bill
+    </span>
+    <span style="display: inline-flex; align-items: center; gap: 0.25rem;">
+      <span style="width: 10px; height: 10px; border-radius: 50%; background: var(--purple, #a855f7); display: inline-block;"></span> Goal
+    </span>
+  </div>
+
+  <%# ---- Calendar Grid ---- %>
+  <div style="padding: 0;">
+    <%# Day-of-week headers %>
+    <div style="display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid var(--border);">
+      <% %w[Sun Mon Tue Wed Thu Fri Sat].each do |day_name| %>
+        <div style="padding: 0.5rem; text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">
+          <%= day_name %>
+        </div>
+      <% end %>
+    </div>
+
+    <%# Calendar cells %>
+    <div style="display: grid; grid-template-columns: repeat(7, 1fr);">
+      <%# Empty cells before first day %>
+      <% @start_date.wday.times do %>
+        <div style="min-height: 100px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); background: var(--bg);"></div>
+      <% end %>
+
+      <% (@start_date..@end_date).each do |date| %>
+        <%
+          day = date.day
+          events = @calendar_data[day] || []
+          is_today = date == today
+          is_past = date < today
+
+          # Calculate day's net for tinting
+          day_income = events.select { |e| e[:type] == "income" }.sum { |e| e[:amount] }
+          day_outflow = events.select { |e| e[:type] != "income" }.sum { |e| e[:amount] }
+          day_net = day_income - day_outflow
+          has_events = events.any?
+
+          # Background tinting
+          if has_events && day_net > 0
+            cell_bg = "rgba(34, 197, 94, 0.04)"
+          elsif has_events && day_net < 0
+            cell_bg = "rgba(239, 68, 68, 0.04)"
+          else
+            cell_bg = is_past ? "var(--bg)" : "transparent"
+          end
+        %>
+        <div class="fc-day-cell"
+             style="min-height: 100px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); padding: 0.375rem; background: <%= cell_bg %>; position: relative; <%= is_today ? 'box-shadow: inset 0 0 0 2px var(--primary, #6366f1);' : '' %> <%= is_past && !is_today ? 'opacity: 0.7;' : '' %>"
+             <% if events.any? %>data-has-events="true"<% end %>>
+
+          <%# Date number %>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.25rem;">
+            <span style="font-size: 0.8125rem; font-weight: <%= is_today ? '700' : '500' %>; color: <%= is_today ? 'var(--primary, #6366f1)' : 'var(--text)' %>; <%= is_today ? 'background: var(--primary, #6366f1); color: #fff; width: 1.5rem; height: 1.5rem; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;' : '' %>">
+              <%= day %>
+            </span>
+            <% if has_events %>
+              <span style="font-size: 0.625rem; font-weight: 600; color: <%= day_net >= 0 ? 'var(--positive, #22c55e)' : 'var(--negative, #ef4444)' %>;">
+                <%= day_net >= 0 ? '+' : '' %><%= number_to_currency(day_net, precision: 0) %>
+              </span>
+            <% end %>
+          </div>
+
+          <%# Event dots / pills %>
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            <% events.first(3).each do |evt| %>
+              <div class="fc-event-pill"
+                   style="display: flex; align-items: center; gap: 3px; padding: 1px 4px; border-radius: 3px; background: color-mix(in srgb, <%= evt[:color] %> 12%, transparent); cursor: pointer; position: relative;"
+                   title="<%= evt[:name] %> - <%= number_to_currency(evt[:amount]) %> (<%= evt[:type].capitalize %>)">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: <%= evt[:color] %>; flex-shrink: 0;"></span>
+                <span style="font-size: 0.625rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; color: var(--text);">
+                  <%= evt[:name].truncate(12) %>
+                </span>
+              </div>
+            <% end %>
+            <% if events.size > 3 %>
+              <div style="font-size: 0.5625rem; color: var(--text-secondary); padding-left: 4px; font-weight: 500;">
+                +<%= events.size - 3 %> more
+              </div>
+            <% end %>
+          </div>
+
+          <%# Hidden detail popover (shown on click via JS) %>
+          <% if events.any? %>
+            <div class="fc-day-detail" style="display: none; position: absolute; top: 100%; left: 0; z-index: 100; background: var(--surface, #fff); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); padding: 0.75rem; min-width: 220px; max-width: 280px;">
+              <div style="font-weight: 600; font-size: 0.8125rem; margin-bottom: 0.5rem; padding-bottom: 0.375rem; border-bottom: 1px solid var(--border);">
+                <%= date.strftime("%A, %b %d") %>
+                <% if is_today %><span style="background: var(--primary, #6366f1); color: #fff; font-size: 0.5625rem; padding: 1px 5px; border-radius: 3px; margin-left: 0.25rem; font-weight: 600;">TODAY</span><% end %>
+              </div>
+              <% events.each do |evt| %>
+                <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0;">
+                  <span style="width: 8px; height: 8px; border-radius: 50%; background: <%= evt[:color] %>; flex-shrink: 0;"></span>
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: 0.75rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><%= evt[:name] %></div>
+                    <div style="font-size: 0.625rem; color: var(--text-secondary);"><%= evt[:type].capitalize %></div>
+                  </div>
+                  <span style="font-size: 0.75rem; font-weight: 600; color: <%= evt[:type] == 'income' ? 'var(--positive, #22c55e)' : 'var(--text)' %>; white-space: nowrap;">
+                    <%= number_to_currency(evt[:amount]) %>
+                  </span>
+                </div>
+              <% end %>
+              <div style="margin-top: 0.375rem; padding-top: 0.375rem; border-top: 1px solid var(--border); display: flex; justify-content: space-between; font-size: 0.6875rem; font-weight: 600;">
+                <span>Net</span>
+                <span style="color: <%= day_net >= 0 ? 'var(--positive, #22c55e)' : 'var(--negative, #ef4444)' %>;">
+                  <%= number_to_currency(day_net) %>
+                </span>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <%# Empty cells after last day %>
+      <% remaining = (7 - (@end_date.wday + 1) % 7) % 7 %>
+      <% remaining.times do %>
+        <div style="min-height: 100px; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); background: var(--bg);"></div>
+      <% end %>
+    </div>
+  </div>
+</div>
+
+<%# ---- Upcoming 7 Days Section ---- %>
+<%
+  upcoming_start = [today, @start_date].max
+  upcoming_end = [upcoming_start + 6.days, @end_date].min
+  upcoming_events = []
+  if upcoming_start <= @end_date
+    (upcoming_start..upcoming_end).each do |date|
+      day_events = @calendar_data[date.day] || []
+      day_events.each do |evt|
+        upcoming_events << evt.merge(date: date)
+      end
+    end
+  end
+  upcoming_by_date = upcoming_events.group_by { |e| e[:date] }.sort_by { |d, _| d }
+%>
+
+<% if upcoming_by_date.any? %>
+  <div class="card" style="margin-bottom: 1.25rem;">
+    <div class="card-header">
+      <h2 style="margin: 0;">
+        <span class="material-icons-outlined" style="vertical-align: middle; margin-right: 0.25rem; font-size: 1.25rem;">upcoming</span>
+        Next 7 Days
+      </h2>
+      <span style="font-size: 0.8125rem; color: var(--text-secondary);"><%= upcoming_events.size %> events</span>
+    </div>
+    <% upcoming_by_date.each do |date, day_events| %>
+      <div style="border-bottom: 1px solid var(--border);">
+        <%
+          day_total_in = day_events.select { |e| e[:type] == "income" }.sum { |e| e[:amount] }
+          day_total_out = day_events.select { |e| e[:type] != "income" }.sum { |e| e[:amount] }
+          day_net_val = day_total_in - day_total_out
+        %>
+        <div style="padding: 0.5rem 1.25rem; background: var(--bg); font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: center;">
+          <span>
+            <%= date.strftime("%A, %b %d") %>
+            <% if date == today %>
+              <span style="background: var(--primary, #6366f1); color: #fff; font-size: 0.5625rem; padding: 1px 6px; border-radius: 3px; margin-left: 0.375rem; font-weight: 600; vertical-align: middle;">TODAY</span>
+            <% end %>
+          </span>
+          <span style="font-weight: 600; color: <%= day_net_val >= 0 ? 'var(--positive, #22c55e)' : 'var(--negative, #ef4444)' %>;">
+            <%= day_net_val >= 0 ? '+' : '' %><%= number_to_currency(day_net_val) %>
+          </span>
+        </div>
+        <% day_events.each do |evt| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 1.25rem;">
+            <span style="width: 10px; height: 10px; border-radius: 50%; background: <%= evt[:color] %>; flex-shrink: 0;"></span>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 0.8125rem; font-weight: 500;"><%= evt[:name] %></div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= evt[:type].capitalize %></div>
+            </div>
+            <span style="font-size: 0.875rem; font-weight: 600; color: <%= evt[:type] == 'income' ? 'var(--positive, #22c55e)' : 'var(--text)' %>;">
+              <%= number_to_currency(evt[:amount]) %>
+            </span>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# ---- Cash Flow Bar ---- %>
+<% if @monthly_summary[:total_income] > 0 || @monthly_summary[:total_expenses] > 0 %>
+  <%
+    flow_total = @monthly_summary[:total_income] + @monthly_summary[:total_expenses] + @monthly_summary[:total_bills]
+    flow_max = [@monthly_summary[:total_income], @monthly_summary[:total_expenses] + @monthly_summary[:total_bills]].max
+    flow_max = 1 if flow_max == 0
+    income_pct = (@monthly_summary[:total_income] / flow_max * 100).round(1)
+    outflow_pct = ((@monthly_summary[:total_expenses] + @monthly_summary[:total_bills]) / flow_max * 100).round(1)
+    savings_rate = @monthly_summary[:total_income] > 0 ? ((@monthly_summary[:net]) / @monthly_summary[:total_income] * 100).round(0) : 0
+  %>
+  <div class="card">
+    <div class="card-header">
+      <h2 style="margin: 0;">
+        <span class="material-icons-outlined" style="vertical-align: middle; margin-right: 0.25rem; font-size: 1.25rem;">bar_chart</span>
+        Cash Flow Breakdown
+      </h2>
+      <% if @monthly_summary[:total_income] > 0 %>
+        <span style="font-size: 0.8125rem; font-weight: 600; color: <%= savings_rate >= 0 ? 'var(--positive, #22c55e)' : 'var(--negative, #ef4444)' %>;">
+          <%= savings_rate %>% savings rate
+        </span>
+      <% end %>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <div style="margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.375rem;">
+          <span style="color: var(--text-secondary); font-weight: 500;">Income</span>
+          <span style="font-weight: 600; color: var(--positive, #22c55e);"><%= number_to_currency(@monthly_summary[:total_income]) %></span>
+        </div>
+        <div style="height: 0.625rem; background: var(--bg); border-radius: 6px; overflow: hidden;">
+          <div style="height: 100%; width: <%= income_pct %>%; background: var(--positive, #22c55e); opacity: 0.7; border-radius: 6px; transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+      <div style="margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.375rem;">
+          <span style="color: var(--text-secondary); font-weight: 500;">Expenses</span>
+          <span style="font-weight: 600; color: var(--negative, #ef4444);"><%= number_to_currency(@monthly_summary[:total_expenses]) %></span>
+        </div>
+        <div style="height: 0.625rem; background: var(--bg); border-radius: 6px; overflow: hidden;">
+          <div style="height: 100%; width: <%= (@monthly_summary[:total_expenses] / flow_max * 100).round(1) %>%; background: var(--negative, #ef4444); opacity: 0.7; border-radius: 6px; transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+      <div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; margin-bottom: 0.375rem;">
+          <span style="color: var(--text-secondary); font-weight: 500;">Scheduled Bills</span>
+          <span style="font-weight: 600; color: var(--primary, #6366f1);"><%= number_to_currency(@monthly_summary[:total_bills]) %></span>
+        </div>
+        <div style="height: 0.625rem; background: var(--bg); border-radius: 6px; overflow: hidden;">
+          <div style="height: 100%; width: <%= (@monthly_summary[:total_bills] / flow_max * 100).round(1) %>%; background: var(--primary, #6366f1); opacity: 0.7; border-radius: 6px; transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# ---- JavaScript for day cell popovers ---- %>
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    var openDetail = null;
+
+    document.querySelectorAll(".fc-day-cell").forEach(function(cell) {
+      var detail = cell.querySelector(".fc-day-detail");
+      if (!detail) return;
+
+      cell.addEventListener("click", function(e) {
+        e.stopPropagation();
+        if (openDetail && openDetail !== detail) {
+          openDetail.style.display = "none";
+        }
+        if (detail.style.display === "none") {
+          // Position the popover smartly
+          var rect = cell.getBoundingClientRect();
+          var viewportWidth = window.innerWidth;
+          var viewportHeight = window.innerHeight;
+
+          detail.style.display = "block";
+          detail.style.left = "0";
+          detail.style.right = "auto";
+          detail.style.top = "100%";
+          detail.style.bottom = "auto";
+
+          // Check if popover goes off right edge
+          var detailRect = detail.getBoundingClientRect();
+          if (detailRect.right > viewportWidth - 16) {
+            detail.style.left = "auto";
+            detail.style.right = "0";
+          }
+          // Check if popover goes off bottom edge
+          if (detailRect.bottom > viewportHeight - 16) {
+            detail.style.top = "auto";
+            detail.style.bottom = "100%";
+          }
+
+          openDetail = detail;
+        } else {
+          detail.style.display = "none";
+          openDetail = null;
+        }
+      });
+    });
+
+    // Close popover when clicking outside
+    document.addEventListener("click", function() {
+      if (openDetail) {
+        openDetail.style.display = "none";
+        openDetail = null;
+      }
+    });
+  });
+</script>
+
+<style>
+  .fc-day-cell:hover {
+    background: var(--surface) !important;
+    cursor: pointer;
+  }
+  .fc-event-pill:hover {
+    opacity: 0.8;
+  }
+  @media (max-width: 768px) {
+    .fc-day-cell {
+      min-height: 70px !important;
+    }
+    .fc-event-pill span:last-child {
+      display: none;
+    }
+    .fc-day-detail {
+      position: fixed !important;
+      left: 1rem !important;
+      right: 1rem !important;
+      top: auto !important;
+      bottom: 1rem !important;
+      max-width: none !important;
+      min-width: auto !important;
+    }
+  }
+</style>

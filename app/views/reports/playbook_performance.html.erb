@@ -1,0 +1,259 @@
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">menu_book</span>
+    Playbook Performance
+  </h1>
+  <div class="page-actions">
+    <%= link_to "Playbooks", playbooks_path, class: "btn btn-sm" %>
+    <%= link_to "Reports Hub", reports_index_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<% if @total_trades.to_i < 5 %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary);">menu_book</span>
+    <h2 style="margin: 1rem 0 0.5rem;">Not Enough Data</h2>
+    <p style="color: var(--text-secondary);">Need at least 5 closed trades. You have <%= @total_trades %>.</p>
+  </div>
+<% else %>
+
+<%# Playbook vs No Playbook comparison %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+  <div class="card" style="border-left: 4px solid var(--positive); padding: 1.25rem;">
+    <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">With Playbook</div>
+    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+      <div style="font-size: 2rem; font-weight: 700;"><%= @with_playbook %> trades</div>
+      <div class="<%= @with_pb_pnl >= 0 ? 'positive' : 'negative' %>" style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@with_pb_pnl) %></div>
+    </div>
+    <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+      Win Rate: <span style="font-weight: 600; color: <%= @with_pb_wr >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @with_pb_wr %>%</span>
+    </div>
+  </div>
+  <div class="card" style="border-left: 4px solid var(--text-secondary); padding: 1.25rem;">
+    <div style="font-size: 0.75rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">Without Playbook</div>
+    <div style="display: flex; justify-content: space-between; align-items: baseline;">
+      <div style="font-size: 2rem; font-weight: 700;"><%= @without_playbook %> trades</div>
+      <div class="<%= @without_pb_pnl >= 0 ? 'positive' : 'negative' %>" style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(@without_pb_pnl) %></div>
+    </div>
+    <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+      Win Rate: <span style="font-weight: 600; color: <%= @without_pb_wr >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @without_pb_wr %>%</span>
+    </div>
+  </div>
+  <% if @with_pb_pnl > @without_pb_pnl && @with_playbook > 0 %>
+    <div class="card" style="border-left: 4px solid var(--primary); padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 2rem; color: var(--positive);">verified</span>
+      <div>
+        <div style="font-weight: 600;">Playbooks Work</div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+          Trades with a playbook outperform by <%= number_to_currency(@with_pb_pnl - @without_pb_pnl) %>
+        </div>
+      </div>
+    </div>
+  <% elsif @without_playbook > 0 %>
+    <div class="card" style="border-left: 4px solid #f9ab00; padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+      <span class="material-icons-outlined" style="font-size: 2rem; color: #f9ab00;">info</span>
+      <div>
+        <div style="font-weight: 600;">Room to Improve</div>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary);">
+          Unplanned trades are outperforming. Review and refine your playbooks.
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# Setup Performance Table %>
+<% if @setup_performance.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">leaderboard</span> Setup Rankings</h2>
+    </div>
+    <table class="table" style="font-size: 0.8125rem;">
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Setup</th>
+          <th style="text-align: center;">Grade</th>
+          <th style="text-align: right;">Trades</th>
+          <th style="text-align: right;">Win Rate</th>
+          <th style="text-align: right;">Expectancy</th>
+          <th style="text-align: right;">PF</th>
+          <th style="text-align: right;">Total P&L</th>
+          <th style="text-align: right;">Max DD</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @setup_performance.each_with_index do |s, i| %>
+          <%
+            grade_colors = { "A" => "var(--positive)", "B" => "#34a853", "C" => "#f9ab00", "D" => "#ea8600", "F" => "var(--negative)" }
+            gc = grade_colors[s[:grade]] || "var(--text-secondary)"
+            medal = case i
+                    when 0 then "#FFD700"
+                    when 1 then "#C0C0C0"
+                    when 2 then "#CD7F32"
+                    end
+          %>
+          <tr style="<%= i < 3 ? "background: #{medal}08;" : '' %>">
+            <td>
+              <% if medal %>
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: <%= medal %>20; color: <%= medal %>; font-weight: 700; font-size: 0.75rem;"><%= i + 1 %></span>
+              <% else %>
+                <span style="color: var(--text-secondary);"><%= i + 1 %></span>
+              <% end %>
+            </td>
+            <td>
+              <strong><%= s[:name] %></strong>
+              <% if s[:has_playbook] %>
+                <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px; color: var(--primary);" title="Linked playbook">menu_book</span>
+              <% end %>
+            </td>
+            <td style="text-align: center;">
+              <span style="display: inline-block; width: 28px; height: 28px; line-height: 28px; border-radius: 50%; background: <%= gc %>; color: white; font-weight: 700; font-size: 0.75rem; text-align: center;"><%= s[:grade] %></span>
+            </td>
+            <td style="text-align: right;"><%= s[:trades] %> (<span class="positive"><%= s[:wins] %>W</span> <span class="negative"><%= s[:losses] %>L</span>)</td>
+            <td style="text-align: right; color: <%= s[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= s[:win_rate] %>%</td>
+            <td style="text-align: right;" class="<%= s[:expectancy] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(s[:expectancy]) %></td>
+            <td style="text-align: right; color: <%= s[:profit_factor] >= 1 ? 'var(--positive)' : 'var(--negative)' %>;"><%= s[:profit_factor] %></td>
+            <td style="text-align: right; font-weight: 600;" class="<%= s[:total_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(s[:total_pnl]) %></td>
+            <td style="text-align: right; color: var(--negative);"><%= s[:max_drawdown] %>%</td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<%# Equity Curves Chart %>
+<% curves_to_show = @setup_performance.select { |s| s[:curve].count >= 3 }.first(6) %>
+<% if curves_to_show.count >= 2 %>
+  <%
+    all_equities = curves_to_show.flat_map { |s| s[:curve].map { |c| c[:equity] } }
+    max_eq = [all_equities.max.to_f, 1].max
+    min_eq = all_equities.min.to_f
+    eq_range = [max_eq - min_eq, 1].max
+    max_trades_in_curve = curves_to_show.map { |s| s[:curve].count }.max
+    chart_colors = %w[#34a853 #1a73e8 #f9ab00 #ea4335 #9c27b0 #00bcd4]
+    chart_w = 700
+    chart_h = 220
+    pad = { l: 70, r: 20, t: 20, b: 10 }
+    usable_w = chart_w - pad[:l] - pad[:r]
+    usable_h = chart_h - pad[:t] - pad[:b]
+  %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">show_chart</span> Equity Curves by Setup</h2>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <svg viewBox="0 0 <%= chart_w %> <%= chart_h + 40 %>" style="width: 100%; height: auto; font-family: Inter, sans-serif;">
+        <%# Grid %>
+        <line x1="<%= pad[:l] %>" y1="<%= pad[:t] %>" x2="<%= pad[:l] %>" y2="<%= pad[:t] + usable_h %>" stroke="var(--border)" stroke-width="0.5"/>
+        <% 5.times do |i| %>
+          <% y = pad[:t] + i * (usable_h / 4.0) %>
+          <line x1="<%= pad[:l] %>" y1="<%= y %>" x2="<%= chart_w - pad[:r] %>" y2="<%= y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="3"/>
+          <text x="<%= pad[:l] - 5 %>" y="<%= y + 3 %>" text-anchor="end" fill="var(--text-secondary)" font-size="8">
+            $<%= (max_eq - (i * eq_range / 4.0)).round(0) %>
+          </text>
+        <% end %>
+        <%# Zero line %>
+        <% zero_y = pad[:t] + (max_eq / eq_range * usable_h) %>
+        <line x1="<%= pad[:l] %>" y1="<%= zero_y %>" x2="<%= chart_w - pad[:r] %>" y2="<%= zero_y %>" stroke="var(--border)" stroke-width="1" stroke-dasharray="6,3"/>
+
+        <%# Curves %>
+        <% curves_to_show.each_with_index do |setup, si| %>
+          <%
+            color = chart_colors[si % chart_colors.length]
+            points = setup[:curve].map { |c|
+              x = pad[:l] + (c[:trade] - 1).to_f / [max_trades_in_curve - 1, 1].max * usable_w
+              y = pad[:t] + (max_eq - c[:equity]) / eq_range * usable_h
+              "#{x.round(1)},#{y.clamp(pad[:t], pad[:t] + usable_h).round(1)}"
+            }.join(' ')
+          %>
+          <polyline points="<%= points %>" fill="none" stroke="<%= color %>" stroke-width="2" opacity="0.8"/>
+        <% end %>
+
+        <%# Legend %>
+        <% curves_to_show.each_with_index do |setup, si| %>
+          <% lx = pad[:l] + si * 110 %>
+          <rect x="<%= lx %>" y="<%= chart_h + 18 %>" width="12" height="3" fill="<%= chart_colors[si % chart_colors.length] %>" rx="1"/>
+          <text x="<%= lx + 16 %>" y="<%= chart_h + 23 %>" fill="var(--text-secondary)" font-size="8"><%= truncate(setup[:name], length: 14) %></text>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<%# Setup Detail Cards %>
+<% if @setup_performance.any? %>
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <% @setup_performance.first(8).each_with_index do |s, i| %>
+      <%
+        grade_colors = { "A" => "var(--positive)", "B" => "#34a853", "C" => "#f9ab00", "D" => "#ea8600", "F" => "var(--negative)" }
+        gc = grade_colors[s[:grade]] || "var(--text-secondary)"
+      %>
+      <div class="card" style="border-top: 3px solid <%= gc %>;">
+        <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: <%= gc %>; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem;">
+            <%= s[:grade] %>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-weight: 600; font-size: 1rem;">
+              <%= s[:name] %>
+              <% if s[:has_playbook] %>
+                <%= link_to "(view)", playbook_path(s[:playbook_id]), style: "font-size: 0.75rem; color: var(--primary); text-decoration: none;" %>
+              <% end %>
+            </div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              #<%= i + 1 %> ranked · <%= s[:trades] %> trades
+            </div>
+          </div>
+          <div style="text-align: right;">
+            <div class="<%= s[:total_pnl] >= 0 ? 'positive' : 'negative' %>" style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(s[:total_pnl]) %></div>
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-bottom: 1px solid var(--border);">
+          <div style="padding: 0.625rem; text-align: center; border-right: 1px solid var(--border);">
+            <div style="font-size: 0.625rem; color: var(--text-secondary);">WIN RATE</div>
+            <div style="font-weight: 600; color: <%= s[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= s[:win_rate] %>%</div>
+          </div>
+          <div style="padding: 0.625rem; text-align: center; border-right: 1px solid var(--border);">
+            <div style="font-size: 0.625rem; color: var(--text-secondary);">EXPECTANCY</div>
+            <div style="font-weight: 600;" class="<%= s[:expectancy] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(s[:expectancy]) %></div>
+          </div>
+          <div style="padding: 0.625rem; text-align: center;">
+            <div style="font-size: 0.625rem; color: var(--text-secondary);">AVG P&L</div>
+            <div style="font-weight: 600;" class="<%= s[:avg_pnl] >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(s[:avg_pnl]) %></div>
+          </div>
+        </div>
+
+        <%# Mini curve %>
+        <% if s[:curve].count >= 3 %>
+          <%
+            mini_eq = s[:curve].map { |c| c[:equity] }
+            mini_max = mini_eq.max.to_f
+            mini_min = mini_eq.min.to_f
+            mini_range = [mini_max - mini_min, 1].max
+            mini_points = s[:curve].map { |c|
+              x = 10 + (c[:trade] - 1).to_f / [s[:curve].count - 1, 1].max * 280
+              y = 5 + (mini_max - c[:equity]) / mini_range * 30
+              "#{x.round(1)},#{y.round(1)}"
+            }.join(' ')
+          %>
+          <div style="padding: 0.5rem 1.25rem;">
+            <svg viewBox="0 0 300 40" style="width: 100%; height: 35px;">
+              <polyline points="<%= mini_points %>" fill="none" stroke="<%= gc %>" stroke-width="1.5" opacity="0.7"/>
+            </svg>
+          </div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Reports Hub", reports_index_path, class: "btn" %>
+  <%= link_to "Playbooks", playbooks_path, class: "btn" %>
+  <%= link_to "Setup Analysis", reports_setup_analysis_path, class: "btn" %>
+  <%= link_to "Expectancy", reports_expectancy_path, class: "btn" %>
+</div>
+
+<% end %>

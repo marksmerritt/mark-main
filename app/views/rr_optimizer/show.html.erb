@@ -1,0 +1,460 @@
+<% content_for(:title) { "R:R Optimizer" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #1565c0;">tune</span>
+    R:R Optimizer
+  </h1>
+</div>
+
+<% if @trades.blank? || @trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem; color: #1565c0;">tune</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Not enough trading data</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades with P&amp;L, stop loss, and take profit to analyze risk/reward patterns.</div>
+  </div>
+<% else %>
+
+  <%# ── Stats Strip ── %>
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #1565c0;"><%= @avg_rr %>:1</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Avg R:R</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @best_rr_bucket || "--" %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Best R:R Bucket</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #2e7d32;"><%= @best_rr_win_rate %>%</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Optimal WR at R:R</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #e65100;"><%= @half_kelly %>%</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Kelly % (Half)</div>
+    </div>
+  </div>
+
+  <%# ── R:R Distribution Histogram ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1565c0;">bar_chart</span>
+        R:R Distribution
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Distribution of planned risk/reward ratios across your trades.
+      </div>
+      <% max_dist = @rr_distribution.values.max || 1 %>
+      <svg viewBox="0 0 600 220" style="width: 100%; height: auto; overflow: visible;">
+        <% bar_width = 60 %>
+        <% gap = 12 %>
+        <% @rr_distribution.each_with_index do |(label, count), i| %>
+          <% x = 40 + i * (bar_width + gap) %>
+          <% bar_height = max_dist > 0 ? (count.to_f / max_dist * 160) : 0 %>
+          <% y = 180 - bar_height %>
+          <rect x="<%= x %>" y="<%= y %>" width="<%= bar_width %>" height="<%= bar_height %>" rx="3" fill="#1565c0" opacity="0.85"/>
+          <text x="<%= x + bar_width / 2 %>" y="<%= y - 6 %>" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-primary)"><%= count %></text>
+          <text x="<%= x + bar_width / 2 %>" y="200" text-anchor="middle" font-size="10" fill="var(--text-secondary)"><%= label %></text>
+        <% end %>
+        <line x1="35" y1="180" x2="<%= 40 + @rr_distribution.count * (bar_width + gap) %>" y2="180" stroke="var(--border)" stroke-width="1"/>
+        <text x="<%= 40 + @rr_distribution.count * (bar_width + gap) / 2 %>" y="216" text-anchor="middle" font-size="11" fill="var(--text-secondary)">Planned R:R Ratio</text>
+      </svg>
+    </div>
+  </div>
+
+  <%# ── Win Rate by R:R Bucket ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2e7d32;">leaderboard</span>
+        Win Rate by R:R Bucket
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        How win rate changes as you target higher risk/reward ratios.
+      </div>
+      <svg viewBox="0 0 600 260" style="width: 100%; height: auto; overflow: visible;">
+        <% bar_w = 80 %>
+        <% bar_gap = 20 %>
+        <% @win_rate_by_rr.each_with_index do |(label, data), i| %>
+          <% x = 50 + i * (bar_w + bar_gap) %>
+          <% bar_h = data[:win_rate] > 0 ? (data[:win_rate] / 100.0 * 160) : 0 %>
+          <% y = 200 - bar_h %>
+          <% color = data[:win_rate] >= 50 ? "#2e7d32" : "#c62828" %>
+          <rect x="<%= x %>" y="<%= y %>" width="<%= bar_w %>" height="<%= bar_h %>" rx="3" fill="<%= color %>" opacity="0.8"/>
+          <text x="<%= x + bar_w / 2 %>" y="<%= y - 8 %>" text-anchor="middle" font-size="12" font-weight="700" fill="<%= color %>"><%= data[:win_rate] %>%</text>
+          <text x="<%= x + bar_w / 2 %>" y="<%= y - 22 %>" text-anchor="middle" font-size="9" fill="var(--text-secondary)"><%= data[:count] %> trades</text>
+          <text x="<%= x + bar_w / 2 %>" y="220" text-anchor="middle" font-size="11" font-weight="600" fill="var(--text-primary)"><%= label %></text>
+          <text x="<%= x + bar_w / 2 %>" y="234" text-anchor="middle" font-size="9" fill="var(--text-secondary)">$<%= number_with_delimiter(data[:avg_pnl].round(0)) %></text>
+        <% end %>
+        <line x1="45" y1="200" x2="<%= 50 + @win_rate_by_rr.count * (bar_w + bar_gap) %>" y2="200" stroke="var(--border)" stroke-width="1"/>
+        <!-- 50% reference line -->
+        <line x1="45" y1="<%= 200 - 80 %>" x2="<%= 50 + @win_rate_by_rr.count * (bar_w + bar_gap) %>" y2="<%= 200 - 80 %>" stroke="var(--text-secondary)" stroke-width="0.5" stroke-dasharray="4,3"/>
+        <text x="38" y="<%= 200 - 80 + 4 %>" text-anchor="end" font-size="9" fill="var(--text-secondary)">50%</text>
+      </svg>
+    </div>
+  </div>
+
+  <%# ── Expectancy Curve ── %>
+  <% if @expectancy_points.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">show_chart</span>
+          Expectancy Curve
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Expected P&amp;L per trade at each R:R level. The peak is your optimal R:R ratio.
+        </div>
+        <%
+          chart_w = 560
+          chart_h = 200
+          padding_left = 50
+          padding_bottom = 30
+          min_e = @expectancy_points.map { |p| p[:expectancy] }.min
+          max_e = @expectancy_points.map { |p| p[:expectancy] }.max
+          range_e = [max_e - min_e, 1].max
+          min_rr = @expectancy_points.first[:rr]
+          max_rr = @expectancy_points.last[:rr]
+          range_rr = [max_rr - min_rr, 0.5].max
+        %>
+        <svg viewBox="0 0 620 260" style="width: 100%; height: auto; overflow: visible;">
+          <!-- Zero line -->
+          <% zero_y = 20 + chart_h - ((0 - min_e) / range_e * chart_h) %>
+          <line x1="<%= padding_left %>" y1="<%= zero_y %>" x2="<%= padding_left + chart_w %>" y2="<%= zero_y %>" stroke="var(--border)" stroke-width="0.5" stroke-dasharray="4,3"/>
+          <text x="<%= padding_left - 5 %>" y="<%= zero_y + 4 %>" text-anchor="end" font-size="9" fill="var(--text-secondary)">$0</text>
+
+          <!-- Line path -->
+          <polyline fill="none" stroke="#1565c0" stroke-width="2.5" points="<%= @expectancy_points.map { |p|
+            px = padding_left + ((p[:rr] - min_rr) / range_rr * chart_w)
+            py = 20 + chart_h - ((p[:expectancy] - min_e) / range_e * chart_h)
+            "#{px.round(1)},#{py.round(1)}"
+          }.join(' ') %>"/>
+
+          <!-- Area fill -->
+          <%
+            first_px = padding_left + ((@expectancy_points.first[:rr] - min_rr) / range_rr * chart_w)
+            last_px = padding_left + ((@expectancy_points.last[:rr] - min_rr) / range_rr * chart_w)
+            base_y = 20 + chart_h
+          %>
+          <polygon fill="#1565c0" opacity="0.1" points="<%= first_px.round(1) %>,<%= base_y %> <%= @expectancy_points.map { |p|
+            px = padding_left + ((p[:rr] - min_rr) / range_rr * chart_w)
+            py = 20 + chart_h - ((p[:expectancy] - min_e) / range_e * chart_h)
+            "#{px.round(1)},#{py.round(1)}"
+          }.join(' ') %> <%= last_px.round(1) %>,<%= base_y %>"/>
+
+          <!-- Data points -->
+          <% @expectancy_points.each do |p| %>
+            <%
+              px = padding_left + ((p[:rr] - min_rr) / range_rr * chart_w)
+              py = 20 + chart_h - ((p[:expectancy] - min_e) / range_e * chart_h)
+              is_optimal = @optimal_rr && p[:rr] == @optimal_rr
+            %>
+            <circle cx="<%= px.round(1) %>" cy="<%= py.round(1) %>" r="<%= is_optimal ? 7 : 3.5 %>" fill="<%= is_optimal ? '#e65100' : '#1565c0' %>" stroke="<%= is_optimal ? '#fff' : 'none' %>" stroke-width="<%= is_optimal ? 2 : 0 %>"/>
+            <% if is_optimal %>
+              <text x="<%= px.round(1) %>" y="<%= py.round(1) - 14 %>" text-anchor="middle" font-size="11" font-weight="700" fill="#e65100">Optimal: $<%= number_with_delimiter(@optimal_expectancy) %></text>
+              <text x="<%= px.round(1) %>" y="<%= py.round(1) - 26 %>" text-anchor="middle" font-size="9" fill="var(--text-secondary)"><%= @optimal_rr %>:1 R:R</text>
+            <% end %>
+          <% end %>
+
+          <!-- X-axis labels -->
+          <% @expectancy_points.each_with_index do |p, i| %>
+            <% next unless i % 2 == 0 || @expectancy_points.count <= 10 %>
+            <% px = padding_left + ((p[:rr] - min_rr) / range_rr * chart_w) %>
+            <text x="<%= px.round(1) %>" y="<%= 20 + chart_h + 18 %>" text-anchor="middle" font-size="9" fill="var(--text-secondary)"><%= p[:rr] %></text>
+          <% end %>
+          <text x="<%= padding_left + chart_w / 2 %>" y="<%= 20 + chart_h + 34 %>" text-anchor="middle" font-size="10" fill="var(--text-secondary)">R:R Ratio</text>
+        </svg>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Stop Distance Analysis ── %>
+  <% if @stop_analysis.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #c62828;">shield</span>
+          Stop Distance Analysis
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">Avg: <%= @avg_stop_distance_pct %>% / $<%= number_with_delimiter(@avg_stop_distance_dollars) %></span>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Which stop loss distances produce the best results.
+        </div>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border);">
+                <th style="text-align: left; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Stop Distance</th>
+                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Trades</th>
+                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Win Rate</th>
+                <th style="text-align: right; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Avg P&amp;L</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% best_stop_pnl = @stop_analysis.map { |s| s[:avg_pnl] }.max %>
+              <% @stop_analysis.each do |sa| %>
+                <tr style="border-bottom: 1px solid var(--border); <%= sa[:avg_pnl] == best_stop_pnl ? 'background: rgba(21, 101, 192, 0.06);' : '' %>">
+                  <td style="padding: 0.5rem; font-weight: 600;">
+                    <%= sa[:label] %>
+                    <% if sa[:avg_pnl] == best_stop_pnl %><span style="color: #1565c0; font-size: 0.6875rem; margin-left: 0.25rem;">BEST</span><% end %>
+                  </td>
+                  <td style="text-align: center; padding: 0.5rem;"><%= sa[:count] %></td>
+                  <td style="text-align: center; padding: 0.5rem;">
+                    <span style="color: <%= sa[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= sa[:win_rate] %>%</span>
+                  </td>
+                  <td style="text-align: right; padding: 0.5rem;">
+                    <span style="color: <%= sa[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= number_to_currency(sa[:avg_pnl]) %></span>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Target Distance Analysis ── %>
+  <% if @target_analysis.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #2e7d32;">flag</span>
+          Target Distance Analysis
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);">Avg: <%= @avg_target_distance_pct %>%</span>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Which take-profit distances produce the best results.
+        </div>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--border);">
+                <th style="text-align: left; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Target Distance</th>
+                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Trades</th>
+                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Win Rate</th>
+                <th style="text-align: center; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Hit Rate</th>
+                <th style="text-align: right; padding: 0.5rem; color: var(--text-secondary); font-weight: 600;">Avg P&amp;L</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% best_target_pnl = @target_analysis.map { |s| s[:avg_pnl] }.max %>
+              <% @target_analysis.each do |ta| %>
+                <tr style="border-bottom: 1px solid var(--border); <%= ta[:avg_pnl] == best_target_pnl ? 'background: rgba(21, 101, 192, 0.06);' : '' %>">
+                  <td style="padding: 0.5rem; font-weight: 600;">
+                    <%= ta[:label] %>
+                    <% if ta[:avg_pnl] == best_target_pnl %><span style="color: #1565c0; font-size: 0.6875rem; margin-left: 0.25rem;">BEST</span><% end %>
+                  </td>
+                  <td style="text-align: center; padding: 0.5rem;"><%= ta[:count] %></td>
+                  <td style="text-align: center; padding: 0.5rem;">
+                    <span style="color: <%= ta[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= ta[:win_rate] %>%</span>
+                  </td>
+                  <td style="text-align: center; padding: 0.5rem;"><%= ta[:hit_rate] %>%</td>
+                  <td style="text-align: right; padding: 0.5rem;">
+                    <span style="color: <%= ta[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= number_to_currency(ta[:avg_pnl]) %></span>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+    <%# ── Premature Exits ── %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">exit_to_app</span>
+          Premature Exits
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% if @premature_exits.any? %>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+            <strong><%= @premature_exit_count %></strong> winning trades exited before reaching target.
+          </div>
+          <% @premature_exits.first(5).each do |pe| %>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.375rem 0; border-bottom: 1px solid var(--border); font-size: 0.8125rem;">
+              <span style="font-weight: 600;"><%= pe[:symbol] %></span>
+              <span style="color: var(--negative);">-$<%= number_with_delimiter(pe[:missed_dollars].round(0)) %> left (<%= pe[:missed_pct] %>%)</span>
+            </div>
+          <% end %>
+        <% else %>
+          <div style="text-align: center; color: var(--text-secondary); font-size: 0.8125rem; padding: 1.5rem 0;">
+            <span class="material-icons-outlined" style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">check_circle</span>
+            No premature exits detected (or data unavailable).
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# ── Stop Outs ── %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #c62828;">block</span>
+          Stop Outs
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% if @stop_outs.any? %>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+            <strong><%= @stop_out_count %></strong> trades stopped out, <strong style="color: #e65100;"><%= @tight_stop_pct %>%</strong> reversed after.
+          </div>
+          <% @stop_outs.first(5).each do |so| %>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.375rem 0; border-bottom: 1px solid var(--border); font-size: 0.8125rem;">
+              <span style="font-weight: 600;"><%= so[:symbol] %></span>
+              <span>
+                <% if so[:reversed] %>
+                  <span style="color: #e65100;">Reversed +<%= so[:reversal_pct] %>%</span>
+                <% else %>
+                  <span style="color: var(--text-secondary);">No reversal</span>
+                <% end %>
+                <span style="color: var(--text-secondary); font-size: 0.75rem; margin-left: 0.25rem;">(<%= so[:stop_distance_pct] %>% stop)</span>
+              </span>
+            </div>
+          <% end %>
+        <% else %>
+          <div style="text-align: center; color: var(--text-secondary); font-size: 0.8125rem; padding: 1.5rem 0;">
+            <span class="material-icons-outlined" style="font-size: 1.5rem; display: block; margin-bottom: 0.25rem;">check_circle</span>
+            No stop outs detected (or stop loss data unavailable).
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# ── R-Multiple Distribution ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1565c0;">analytics</span>
+        R-Multiple Distribution
+      </h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Avg: <%= @avg_r_multiple %>R &middot; Median: <%= @median_r_multiple %>R</span>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        P&amp;L expressed as multiples of initial risk (R). Positive R = winning R-multiples.
+      </div>
+      <% max_r = @r_multiple_distribution.values.max || 1 %>
+      <svg viewBox="0 0 620 220" style="width: 100%; height: auto; overflow: visible;">
+        <% r_bar_w = 60 %>
+        <% r_gap = 10 %>
+        <% @r_multiple_distribution.each_with_index do |(label, count), i| %>
+          <% x = 40 + i * (r_bar_w + r_gap) %>
+          <% bar_h = max_r > 0 ? (count.to_f / max_r * 150) : 0 %>
+          <% y = 175 - bar_h %>
+          <% is_positive = label.include?("to 1R") || label.include?("to 2R") || label.include?("to 3R") || label.include?("3R+") %>
+          <% is_negative = label.start_with?("-") %>
+          <% color = is_negative ? "#c62828" : (count > 0 ? "#2e7d32" : "#9e9e9e") %>
+          <% color = "#9e9e9e" if !is_negative && label.include?("-1 to 0") %>
+          <% color = "#c62828" if label.include?("-1 to 0") %>
+          <% color = "#2e7d32" if label.include?("0 to 1") || label.include?("1R to") || label.include?("2R to") || label.include?("3R+") %>
+          <rect x="<%= x %>" y="<%= y %>" width="<%= r_bar_w %>" height="<%= bar_h %>" rx="3" fill="<%= color %>" opacity="0.8"/>
+          <text x="<%= x + r_bar_w / 2 %>" y="<%= y - 5 %>" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-primary)"><%= count %></text>
+          <text x="<%= x + r_bar_w / 2 %>" y="192" text-anchor="middle" font-size="8.5" fill="var(--text-secondary)"><%= label %></text>
+        <% end %>
+        <line x1="35" y1="175" x2="<%= 40 + @r_multiple_distribution.count * (r_bar_w + r_gap) %>" y2="175" stroke="var(--border)" stroke-width="1"/>
+        <text x="<%= 40 + @r_multiple_distribution.count * (r_bar_w + r_gap) / 2 %>" y="210" text-anchor="middle" font-size="10" fill="var(--text-secondary)">R-Multiple Buckets</text>
+      </svg>
+    </div>
+  </div>
+
+  <%# ── Kelly Criterion Card ── %>
+  <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #e65100;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">calculate</span>
+        Kelly Criterion
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+        Optimal position sizing based on your historical win rate (<%= @win_rate %>%) and win/loss ratio (<%= @win_loss_ratio %>:1).
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.25rem;">
+        <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 0.5rem;">
+          <div style="font-size: 1.25rem; font-weight: 700; color: #c62828;"><%= @kelly_pct %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Full Kelly</div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;">Maximum growth, high volatility</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: rgba(230, 81, 0, 0.06); border-radius: 0.5rem; border: 1px solid rgba(230, 81, 0, 0.2);">
+          <div style="font-size: 1.25rem; font-weight: 700; color: #e65100;"><%= @half_kelly %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Half Kelly (Recommended)</div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;">~75% growth, much smoother</div>
+        </div>
+        <div style="text-align: center; padding: 1rem; background: var(--bg); border-radius: 0.5rem;">
+          <div style="font-size: 1.25rem; font-weight: 700; color: #2e7d32;"><%= @quarter_kelly %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Quarter Kelly</div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;">Conservative, minimal drawdown</div>
+        </div>
+      </div>
+      <div style="background: var(--bg); border-radius: 0.5rem; padding: 0.75rem 1rem; font-size: 0.8125rem; color: var(--text-secondary);">
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #1565c0;">info</span>
+        <strong>How to use:</strong> Risk no more than <strong style="color: #e65100;"><%= @half_kelly %>%</strong> of your account on any single trade.
+        <% if @half_kelly > 0 %>
+          For a $50,000 account, that's <strong>$<%= number_with_delimiter((50000 * @half_kelly / 100.0).round(0)) %></strong> max risk per trade.
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Recommendations ── %>
+  <% if @recommendations.any? %>
+    <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #1565c0;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1565c0;">tips_and_updates</span>
+          Recommendations
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Data-driven suggestions to improve your risk/reward performance.
+        </div>
+        <div style="display: grid; gap: 1rem;">
+          <% @recommendations.each_with_index do |rec, idx| %>
+            <div style="display: flex; gap: 1rem; align-items: flex-start; padding: 1rem; background: var(--bg); border-radius: 0.5rem; border-left: 4px solid #1565c0;">
+              <div style="min-width: 2.25rem; height: 2.25rem; border-radius: 50%; background: #1565c0; color: #fff; display: flex; align-items: center; justify-content: center;">
+                <span class="material-icons-outlined" style="font-size: 1.125rem;"><%= rec[:icon] %></span>
+              </div>
+              <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 0.9375rem;"><%= rec[:title] %></div>
+                <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem; line-height: 1.5;"><%= rec[:detail] %></div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Bottom Nav ── %>
+  <div style="display: flex; justify-content: center; gap: 1rem; padding: 1rem 0;">
+    <%= link_to edge_finder_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">gps_fixed</span> Edge Finder
+    <% end %>
+    <%= link_to reports_index_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">assessment</span> Reports
+    <% end %>
+    <%= link_to account_summary_path, class: "btn", style: "display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem;">account_balance</span> Account Summary
+    <% end %>
+  </div>
+
+<% end %>

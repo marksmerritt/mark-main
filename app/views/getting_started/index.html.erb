@@ -1,0 +1,83 @@
+<% content_for(:title) { "Getting Started — Mark Main" } %>
+
+<div class="page-header">
+  <h1>Getting Started</h1>
+  <div class="page-actions">
+    <%= link_to "Settings", settings_path, class: "btn" %>
+    <%= link_to "Dashboard", root_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="padding: 1.5rem;">
+    <h2 style="margin-bottom: 0.25rem;">Welcome to Mark Main</h2>
+    <p class="text-muted" style="margin-bottom: 1rem;">
+      Your unified platform for trading journals, note-taking, and personal finance.
+      Complete the steps below to unlock the full experience.
+    </p>
+    <% pct = @total > 0 ? (@completed.to_f / @total * 100).round : 0 %>
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <div class="budget-progress-bar" style="flex: 1; height: 0.625rem;">
+        <div class="budget-progress-fill <%= pct >= 100 ? 'progress-safe' : 'progress-warn' %>"
+             style="width: <%= pct %>%"></div>
+      </div>
+      <span style="font-size: 0.875rem; font-weight: 600; white-space: nowrap;"><%= @completed %> / <%= @total %></span>
+    </div>
+    <% if pct >= 100 %>
+      <p class="positive" style="margin-top: 0.5rem; font-weight: 500;">All steps completed! You're all set.</p>
+    <% end %>
+  </div>
+</div>
+
+<% @sections.each do |section| %>
+  <% section_done = section[:steps].count { |s| s[:done] } %>
+  <% section_total = section[:steps].count %>
+  <div class="card" style="margin-bottom: 1.25rem;">
+    <div class="card-header" style="padding: 1rem 1.25rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span class="material-icons-outlined" style="font-size: 1.5rem; color: var(--primary);"><%= section[:icon] %></span>
+        <div>
+          <h2 style="margin: 0; font-size: 1.125rem;"><%= section[:name] %></h2>
+          <p class="text-muted" style="margin: 0; font-size: 0.8125rem;"><%= section[:description] %></p>
+        </div>
+      </div>
+      <span class="text-muted" style="font-size: 0.8125rem; white-space: nowrap;"><%= section_done %>/<%= section_total %></span>
+    </div>
+
+    <% section[:steps].each do |step| %>
+      <div class="onboarding-step <%= 'onboarding-step-done' if step[:done] %>">
+        <div class="onboarding-check">
+          <% if step[:done] %>
+            <span class="material-icons-outlined" style="color: var(--positive); font-size: 1.25rem;">check_circle</span>
+          <% else %>
+            <span class="material-icons-outlined" style="color: var(--text-muted); font-size: 1.25rem;"><%= step[:icon] %></span>
+          <% end %>
+        </div>
+        <div class="onboarding-content">
+          <h3><%= step[:title] %></h3>
+          <p><%= step[:desc] %></p>
+        </div>
+        <% if step[:action_path] && !step[:done] %>
+          <%= link_to "Start", step[:action_path], class: "btn btn-primary btn-sm" %>
+        <% elsif step[:done] %>
+          <span class="badge badge-success">Done</span>
+        <% else %>
+          <span class="badge" style="opacity: 0.5;">Connect API first</span>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<div class="card" style="padding: 1.5rem; text-align: center;">
+  <h3 style="margin-bottom: 0.5rem;">Keyboard Shortcuts</h3>
+  <p class="text-muted" style="margin-bottom: 1rem;">Press <kbd>?</kbd> anywhere to see all available shortcuts.</p>
+  <div style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; font-size: 0.875rem;">
+    <div><kbd>a</kbd> Quick Add Trade</div>
+    <div><kbd>q</kbd> Quick Journal</div>
+    <div><kbd>g</kbd> Budget Dashboard</div>
+    <div><kbd>b</kbd> Playbooks</div>
+    <div><kbd>v</kbd> Trade Review</div>
+    <div><kbd>/</kbd> Search</div>
+  </div>
+</div>

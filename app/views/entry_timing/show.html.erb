@@ -1,0 +1,408 @@
+<% content_for(:title) { "Entry Timing" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #e65100;">timer</span>
+    Entry Timing Analyzer
+  </h1>
+</div>
+
+<% if @trades.blank? || @trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem; color: #e65100;">timer</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">Not enough trading data</div>
+    <div style="font-size: 0.875rem; margin-top: 0.5rem;">Close some trades with entry prices and P&amp;L to analyze your entry timing quality.</div>
+  </div>
+<% else %>
+
+  <%# ── Stats Strip ── %>
+  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #e65100;"><%= @avg_mae %>%</div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Avg MAE</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @avg_quality >= 60 ? 'var(--positive)' : @avg_quality >= 40 ? '#e65100' : 'var(--negative)' %>;"><%= @avg_quality %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Avg Entry Quality</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: #2e7d32;"><%= @best_hour ? @best_hour[:label] : "--" %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Best Entry Hour</div>
+    </div>
+    <div class="card" style="padding: 1rem; text-align: center;">
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);"><%= @reentry_count %></div>
+      <div style="font-size: 0.75rem; color: var(--text-secondary);">Re-entries</div>
+    </div>
+  </div>
+
+  <%# ── MAE Distribution Chart ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">bar_chart</span>
+        MAE Distribution (Maximum Adverse Excursion)
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        How far trades move against you before becoming profitable. Lower MAE = better entry timing.
+      </div>
+      <% max_mae_count = @mae_distribution.values.map { |v| v[:count] }.max || 1 %>
+      <svg viewBox="0 0 620 240" style="width: 100%; height: auto; overflow: visible;">
+        <% bar_width = 68 %>
+        <% gap = 12 %>
+        <% @mae_distribution.each_with_index do |(label, data), i| %>
+          <% x = 40 + i * (bar_width + gap) %>
+          <% bar_height = max_mae_count > 0 ? (data[:count].to_f / max_mae_count * 160) : 0 %>
+          <% y = 180 - bar_height %>
+          <% fill = data[:win_rate] >= 55 ? "#2e7d32" : data[:win_rate] >= 45 ? "#e65100" : "#d32f2f" %>
+          <rect x="<%= x %>" y="<%= y %>" width="<%= bar_width %>" height="<%= bar_height %>" rx="3" fill="<%= fill %>" opacity="0.8"/>
+          <text x="<%= x + bar_width / 2 %>" y="<%= y - 14 %>" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-primary)"><%= data[:count] %></text>
+          <text x="<%= x + bar_width / 2 %>" y="<%= y - 3 %>" text-anchor="middle" font-size="9" fill="var(--text-secondary)"><%= data[:win_rate] %>% WR</text>
+          <text x="<%= x + bar_width / 2 %>" y="198" text-anchor="middle" font-size="10" fill="var(--text-secondary)"><%= label %></text>
+        <% end %>
+        <line x1="35" y1="180" x2="<%= 40 + @mae_distribution.count * (bar_width + gap) %>" y2="180" stroke="var(--border)" stroke-width="1"/>
+        <text x="<%= 40 + @mae_distribution.count * (bar_width + gap) / 2 %>" y="220" text-anchor="middle" font-size="11" fill="var(--text-secondary)">Adverse Excursion %</text>
+        <%# Legend %>
+        <rect x="40" y="230" width="10" height="10" rx="2" fill="#2e7d32" opacity="0.8"/>
+        <text x="54" y="239" font-size="9" fill="var(--text-secondary)">WR &gt;55%</text>
+        <rect x="120" y="230" width="10" height="10" rx="2" fill="#e65100" opacity="0.8"/>
+        <text x="134" y="239" font-size="9" fill="var(--text-secondary)">WR 45-55%</text>
+        <rect x="210" y="230" width="10" height="10" rx="2" fill="#d32f2f" opacity="0.8"/>
+        <text x="224" y="239" font-size="9" fill="var(--text-secondary)">WR &lt;45%</text>
+      </svg>
+    </div>
+  </div>
+
+  <%# ── Entry Hour Win Rate Chart ── %>
+  <% if @hour_stats.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">schedule</span>
+          Entry Hour Win Rate
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Win rate by hour of entry. Identify your most profitable trading windows.
+        </div>
+        <% sorted_hours = @hour_stats.sort_by { |h, _| h } %>
+        <% max_hour_count = sorted_hours.map { |_, v| v[:count] }.max || 1 %>
+        <svg viewBox="0 0 <%= [sorted_hours.count * 46 + 60, 400].max %> 240" style="width: 100%; height: auto; overflow: visible;">
+          <% bar_w = 36 %>
+          <% gap_h = 8 %>
+          <% sorted_hours.each_with_index do |(hour, stats), i| %>
+            <% x = 40 + i * (bar_w + gap_h) %>
+            <% bar_h = max_hour_count > 0 ? (stats[:count].to_f / max_hour_count * 140) : 0 %>
+            <% y = 170 - bar_h %>
+            <% fill = stats[:win_rate] >= 55 ? "#2e7d32" : stats[:win_rate] >= 45 ? "#e65100" : "#d32f2f" %>
+            <rect x="<%= x %>" y="<%= y %>" width="<%= bar_w %>" height="<%= bar_h %>" rx="3" fill="<%= fill %>" opacity="0.8"/>
+            <text x="<%= x + bar_w / 2 %>" y="<%= y - 14 %>" text-anchor="middle" font-size="10" font-weight="600" fill="<%= fill %>"><%= stats[:win_rate] %>%</text>
+            <text x="<%= x + bar_w / 2 %>" y="<%= y - 3 %>" text-anchor="middle" font-size="8" fill="var(--text-secondary)">n=<%= stats[:count] %></text>
+            <text x="<%= x + bar_w / 2 %>" y="188" text-anchor="middle" font-size="9" fill="var(--text-secondary)"><%= format_hour(hour) %></text>
+          <% end %>
+          <line x1="35" y1="170" x2="<%= 40 + sorted_hours.count * (bar_w + gap_h) %>" y2="170" stroke="var(--border)" stroke-width="1"/>
+          <%# 50% reference line %>
+          <% ref_y = 170 - (50.0 / 100 * 140) %>
+          <line x1="35" y1="<%= ref_y %>" x2="<%= 40 + sorted_hours.count * (bar_w + gap_h) %>" y2="<%= ref_y %>" stroke="var(--text-secondary)" stroke-width="0.5" stroke-dasharray="4,4"/>
+          <text x="30" y="<%= ref_y + 3 %>" text-anchor="end" font-size="8" fill="var(--text-secondary)">50%</text>
+        </svg>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Entry Quality by Day of Week ── %>
+  <% if @day_stats.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">date_range</span>
+          Entry Quality by Day of Week
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Which days produce the best entry timing and outcomes.
+        </div>
+        <% ordered_days = @day_stats.sort_by { |_, v| v[:wday] } %>
+        <div style="display: grid; gap: 0.5rem;">
+          <% ordered_days.each do |day_name, stats| %>
+            <% wr = stats[:win_rate] %>
+            <% wr_color = wr >= 55 ? "var(--positive)" : wr >= 45 ? "#e65100" : "var(--negative)" %>
+            <div style="display: flex; align-items: center; gap: 1rem; padding: 0.625rem 0.75rem; background: var(--bg); border-radius: 0.5rem;">
+              <div style="min-width: 5.5rem; font-weight: 600; font-size: 0.875rem;">
+                <% if @best_day && @best_day[0] == day_name %>
+                  <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: #2e7d32;">star</span>
+                <% end %>
+                <%= day_name %>
+              </div>
+              <div style="flex: 1; height: 0.5rem; background: var(--border); border-radius: 3px; overflow: hidden;">
+                <div style="height: 100%; width: <%= [wr, 100].min %>%; background: <%= wr_color %>; opacity: 0.75; border-radius: 3px;"></div>
+              </div>
+              <div style="min-width: 3.5rem; text-align: right; font-weight: 700; font-size: 0.8125rem; color: <%= wr_color %>;"><%= wr %>%</div>
+              <div style="min-width: 4.5rem; text-align: right; font-size: 0.75rem; color: <%= stats[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(stats[:avg_pnl]) %></div>
+              <div style="min-width: 2.5rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary);"><%= stats[:count] %> trades</div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Entry Quality Score Distribution ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">assessment</span>
+        Entry Quality Score Distribution
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Composite score (0-100) based on MAE, P&amp;L outcome, and risk/reward execution.
+      </div>
+      <% quality_colors = { "Excellent (80-100)" => "#2e7d32", "Good (60-79)" => "#43a047", "Fair (40-59)" => "#e65100", "Poor (20-39)" => "#ef6c00", "Bad (0-19)" => "#d32f2f" } %>
+      <% total_q = @quality_distribution.values.sum.to_f %>
+      <div style="display: grid; gap: 0.5rem;">
+        <% @quality_distribution.each do |label, count| %>
+          <% pct = total_q > 0 ? (count / total_q * 100).round(1) : 0 %>
+          <% color = quality_colors[label] || "#e65100" %>
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="min-width: 9rem; font-size: 0.8125rem; font-weight: 500;"><%= label %></div>
+            <div style="flex: 1; height: 1.25rem; background: var(--bg); border-radius: 4px; overflow: hidden; position: relative;">
+              <div style="height: 100%; width: <%= pct %>%; background: <%= color %>; opacity: 0.75; border-radius: 4px;"></div>
+              <% if count > 0 %>
+                <span style="position: absolute; right: 0.5rem; top: 50%; transform: translateY(-50%); font-size: 0.6875rem; font-weight: 600; color: var(--text-primary);"><%= count %></span>
+              <% end %>
+            </div>
+            <div style="min-width: 3rem; text-align: right; font-size: 0.75rem; color: var(--text-secondary);"><%= pct %>%</div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Speed to Target ── %>
+  <% if @speed_buckets.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">speed</span>
+          Speed to Exit &mdash; Win Rate by Duration
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          How quickly winning trades reach target vs how long losers drag on.
+          <span style="font-weight: 600;">Avg winner: <%= @avg_win_duration < 60 ? "#{@avg_win_duration}min" : "#{(@avg_win_duration / 60.0).round(1)}h" %></span> &middot;
+          <span style="font-weight: 600;">Avg loser: <%= @avg_loss_duration < 60 ? "#{@avg_loss_duration}min" : "#{(@avg_loss_duration / 60.0).round(1)}h" %></span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: 0.75rem;">
+          <% @speed_buckets.each do |label, data| %>
+            <% wr = data[:win_rate] %>
+            <% wr_color = wr >= 55 ? "var(--positive)" : wr >= 45 ? "#e65100" : "var(--negative)" %>
+            <div style="padding: 0.75rem; background: var(--bg); border-radius: 0.5rem; text-align: center; border-top: 3px solid <%= wr_color %>;">
+              <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-secondary);"><%= label %></div>
+              <div style="font-size: 1.25rem; font-weight: 700; color: <%= wr_color %>; margin: 0.25rem 0;"><%= wr %>%</div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= data[:count] %> trades</div>
+              <div style="font-size: 0.75rem; font-weight: 600; color: <%= data[:avg_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; margin-top: 0.125rem;"><%= number_to_currency(data[:avg_pnl]) %></div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ── Early vs Late Entry Analysis ── %>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+    <%# Early Entries %>
+    <div class="card" style="border-top: 4px solid #1565c0;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #1565c0;">hourglass_top</span>
+          Early Entries
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          Trades entered before the move started &mdash; good location but bad timing.
+        </div>
+        <div style="display: flex; gap: 1.5rem; margin-bottom: 0.75rem;">
+          <div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: #1565c0;"><%= @early_entry_count %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Count</div>
+          </div>
+          <div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@early_avg_pnl) %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg P&amp;L</div>
+          </div>
+        </div>
+        <% if @early_entries.any? %>
+          <div style="font-size: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem;">
+            <% @early_entries.first(5).each do |e| %>
+              <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; border-bottom: 1px solid var(--border);">
+                <span style="font-weight: 600;"><%= e[:symbol] %></span>
+                <span style="color: var(--negative);"><%= number_to_currency(e[:pnl]) %></span>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary); font-style: italic;">No early entry patterns detected.</div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Late Entries %>
+    <div class="card" style="border-top: 4px solid #d32f2f;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #d32f2f;">trending_up</span>
+          Late Entries (Chasing)
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          Trades entered after the move already happened &mdash; chasing price action.
+        </div>
+        <div style="display: flex; gap: 1.5rem; margin-bottom: 0.75rem;">
+          <div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: #d32f2f;"><%= @late_entry_count %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Count</div>
+          </div>
+          <div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@late_avg_pnl) %></div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg P&amp;L</div>
+          </div>
+          <div>
+            <div style="font-size: 1.25rem; font-weight: 700; color: <%= @late_win_rate >= 45 ? '#e65100' : 'var(--negative)' %>;"><%= @late_win_rate %>%</div>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);">Win Rate</div>
+          </div>
+        </div>
+        <% if @late_entries.any? %>
+          <div style="font-size: 0.75rem; border-top: 1px solid var(--border); padding-top: 0.5rem;">
+            <% @late_entries.first(5).each do |e| %>
+              <div style="display: flex; justify-content: space-between; padding: 0.25rem 0; border-bottom: 1px solid var(--border);">
+                <span style="font-weight: 600;"><%= e[:symbol] %></span>
+                <span style="color: <%= e[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(e[:pnl]) %></span>
+              </div>
+            <% end %>
+          </div>
+        <% else %>
+          <div style="font-size: 0.8125rem; color: var(--text-secondary); font-style: italic;">No late/chasing entries detected.</div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# ── Re-entry Analysis ── %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">replay</span>
+        Re-entry Analysis
+      </h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 1rem;">
+        Same symbol trades within 24 hours. Identifies patterns of exiting too early and re-entering.
+      </div>
+      <div style="display: flex; gap: 2rem; margin-bottom: 1rem;">
+        <div style="text-align: center;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: #e65100;"><%= @reentry_count %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Re-entries</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: <%= @reentry_improved_pct >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @reentry_improved_pct %>%</div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Improved on 2nd</div>
+        </div>
+        <div style="text-align: center;">
+          <div style="font-size: 1.5rem; font-weight: 700; color: <%= @reentry_avg_combined >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@reentry_avg_combined) %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg Combined P&amp;L</div>
+        </div>
+      </div>
+
+      <% if @reentries.any? %>
+        <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem;">
+          <thead>
+            <tr>
+              <th style="padding: 0.375rem 0.5rem; text-align: left; border-bottom: 2px solid var(--border);">Symbol</th>
+              <th style="padding: 0.375rem 0.5rem; text-align: right; border-bottom: 2px solid var(--border);">Gap</th>
+              <th style="padding: 0.375rem 0.5rem; text-align: right; border-bottom: 2px solid var(--border);">1st P&amp;L</th>
+              <th style="padding: 0.375rem 0.5rem; text-align: right; border-bottom: 2px solid var(--border);">2nd P&amp;L</th>
+              <th style="padding: 0.375rem 0.5rem; text-align: right; border-bottom: 2px solid var(--border);">Combined</th>
+              <th style="padding: 0.375rem 0.5rem; text-align: center; border-bottom: 2px solid var(--border);">Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @reentries.each do |r| %>
+              <tr>
+                <td style="padding: 0.375rem 0.5rem; font-weight: 600; border-bottom: 1px solid var(--border);"><%= r[:symbol] %></td>
+                <td style="padding: 0.375rem 0.5rem; text-align: right; border-bottom: 1px solid var(--border);"><%= r[:gap_hours] %>h</td>
+                <td style="padding: 0.375rem 0.5rem; text-align: right; border-bottom: 1px solid var(--border); color: <%= r[:first_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(r[:first_pnl]) %></td>
+                <td style="padding: 0.375rem 0.5rem; text-align: right; border-bottom: 1px solid var(--border); color: <%= r[:second_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(r[:second_pnl]) %></td>
+                <td style="padding: 0.375rem 0.5rem; text-align: right; border-bottom: 1px solid var(--border); font-weight: 600; color: <%= r[:combined_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(r[:combined_pnl]) %></td>
+                <td style="padding: 0.375rem 0.5rem; text-align: center; border-bottom: 1px solid var(--border);">
+                  <% if r[:improved] %>
+                    <span style="font-size: 0.625rem; padding: 0.125rem 0.375rem; background: rgba(46,125,50,0.15); color: #2e7d32; border-radius: 0.75rem; font-weight: 600;">IMPROVED</span>
+                  <% else %>
+                    <span style="font-size: 0.625rem; padding: 0.125rem 0.375rem; background: rgba(211,47,47,0.15); color: #d32f2f; border-radius: 0.75rem; font-weight: 600;">WORSE</span>
+                  <% end %>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <div style="text-align: center; padding: 1rem; color: var(--text-secondary); font-size: 0.8125rem;">
+          No re-entry patterns detected. You are not re-entering the same symbol within 24 hours.
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ── Recommendations ── %>
+  <% if @recommendations.any? %>
+    <div class="card" style="margin-bottom: 1.5rem; border-top: 4px solid #e65100;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #e65100;">tips_and_updates</span>
+          Entry Timing Recommendations
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <div style="display: grid; gap: 1rem;">
+          <% @recommendations.each do |rec| %>
+            <div style="display: flex; gap: 1rem; align-items: flex-start; padding: 1rem; background: var(--bg); border-radius: 0.5rem; border-left: 4px solid #e65100;">
+              <span class="material-icons-outlined" style="font-size: 1.5rem; color: #e65100; margin-top: 0.125rem;"><%= rec[:icon] %></span>
+              <div>
+                <div style="font-weight: 700; font-size: 0.9375rem;"><%= rec[:title] %></div>
+                <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;"><%= rec[:detail] %></div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+<% end %>
+
+<%# ── Bottom Nav ── %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to edge_finder_path, class: "btn" do %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">gps_fixed</span> Edge Finder<% end %>
+  <%= link_to rr_optimizer_path, class: "btn" do %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">tune</span> R:R Optimizer<% end %>
+  <%= link_to session_analyzer_path, class: "btn" do %><span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">view_timeline</span> Sessions<% end %>
+</div>
+
+<style>
+  @media (max-width: 640px) {
+    div[style*="grid-template-columns: repeat(4"] { grid-template-columns: repeat(2, 1fr) !important; }
+    div[style*="grid-template-columns: 1fr 1fr"] { grid-template-columns: 1fr !important; }
+  }
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>

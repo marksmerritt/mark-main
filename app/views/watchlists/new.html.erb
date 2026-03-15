@@ -1,0 +1,9 @@
+<div class="page-header">
+  <h1>Add to Watchlist</h1>
+</div>
+
+<div class="card">
+  <%= render "form", watchlist: @watchlist,
+             form_url: watchlists_path, form_method: :post,
+             submit_label: "Add Symbol", cancel_path: watchlists_path %>
+</div>

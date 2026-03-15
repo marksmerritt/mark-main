@@ -1,0 +1,276 @@
+<% content_for(:title) { "Note Connections" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #009688;">hub</span>
+    Note Connections
+  </h1>
+  <p style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.25rem;">
+    Cross-reference analysis of how your notes relate to each other
+  </p>
+</div>
+
+<%# Stats Strip %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Notes</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_notes %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Connected</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @connected_count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Orphan Notes</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @orphan_count > 0 ? 'var(--negative)' : 'var(--text)' %>;"><%= @orphan_count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Tag Clusters</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @tag_cluster_count %></div>
+    </div>
+    <div style="padding: 1rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Hub Notes</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: #009688;"><%= @hub_count %></div>
+    </div>
+  </div>
+</div>
+
+<%# Connection Clusters (by Tag) %>
+<% if @tag_groups.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">label</span> Connection Clusters</h2>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+        <% @tag_groups.first(12).each do |tag, notes| %>
+          <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; background: var(--surface);">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; color: #009688;">sell</span>
+              <span style="font-weight: 600; font-size: 0.9375rem;"><%= tag %></span>
+              <span style="margin-left: auto; font-size: 0.6875rem; padding: 0.125rem 0.5rem; background: var(--bg); border-radius: 9999px; color: var(--text-secondary);"><%= notes.length %> notes</span>
+            </div>
+            <% notes.first(5).each do |note| %>
+              <div style="padding: 0.25rem 0; font-size: 0.8125rem; display: flex; align-items: center; gap: 0.375rem;">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; color: var(--text-secondary);">description</span>
+                <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--primary); text-decoration: none;" %>
+              </div>
+            <% end %>
+            <% if notes.length > 5 %>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">+<%= notes.length - 5 %> more</div>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Hub Notes %>
+<% if @hub_notes.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">stars</span> Hub Notes</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Most connected notes in your collection</span>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem;">
+        <% @hub_notes.each do |note| %>
+          <div style="border: 1px solid var(--border); border-radius: 8px; padding: 1rem; background: var(--surface); display: flex; align-items: flex-start; gap: 0.75rem;">
+            <div style="min-width: 2.5rem; height: 2.5rem; border-radius: 50%; background: #009688; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.875rem;">
+              <%= @connection_counts[note["id"]] %>
+            </div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 600; font-size: 0.9375rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--text); text-decoration: none;" %>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                <% tags = (note["tags"] || []).map { |t| t.is_a?(Hash) ? t["name"] : t.to_s }.compact %>
+                <% if tags.any? %>
+                  <% tags.first(4).each do |tag| %>
+                    <span style="padding: 0.0625rem 0.375rem; background: var(--bg); border-radius: 9999px; font-size: 0.6875rem; margin-right: 0.25rem;"><%= tag %></span>
+                  <% end %>
+                <% end %>
+              </div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                Connected to <%= @connection_counts[note["id"]] %> other note<%= @connection_counts[note["id"]] == 1 ? "" : "s" %>
+              </div>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<%# Suggested Links %>
+<% if @suggested_links.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">link</span> Suggested Links</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Notes that share keywords and might be related</span>
+    </div>
+    <div style="padding: 0; overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Note A</th>
+            <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Note B</th>
+            <th style="padding: 0.75rem 1rem; text-align: left; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Shared Keywords</th>
+            <th style="padding: 0.75rem 1rem; text-align: center; font-weight: 600; color: var(--text-secondary); font-size: 0.6875rem; text-transform: uppercase;">Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @suggested_links.each do |link| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.625rem 1rem;">
+                <%= link_to (link[:note_a]["title"].presence || "Untitled"), note_path(link[:note_a]["id"]), style: "color: var(--primary); text-decoration: none;" %>
+              </td>
+              <td style="padding: 0.625rem 1rem;">
+                <%= link_to (link[:note_b]["title"].presence || "Untitled"), note_path(link[:note_b]["id"]), style: "color: var(--primary); text-decoration: none;" %>
+              </td>
+              <td style="padding: 0.625rem 1rem;">
+                <% link[:shared_keywords].each do |kw| %>
+                  <span style="font-size: 0.6875rem; padding: 0.125rem 0.375rem; background: var(--bg); border-radius: 4px; margin-right: 0.25rem;"><%= kw %></span>
+                <% end %>
+              </td>
+              <td style="padding: 0.625rem 1rem; text-align: center;">
+                <span style="display: inline-block; min-width: 1.5rem; padding: 0.125rem 0.375rem; background: #009688; color: #fff; border-radius: 9999px; font-size: 0.6875rem; font-weight: 600;"><%= link[:score] %></span>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Tag Co-occurrence Matrix %>
+<% if @tag_cooccurrence.any? && @tag_cooccurrence.keys.length >= 2 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">grid_on</span> Tag Co-occurrence Matrix</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Which tags appear together most often</span>
+    </div>
+    <div style="padding: 1.25rem; overflow-x: auto;">
+      <%
+        tags_list = @tag_cooccurrence.keys
+        max_cooccurrence = @tag_cooccurrence.values.flat_map(&:values).max.to_f
+        max_cooccurrence = 1 if max_cooccurrence == 0
+        cell_size = 36
+        label_offset = 90
+        svg_w = label_offset + tags_list.length * cell_size + 10
+        svg_h = label_offset + tags_list.length * cell_size + 10
+      %>
+      <svg viewBox="0 0 <%= svg_w %> <%= svg_h %>" style="width: 100%; max-width: <%= svg_w %>px; height: auto; font-family: Inter, sans-serif;">
+        <%# Column headers %>
+        <% tags_list.each_with_index do |tag, i| %>
+          <text x="<%= label_offset + i * cell_size + cell_size / 2 %>" y="<%= label_offset - 6 %>"
+                text-anchor="end" fill="var(--text-secondary)" font-size="8"
+                transform="rotate(-45, <%= label_offset + i * cell_size + cell_size / 2 %>, <%= label_offset - 6 %>)">
+            <%= tag.length > 12 ? "#{tag[0..11]}..." : tag %>
+          </text>
+        <% end %>
+
+        <%# Row headers + cells %>
+        <% tags_list.each_with_index do |tag_row, ri| %>
+          <text x="<%= label_offset - 6 %>" y="<%= label_offset + ri * cell_size + cell_size / 2 + 3 %>"
+                text-anchor="end" fill="var(--text-secondary)" font-size="8">
+            <%= tag_row.length > 12 ? "#{tag_row[0..11]}..." : tag_row %>
+          </text>
+          <% tags_list.each_with_index do |tag_col, ci| %>
+            <% val = @tag_cooccurrence.dig(tag_row, tag_col) || 0 %>
+            <% intensity = val > 0 ? (0.15 + (val.to_f / max_cooccurrence) * 0.85).round(2) : 0.03 %>
+            <rect x="<%= label_offset + ci * cell_size %>" y="<%= label_offset + ri * cell_size %>"
+                  width="<%= cell_size - 2 %>" height="<%= cell_size - 2 %>" rx="3"
+                  fill="#009688" opacity="<%= intensity %>"
+                  style="cursor: default;">
+              <title><%= tag_row %> + <%= tag_col %>: <%= val %></title>
+            </rect>
+            <% if val > 0 %>
+              <text x="<%= label_offset + ci * cell_size + (cell_size - 2) / 2 %>"
+                    y="<%= label_offset + ri * cell_size + (cell_size - 2) / 2 + 3 %>"
+                    text-anchor="middle" fill="<%= intensity > 0.5 ? '#fff' : 'var(--text-secondary)' %>" font-size="8" font-weight="600">
+                <%= val %>
+              </text>
+            <% end %>
+          <% end %>
+        <% end %>
+      </svg>
+    </div>
+  </div>
+<% end %>
+
+<%# Temporal Clusters %>
+<% if @temporal_clusters.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">schedule</span> Temporal Clusters</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Notes created on the same day, suggesting related work sessions</span>
+    </div>
+    <div style="padding: 1.25rem;">
+      <% @temporal_clusters.each do |date, notes| %>
+        <div style="margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span class="material-icons-outlined" style="font-size: 0.875rem; color: #009688;">event</span>
+            <span style="font-weight: 600; font-size: 0.875rem;"><%= Date.parse(date).strftime("%B %d, %Y") rescue date %></span>
+            <span style="font-size: 0.6875rem; padding: 0.125rem 0.5rem; background: var(--bg); border-radius: 9999px; color: var(--text-secondary);"><%= notes.length %> notes</span>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; padding-left: 1.375rem;">
+            <% notes.first(6).each do |note| %>
+              <span style="font-size: 0.8125rem; padding: 0.25rem 0.625rem; background: var(--bg); border-radius: 6px; border: 1px solid var(--border);">
+                <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--primary); text-decoration: none;" %>
+              </span>
+            <% end %>
+            <% if notes.length > 6 %>
+              <span style="font-size: 0.75rem; color: var(--text-secondary); padding: 0.25rem;">+<%= notes.length - 6 %> more</span>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Orphan Notes %>
+<% if @orphan_notes.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">warning</span> Orphan Notes</h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">Notes with no tags, no notebook, and no connections — consider tagging them</span>
+    </div>
+    <div style="padding: 1.25rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.75rem;">
+        <% @orphan_notes.first(20).each do |note| %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 0.75rem; background: var(--bg); border-radius: 6px; border: 1px solid var(--border);">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--negative);">description</span>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-size: 0.8125rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "color: var(--text); text-decoration: none;" %>
+              </div>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+                <%= (note["created_at"] || "").to_s.slice(0, 10) %>
+              </div>
+            </div>
+            <%= link_to note_path(note["id"]), style: "color: var(--text-secondary); text-decoration: none;" do %>
+              <span class="material-icons-outlined" style="font-size: 0.875rem;">edit</span>
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+      <% if @orphan_notes.length > 20 %>
+        <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.75rem; text-align: center;">
+          +<%= @orphan_notes.length - 20 %> more orphan notes
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# Bottom Nav %>
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Notes", notes_path, class: "btn" %>
+  <%= link_to "Knowledge Graph", knowledge_graph_notes_path, class: "btn" %>
+  <%= link_to "Writing Stats", writing_stats_path, class: "btn" %>
+</div>

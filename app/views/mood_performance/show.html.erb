@@ -1,0 +1,190 @@
+<% content_for(:title) { "Mood & Performance" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #e91e63;">psychology_alt</span>
+    Mood & Performance Analysis
+  </h1>
+</div>
+
+<% if @mood_stats.blank? || @total_matched == 0 %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; margin-bottom: 1rem;">psychology_alt</span>
+    <div style="font-size: 1.125rem; font-weight: 600;">No mood-trade correlations found</div>
+    <div style="margin-top: 0.5rem;">Add mood to your journal entries and trade on the same days to see this analysis.</div>
+    <div style="margin-top: 1rem;"><%= link_to "Write Journal Entry", new_journal_entry_path, class: "btn btn-primary" %></div>
+  </div>
+<% else %>
+
+<%# Recommendations %>
+<% if @recommendations.any? %>
+  <div style="display: grid; gap: 0.5rem; margin-bottom: 1.5rem;">
+    <% @recommendations.each do |rec| %>
+      <div class="card" style="padding: 0.75rem 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
+        <span class="material-icons-outlined" style="color: <%= rec[:color] %>;"><%= rec[:icon] %></span>
+        <span style="font-size: 0.875rem;"><%= rec[:text] %></span>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# Mood Category Summary %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Positive Moods</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @positive_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@positive_pnl) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @positive_wr %>% win rate</div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Negative Moods</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: <%= @negative_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(@negative_pnl) %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @negative_wr %>% win rate</div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Neutral Moods</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@neutral_pnl) %></div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Matched Trades</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @total_matched %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @match_rate %>% of all trades</div>
+    </div>
+    <div style="padding: 1.25rem; text-align: center;">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Unmatched</div>
+      <div style="font-size: 1.5rem; font-weight: 700; color: var(--text-secondary);"><%= @unmatched_count %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">no journal entry</div>
+    </div>
+  </div>
+</div>
+
+<%# P&L by Mood %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">mood</span> Performance by Mood</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <% pnl_max = @mood_stats.map { |m| m[:pnl].abs }.max.to_f; pnl_max = 1 if pnl_max == 0 %>
+    <% @mood_stats.each do |ms| %>
+      <%
+        is_positive = @positive_moods.include?(ms[:mood].downcase)
+        is_negative = @negative_moods.include?(ms[:mood].downcase)
+        mood_color = is_positive ? "var(--positive)" : (is_negative ? "var(--negative)" : "var(--text-secondary)")
+      %>
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.625rem;">
+        <span style="width: 6rem; font-weight: 600; font-size: 0.8125rem; text-align: right; color: <%= mood_color %>;"><%= ms[:mood] %></span>
+        <div style="flex: 1; height: 1.25rem; background: var(--bg); border-radius: 4px; overflow: hidden;">
+          <div style="height: 100%; width: <%= (ms[:pnl].abs / pnl_max * 100).round(1) %>%; background: <%= ms[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; opacity: 0.5; border-radius: 4px;"></div>
+        </div>
+        <span style="min-width: 5rem; text-align: right; font-size: 0.8125rem; font-weight: 600; color: <%= ms[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(ms[:pnl]) %></span>
+        <span style="min-width: 3rem; text-align: right; font-size: 0.6875rem;"><%= ms[:win_rate] %>%</span>
+        <span style="min-width: 3rem; text-align: right; font-size: 0.6875rem; color: var(--text-secondary);"><%= ms[:count] %> trades</span>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# Mood-P&L 30-Day Calendar %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">calendar_month</span> 30-Day Mood + P&L Calendar</h2>
+  </div>
+  <div style="padding: 1.25rem;">
+    <div style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px;">
+      <% %w[Mon Tue Wed Thu Fri Sat Sun].each do |d| %>
+        <div style="text-align: center; font-size: 0.5625rem; color: var(--text-secondary); font-weight: 600; padding-bottom: 4px;"><%= d %></div>
+      <% end %>
+      <%# Pad to start on correct day %>
+      <% first_wday = (@calendar_days.first[:date].wday + 6) % 7 %>
+      <% first_wday.times do %><div></div><% end %>
+      <% @calendar_days.each do |day| %>
+        <%
+          mood = day[:mood]
+          is_pos = mood && @positive_moods.include?(mood)
+          is_neg = mood && @negative_moods.include?(mood)
+          bg = if mood
+            is_pos ? "rgba(76,175,80,0.2)" : (is_neg ? "rgba(244,67,54,0.2)" : "rgba(158,158,158,0.15)")
+          else
+            "transparent"
+          end
+          border = day[:is_today] ? "2px solid var(--primary)" : "1px solid var(--border)"
+        %>
+        <div style="aspect-ratio: 1; border: <%= border %>; border-radius: 6px; background: <%= bg %>; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 0.625rem; position: relative;" title="<%= day[:date].strftime('%b %d') %><%= mood ? " — #{mood.capitalize}" : '' %><%= day[:has_trades] ? " — #{number_to_currency(day[:pnl])}" : '' %>">
+          <span style="font-weight: 600;"><%= day[:date].day %></span>
+          <% if mood %>
+            <span style="font-size: 0.5rem; color: <%= is_pos ? 'var(--positive)' : (is_neg ? 'var(--negative)' : 'var(--text-secondary)') %>;"><%= mood[0..3] %></span>
+          <% end %>
+          <% if day[:has_trades] %>
+            <span style="font-size: 0.4375rem; font-weight: 600; color: <%= day[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= day[:pnl] >= 0 ? '+' : '' %><%= (day[:pnl] / 1000.0).round(1) %>k</span>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+    <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 0.75rem; font-size: 0.625rem; color: var(--text-secondary);">
+      <span><span style="display: inline-block; width: 10px; height: 10px; background: rgba(76,175,80,0.3); border-radius: 2px; vertical-align: -1px;"></span> Positive mood</span>
+      <span><span style="display: inline-block; width: 10px; height: 10px; background: rgba(244,67,54,0.3); border-radius: 2px; vertical-align: -1px;"></span> Negative mood</span>
+      <span><span style="display: inline-block; width: 10px; height: 10px; background: rgba(158,158,158,0.2); border-radius: 2px; vertical-align: -1px;"></span> Neutral</span>
+    </div>
+  </div>
+</div>
+
+<%# Market Conditions %>
+<% if @condition_stats.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">cloud</span> Performance by Market Conditions</h2>
+    </div>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.8125rem;">
+        <thead>
+          <tr style="border-bottom: 2px solid var(--border);">
+            <th style="padding: 0.75rem 1rem; text-align: left;">Conditions</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Trades</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Win Rate</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Total P&L</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% @condition_stats.each do |cs| %>
+            <tr style="border-bottom: 1px solid var(--border);">
+              <td style="padding: 0.75rem 1rem; font-weight: 500;"><%= cs[:condition] %></td>
+              <td style="padding: 0.75rem 1rem; text-align: right;"><%= cs[:count] %></td>
+              <td style="padding: 0.75rem 1rem; text-align: right;"><%= cs[:win_rate] %>%</td>
+              <td style="padding: 0.75rem 1rem; text-align: right; font-weight: 600; color: <%= cs[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(cs[:pnl]) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% end %>
+
+<%# Best/Worst Mood Cards %>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+  <% if @best_mood %>
+    <div class="card" style="padding: 1.25rem; border-left: 4px solid var(--positive);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Trading Mood</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--positive); margin-top: 0.25rem;"><%= @best_mood[:mood] %></div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+        <%= @best_mood[:win_rate] %>% win rate &middot; <%= number_to_currency(@best_mood[:avg_pnl]) %>/trade &middot; <%= @best_mood[:count] %> trades
+      </div>
+    </div>
+  <% end %>
+  <% if @worst_mood && @worst_mood[:pnl] < 0 %>
+    <div class="card" style="padding: 1.25rem; border-left: 4px solid var(--negative);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Trading Mood</div>
+      <div style="font-size: 1.25rem; font-weight: 700; color: var(--negative); margin-top: 0.25rem;"><%= @worst_mood[:mood] %></div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+        <%= @worst_mood[:win_rate] %>% win rate &middot; <%= number_to_currency(@worst_mood[:avg_pnl]) %>/trade &middot; <%= @worst_mood[:count] %> trades
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% end %>
+
+<div style="text-align: center; margin-top: 1.5rem;">
+  <%= link_to "Journal", journal_entries_path, class: "btn" %>
+  <%= link_to "Journal Insights", journal_insights_path, class: "btn" %>
+  <%= link_to "Report Card", trading_grades_path, class: "btn" %>
+</div>

@@ -1,0 +1,9 @@
+<div class="page-header">
+  <h1>New Note</h1>
+</div>
+
+<div class="card">
+  <%= render "form", note: @note, notebooks: @notebooks, tags: @tags,
+             form_url: notes_path, form_method: :post,
+             submit_label: "Create Note", cancel_path: notes_path %>
+</div>

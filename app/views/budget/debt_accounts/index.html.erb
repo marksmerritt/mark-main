@@ -1,0 +1,166 @@
+<div class="page-header">
+  <h1>Debt Snowball</h1>
+  <div class="page-actions">
+    <%= link_to "Compare Plans", compare_plans_budget_debt_accounts_path, class: "btn" %>
+    <%= link_to "Add Debt", new_budget_debt_account_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<% if @overview.present? && !@overview["error"] && @overview["total_debt"].to_f > 0 %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Debt</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@overview["total_debt"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Mins</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@overview["total_minimum_payments"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Interest</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@overview["total_monthly_interest"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Paid</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@overview["total_paid"]) %></div>
+      </div>
+    </div>
+  </div>
+<% end %>
+
+<% if @accounts.is_a?(Array) && @accounts.any? %>
+  <%
+    active_accounts = @accounts.select { |a| a["status"] == "active" }
+    total_balance = active_accounts.sum { |a| a["balance"].to_f }
+    total_original = active_accounts.sum { |a| a["original_balance"].to_f }
+    palette = %w[#1a73e8 #ea4335 #34a853 #fbbc04 #9334e6 #e8710a #0d904f #d93025]
+  %>
+  <% if active_accounts.size > 1 && total_balance > 0 %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header"><h2>Debt Composition</h2></div>
+      <div style="padding: 1rem 1.25rem;">
+        <%# Stacked bar %>
+        <div style="display: flex; height: 2rem; border-radius: var(--radius); overflow: hidden; margin-bottom: 0.75rem;">
+          <% active_accounts.sort_by { |a| -a["balance"].to_f }.each_with_index do |a, i| %>
+            <% pct = (a["balance"].to_f / total_balance * 100).round(1) %>
+            <div style="width: <%= pct %>%; background: <%= palette[i % palette.size] %>; display: flex; align-items: center; justify-content: center; min-width: 2rem;"
+                 title="<%= a["name"] %>: <%= number_to_currency(a["balance"]) %> (<%= pct %>%)">
+              <% if pct > 8 %>
+                <span style="font-size: 0.6875rem; font-weight: 600; color: white;"><%= pct %>%</span>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+
+        <%# Legend %>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.75rem;">
+          <% active_accounts.sort_by { |a| -a["balance"].to_f }.each_with_index do |a, i| %>
+            <div style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+              <div style="width: 10px; height: 10px; border-radius: 50%; background: <%= palette[i % palette.size] %>;"></div>
+              <span><%= a["name"] %></span>
+              <span style="color: var(--text-secondary);"><%= number_to_currency(a["balance"]) %></span>
+            </div>
+          <% end %>
+        </div>
+
+        <%# Overall progress %>
+        <% if total_original > 0 %>
+          <% overall_pct = ((1 - total_balance / total_original) * 100).clamp(0, 100).round(1) %>
+          <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border);">
+            <div style="display: flex; justify-content: space-between; font-size: 0.8125rem; margin-bottom: 0.375rem;">
+              <span style="color: var(--text-secondary);">Overall payoff progress</span>
+              <span style="font-weight: 600;"><%= overall_pct %>%</span>
+            </div>
+            <div class="budget-progress-bar">
+              <div class="budget-progress-fill progress-safe" style="width: <%= overall_pct %>%;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+              <span>Paid: <%= number_to_currency(total_original - total_balance) %></span>
+              <span>Remaining: <%= number_to_currency(total_balance) %></span>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+  <% @accounts.each do |account| %>
+    <div class="card" style="margin-bottom: 1rem;">
+      <div class="card-header">
+        <h2><%= account["name"] %></h2>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <span class="tag"><%= debt_type_label(account["debt_type"]) %></span>
+          <span class="badge badge-<%= account["status"] == "paid_off" ? "success" : "primary" %>"><%= account["status"]&.humanize %></span>
+        </div>
+      </div>
+
+      <% if account["status"] == "active" %>
+        <div class="budget-progress-bar" style="margin: 0 1.25rem 0.75rem;">
+          <div class="budget-progress-fill progress-safe" style="width: <%= account["percentage_paid"].to_f %>%"></div>
+        </div>
+      <% end %>
+
+      <div class="detail-grid">
+        <div class="detail-item">
+          <span class="detail-label">Balance</span>
+          <span class="detail-value negative"><%= number_to_currency(account["balance"]) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Interest Rate</span>
+          <span class="detail-value"><%= account["interest_rate"] %>%</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Minimum Payment</span>
+          <span class="detail-value"><%= number_to_currency(account["minimum_payment"]) %></span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Paid Off</span>
+          <span class="detail-value"><%= account["percentage_paid"] %>%</span>
+        </div>
+        <% if account["payoff_months"].to_i > 0 && account["payoff_months"].to_i < 360 %>
+          <div class="detail-item">
+            <span class="detail-label">Payoff Time</span>
+            <span class="detail-value"><%= account["payoff_months"] %> months</span>
+          </div>
+        <% end %>
+      </div>
+
+      <div style="padding: 0.5rem 1.25rem; display: flex; gap: 0.5rem;">
+        <%= link_to "Details", budget_debt_account_path(account["id"]), class: "btn btn-sm" %>
+        <% if account["status"] == "active" %>
+          <%= link_to "Make Payment", budget_debt_account_path(account["id"]), class: "btn btn-sm btn-primary" %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% else %>
+  <div class="card empty-state">
+    <p>No debt accounts. You're debt free! (Or add your debts to track payoff progress.)</p>
+  </div>
+<% end %>
+
+<% if @plan.present? && !@plan["error"] %>
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+      <h2>Snowball Payoff Plan</h2>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <span class="detail-label">Total Debt</span>
+        <span class="detail-value"><%= number_to_currency(@plan["total_debt"]) %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Total Interest</span>
+        <span class="detail-value negative"><%= number_to_currency(@plan["total_interest_cost"]) %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Payoff Time</span>
+        <span class="detail-value"><%= @plan["payoff_months"] %> months</span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Debt Free By</span>
+        <span class="detail-value positive"><%= @plan["payoff_date"] %></span>
+      </div>
+    </div>
+  </div>
+<% end %>

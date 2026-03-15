@@ -1,0 +1,211 @@
+<div class="page-header">
+  <h1>Execution Quality</h1>
+  <div class="page-actions">
+    <%= link_to "Scorecard", reports_scorecard_path, class: "btn btn-sm" %>
+    <%= link_to "Risk Analysis", reports_risk_analysis_path, class: "btn btn-sm" %>
+  </div>
+</div>
+
+<% if @trades_analyzed == 0 %>
+  <div class="card">
+    <p class="empty-state">No closed trades found. Close and review trades to see execution metrics.</p>
+  </div>
+<% else %>
+
+  <% if @overall_score %>
+    <div class="card" style="display: flex; align-items: center; gap: 1.5rem; padding: 1.5rem;">
+      <div class="grade-circle <%= @overall_score >= 80 ? 'grade-a' : @overall_score >= 60 ? 'grade-b' : @overall_score >= 40 ? 'grade-c' : 'grade-f' %>"
+           style="width: 5rem; height: 5rem; border-width: 4px; flex-shrink: 0;">
+        <span class="grade-letter" style="font-size: 1.5rem;"><%= @overall_score %></span>
+        <span class="grade-score" style="font-size: 0.625rem;">/ 100</span>
+      </div>
+      <div>
+        <h2 style="margin-bottom: 0.25rem;">Overall Execution Score</h2>
+        <p class="text-muted" style="font-size: 0.875rem;">
+          Based on plan adherence, MFE capture efficiency, MAE control, and target capture across
+          <strong><%= @trades_analyzed %></strong> trades.
+        </p>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <% if @scores[:plan_adherence] %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Plan Adherence</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @scores[:plan_adherence] >= 80 ? 'positive' : @scores[:plan_adherence] >= 50 ? '' : 'negative' %>"><%= @scores[:plan_adherence] %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @metrics[:plan_adherence][:followed] %>/<%= @metrics[:plan_adherence][:total] %> followed plan</div>
+        </div>
+      <% end %>
+      <% if @scores[:mfe_efficiency] %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">MFE Capture</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @scores[:mfe_efficiency] >= 60 ? 'positive' : @scores[:mfe_efficiency] >= 30 ? '' : 'negative' %>"><%= @scores[:mfe_efficiency] %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Of max favorable excursion on wins</div>
+        </div>
+      <% end %>
+      <% if @scores[:mae_control] %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">MAE Control</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @scores[:mae_control] <= 80 ? 'positive' : 'negative' %>"><%= @scores[:mae_control] %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Loss vs max adverse (lower = better)</div>
+        </div>
+      <% end %>
+      <% if @scores[:target_hit_rate] %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Target Hit Rate</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= @scores[:target_hit_rate] %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= @metrics[:target_capture][:hit] %>/<%= @metrics[:target_capture][:total_with_targets] %> targets hit</div>
+        </div>
+      <% end %>
+      <% if @scores[:avg_capture] %>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Move Capture</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= @scores[:avg_capture] %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Of planned move captured</div>
+        </div>
+      <% end %>
+      <% if @scores[:stop_discipline] %>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Stop Usage</div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= @scores[:stop_discipline] %>%</div>
+          <div style="font-size: 0.75rem; color: var(--text-secondary);">Of trades with stops hit</div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <%# Visual score breakdown bars %>
+  <% if @overall_score %>
+    <%
+      score_items = []
+      score_items << { label: "Plan Adherence", score: @scores[:plan_adherence], icon: "assignment" } if @scores[:plan_adherence]
+      score_items << { label: "MFE Capture", score: @scores[:mfe_efficiency], icon: "trending_up" } if @scores[:mfe_efficiency]
+      score_items << { label: "MAE Control", score: [100 - @scores[:mae_control].to_i, 0].max, icon: "shield" } if @scores[:mae_control]
+      score_items << { label: "Target Hit Rate", score: @scores[:target_hit_rate], icon: "gps_fixed" } if @scores[:target_hit_rate]
+      score_items << { label: "Move Capture", score: @scores[:avg_capture], icon: "straighten" } if @scores[:avg_capture]
+    %>
+    <% if score_items.count >= 3 %>
+      <div class="card" style="margin-top: 1.5rem;">
+        <div class="card-header"><h2>Score Breakdown</h2></div>
+        <div style="padding: 1rem 1.25rem;">
+          <% score_items.each do |item| %>
+            <%
+              s = item[:score].to_i
+              color = s >= 70 ? "var(--positive)" : s >= 45 ? "var(--primary)" : s >= 25 ? "#f9ab00" : "var(--negative)"
+            %>
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.625rem;">
+              <span class="material-icons-outlined" style="font-size: 1rem; color: <%= color %>; width: 20px;"><%= item[:icon] %></span>
+              <span style="width: 100px; font-size: 0.8125rem; font-weight: 600;"><%= item[:label] %></span>
+              <div style="flex: 1; height: 12px; background: var(--bg); border-radius: 6px; overflow: hidden;">
+                <div style="height: 100%; width: <%= s %>%; background: <%= color %>; border-radius: 6px; transition: width 0.3s;"></div>
+              </div>
+              <span style="width: 40px; text-align: right; font-size: 0.875rem; font-weight: 700; color: <%= color %>;"><%= s %>%</span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <% if @metrics[:grade_distribution].any? %>
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <h2>Grade Distribution</h2>
+        <span class="text-muted"><%= @metrics[:grade_distribution].values.sum %> graded trades</span>
+      </div>
+      <div style="padding: 1rem 1.25rem;">
+        <% grade_colors = { "A" => "var(--positive)", "B" => "#34a853", "C" => "#ea8600", "D" => "#f59e0b", "F" => "var(--negative)" } %>
+        <% total_graded = @metrics[:grade_distribution].values.sum.to_f %>
+        <% %w[A B C D F].each do |grade| %>
+          <% count = @metrics[:grade_distribution][grade] || 0 %>
+          <% pct = total_graded > 0 ? (count / total_graded * 100).round(1) : 0 %>
+          <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+            <span style="width: 1.5rem; font-weight: 700; color: <%= grade_colors[grade] || 'var(--text)' %>;"><%= grade %></span>
+            <div class="budget-progress-bar" style="flex: 1; height: 1.25rem;">
+              <div style="width: <%= pct %>%; height: 100%; background: <%= grade_colors[grade] || 'var(--primary)' %>; border-radius: var(--radius); transition: width 0.3s;"></div>
+            </div>
+            <span style="width: 4rem; text-align: right; font-size: 0.8125rem; font-variant-numeric: tabular-nums;"><%= count %> (<%= pct %>%)</span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @metrics[:emotion_distribution].any? %>
+    <div class="card" style="margin-top: 1.5rem;">
+      <div class="card-header">
+        <h2>Emotional State Distribution</h2>
+      </div>
+      <%
+        emotion_colors = {
+          "calm" => "#34a853", "focused" => "#1a73e8", "confident" => "#0d904f",
+          "anxious" => "#ea8600", "fearful" => "#f59e0b", "greedy" => "#d93025",
+          "fomo" => "#dc2626", "revenge" => "#991b1b", "bored" => "#9aa0a6"
+        }
+        emotion_icons = {
+          "calm" => "spa", "focused" => "center_focus_strong", "confident" => "thumb_up",
+          "anxious" => "psychology", "fearful" => "warning", "greedy" => "attach_money",
+          "fomo" => "speed", "revenge" => "gavel", "bored" => "hotel_class"
+        }
+        sorted_emotions = @metrics[:emotion_distribution].sort_by { |_, v| -v }
+      %>
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.75rem; padding: 1rem 1.25rem;">
+        <% sorted_emotions.each do |emotion, count| %>
+          <div style="text-align: center; padding: 0.75rem; border: 1px solid var(--border); border-radius: var(--radius);">
+            <span class="material-icons-outlined" style="font-size: 1.5rem; color: <%= emotion_colors[emotion] || 'var(--text-secondary)' %>;">
+              <%= emotion_icons[emotion] || "sentiment_neutral" %>
+            </span>
+            <div style="font-weight: 600; font-size: 1.25rem; margin: 0.25rem 0;"><%= count %></div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);"><%= emotion&.capitalize %></div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+      <h2>Execution Tips</h2>
+    </div>
+    <div style="padding: 1rem 1.25rem;">
+      <% tips = [] %>
+
+      <% if @scores[:plan_adherence] && @scores[:plan_adherence] < 70 %>
+        <% tips << { icon: "assignment", text: "Plan adherence is below 70%. Consider writing more detailed trade plans before entering.", type: "warning" } %>
+      <% end %>
+
+      <% if @scores[:mfe_efficiency] && @scores[:mfe_efficiency] < 40 %>
+        <% tips << { icon: "trending_up", text: "You're leaving money on the table — capturing only #{@scores[:mfe_efficiency]}% of max favorable moves. Consider trailing stops.", type: "warning" } %>
+      <% end %>
+
+      <% if @scores[:mae_control] && @scores[:mae_control] > 90 %>
+        <% tips << { icon: "shield", text: "Losses are close to max adverse excursion, suggesting stops are being hit. Tighten entries or widen stops strategically.", type: "warning" } %>
+      <% end %>
+
+      <% if @scores[:target_hit_rate] && @scores[:target_hit_rate] > 70 %>
+        <% tips << { icon: "emoji_events", text: "Great target hit rate at #{@scores[:target_hit_rate]}%. Your targets are well-calibrated.", type: "success" } %>
+      <% end %>
+
+      <% if @scores[:plan_adherence] && @scores[:plan_adherence] >= 80 %>
+        <% tips << { icon: "check_circle", text: "Strong plan adherence at #{@scores[:plan_adherence]}%. Disciplined execution!", type: "success" } %>
+      <% end %>
+
+      <% if @metrics[:emotion_distribution]["revenge"].to_i > 2 %>
+        <% tips << { icon: "warning", text: "#{@metrics[:emotion_distribution]["revenge"]} revenge trades detected. Consider mandatory cool-down periods after losses.", type: "danger" } %>
+      <% end %>
+
+      <% if tips.empty? %>
+        <% tips << { icon: "info", text: "Review and grade more trades to get personalized execution tips.", type: "info" } %>
+      <% end %>
+
+      <% tips.each do |tip| %>
+        <div class="insight-item insight-<%= tip[:type] %>" style="margin-bottom: 0.5rem;">
+          <span class="material-icons-outlined"><%= tip[:icon] %></span>
+          <span><%= tip[:text] %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

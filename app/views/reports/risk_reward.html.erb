@@ -1,0 +1,163 @@
+<div class="page-header">
+  <h1>Risk/Reward Analysis</h1>
+  <div class="page-actions">
+    <button class="btn" onclick="window.print()">
+      <span class="material-icons-outlined">print</span> Print
+    </button>
+  </div>
+</div>
+
+<div class="card">
+  <%= form_with url: reports_risk_reward_path, method: :get, class: "filter-form" do |f| %>
+    <div class="filter-row">
+      <div class="form-group">
+        <%= f.label :start_date, "Start Date" %>
+        <%= f.date_field :start_date, value: params[:start_date], class: "form-control" %>
+      </div>
+      <div class="form-group">
+        <%= f.label :end_date, "End Date" %>
+        <%= f.date_field :end_date, value: params[:end_date], class: "form-control" %>
+      </div>
+      <div class="form-group form-actions-inline">
+        <%= f.submit "Apply", class: "btn btn-primary" %>
+        <%= link_to "Clear", reports_risk_reward_path, class: "btn" %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<% if @trades_data.present? && @trades_data.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg R:R Ratio</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= @avg_rr >= 0 ? 'positive' : 'negative' %>"><%= @avg_rr %>R</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win R:R</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= @avg_win_rr %>R</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss R:R</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= @avg_loss_rr %>R</div>
+      </div>
+      <% if @best_rr %>
+        <div style="padding: 1rem; text-align: center;">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best R:R</div>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= @best_rr[:rr_ratio] %>R</div>
+          <div style="font-size: 0.75rem;"><%= @best_rr[:symbol] %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Risk vs Reward Scatter</h2>
+      <span class="text-muted">Each dot is a trade</span>
+    </div>
+    <div class="chart-wrapper"
+         data-controller="chart"
+         data-chart-type-value="scatter"
+         data-chart-points-value="<%= @trades_data.map { |t| { x: t[:risk], y: t[:pnl], label: t[:symbol] } }.to_json %>">
+    </div>
+  </div>
+
+  <%
+    # Group by R:R bucket
+    buckets = { "< -2R" => [], "-2R to -1R" => [], "-1R to 0R" => [], "0R to 1R" => [], "1R to 2R" => [], "2R to 3R" => [], "> 3R" => [] }
+    @trades_data.each do |t|
+      rr = t[:rr_ratio]
+      key = case rr
+            when ..(- 2)   then "< -2R"
+            when (-2)...(-1) then "-2R to -1R"
+            when (-1)...0    then "-1R to 0R"
+            when 0...1       then "0R to 1R"
+            when 1...2       then "1R to 2R"
+            when 2...3       then "2R to 3R"
+            else "> 3R"
+            end
+      buckets[key] << t
+    end
+  %>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>R:R Distribution</h2>
+    </div>
+    <% max_count = buckets.values.map(&:count).max.to_f %>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>R:R Range</th>
+          <th>Trades</th>
+          <th>Avg P&L</th>
+          <th>Total P&L</th>
+          <th>Distribution</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% buckets.each do |range, trades| %>
+          <% next if trades.empty? %>
+          <%
+            avg = (trades.sum { |t| t[:pnl] } / trades.count).round(2)
+            total = trades.sum { |t| t[:pnl] }.round(2)
+          %>
+          <tr>
+            <td><strong><%= range %></strong></td>
+            <td><%= trades.count %></td>
+            <td class="<%= pnl_class(avg) %>"><%= number_to_currency(avg) %></td>
+            <td class="<%= pnl_class(total) %>"><%= number_to_currency(total) %></td>
+            <td>
+              <div class="mini-bar-container">
+                <div class="mini-bar <%= total >= 0 ? 'positive' : 'negative' %>"
+                     style="width: <%= max_count > 0 ? (trades.count / max_count * 100).round(1) : 0 %>%"></div>
+              </div>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>All Trades by R:R</h2>
+      <span class="text-muted"><%= @trades_data.count %> closed trades</span>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Symbol</th>
+          <th>Side</th>
+          <th>Entry</th>
+          <th>Exit</th>
+          <th>P&L</th>
+          <th>Risk</th>
+          <th>R:R</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% @trades_data.sort_by { |t| -t[:rr_ratio] }.each do |trade| %>
+          <tr>
+            <td><%= trade[:date] %></td>
+            <td><strong><%= link_to trade[:symbol], trade_path(trade[:id]) %></strong></td>
+            <td><%= trade[:side]&.capitalize %></td>
+            <td><%= number_to_currency(trade[:entry]) %></td>
+            <td><%= number_to_currency(trade[:exit_price]) %></td>
+            <td class="<%= pnl_class(trade[:pnl]) %>"><%= number_to_currency(trade[:pnl]) %></td>
+            <td><%= number_to_currency(trade[:risk]) %></td>
+            <td>
+              <strong class="<%= trade[:rr_ratio] >= 0 ? 'positive' : 'negative' %>"><%= trade[:rr_ratio] %>R</strong>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <div class="card empty-state" style="padding: 3rem; text-align: center;">
+    <p>No closed trades found.</p>
+  </div>
+<% end %>

@@ -1,44 +1,613 @@
-<h1>Dashboard</h1>
+<div style="display: flex; justify-content: space-between; align-items: center;">
+  <h1>Dashboard</h1>
+  <%= link_to getting_started_path, class: "btn btn-sm", title: "Getting Started" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">help_outline</span> Getting Started
+  <% end %>
+</div>
 
-<% if @stats.present? && !@stats["error"] %>
-  <div class="stats-grid">
-    <div class="card stat-card">
-      <h3>Total P&L</h3>
-      <p class="stat-value <%= @stats["total_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
-        <%= number_to_currency(@stats["total_pnl"]) %>
-      </p>
-    </div>
+<div class="quick-actions">
+  <%= link_to new_trade_path, class: "quick-action-btn" do %>
+    <%= icon("add_circle_outline") %>
+    <span>New Trade</span>
+  <% end %>
+  <%= link_to new_note_path, class: "quick-action-btn" do %>
+    <%= icon("edit_note") %>
+    <span>New Note</span>
+  <% end %>
+  <%= link_to new_journal_entry_path, class: "quick-action-btn" do %>
+    <%= icon("auto_stories") %>
+    <span>Journal</span>
+  <% end %>
+  <%= link_to new_trade_plan_path, class: "quick-action-btn" do %>
+    <%= icon("assignment") %>
+    <span>Trade Plan</span>
+  <% end %>
+  <%= link_to position_calculator_path, class: "quick-action-btn" do %>
+    <%= icon("calculate") %>
+    <span>Calculator</span>
+  <% end %>
+  <%= link_to search_path, class: "quick-action-btn" do %>
+    <%= icon("search") %>
+    <span>Search</span>
+  <% end %>
+  <%= link_to morning_briefing_path, class: "quick-action-btn" do %>
+    <%= icon("wb_sunny") %>
+    <span>Briefing</span>
+  <% end %>
+  <%= link_to achievements_path, class: "quick-action-btn" do %>
+    <%= icon("emoji_events") %>
+    <span>Achievements</span>
+  <% end %>
+</div>
 
-    <div class="card stat-card">
-      <h3>Total Trades</h3>
-      <p class="stat-value"><%= @stats["total_trades"] %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Win Rate</h3>
-      <p class="stat-value"><%= @stats["win_rate"] %>%</p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Profit Factor</h3>
-      <p class="stat-value"><%= @stats["profit_factor"] %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Avg Win</h3>
-      <p class="stat-value positive"><%= number_to_currency(@stats["avg_win"]) %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Avg Loss</h3>
-      <p class="stat-value negative"><%= number_to_currency(@stats["avg_loss"]) %></p>
+<% if @health_score.present? %>
+  <div class="health-score-card card">
+    <div class="health-score-header">
+      <div class="health-score-ring" style="--score: <%= @health_score[:overall] %>; --score-color: <%= score_color(@health_score[:overall]) %>;">
+        <svg viewBox="0 0 120 120" class="health-ring-svg">
+          <circle cx="60" cy="60" r="52" fill="none" stroke="var(--border)" stroke-width="8"/>
+          <circle cx="60" cy="60" r="52" fill="none" stroke="<%= score_color(@health_score[:overall]) %>" stroke-width="8"
+                  stroke-dasharray="<%= (326.7 * @health_score[:overall] / 100.0).round(1) %> 326.7"
+                  stroke-linecap="round" transform="rotate(-90 60 60)"/>
+        </svg>
+        <div class="health-ring-text">
+          <span class="health-ring-number"><%= @health_score[:overall] %></span>
+          <span class="health-ring-grade"><%= @health_score[:grade] %></span>
+        </div>
+      </div>
+      <div class="health-score-details">
+        <h3>Financial Health Score</h3>
+        <div class="health-score-components">
+          <% component_labels = { trading: "Trading", journal: "Journal", budget: "Budget", notes: "Notes" } %>
+          <% component_icons = { trading: "trending_up", journal: "auto_stories", budget: "account_balance", notes: "description" } %>
+          <% @health_score[:components].each do |key, value| %>
+            <div class="health-component">
+              <div class="health-component-label">
+                <span class="material-icons-outlined" style="font-size: 1rem;"><%= component_icons[key] %></span>
+                <span><%= component_labels[key] %></span>
+              </div>
+              <div class="health-component-bar">
+                <div class="health-component-fill" style="width: <%= value %>%; background: <%= score_color(value) %>;"></div>
+              </div>
+              <span class="health-component-value"><%= value %></span>
+            </div>
+          <% end %>
+        </div>
+      </div>
     </div>
   </div>
+<% end %>
+
+<%# Earned Badges %>
+<% if @stats.present? && !@stats["error"] %>
+  <% badges = earned_badges(@stats, @streaks) %>
+  <% earned = badges.select { |b| b[:earned] } %>
+  <% if earned.any? %>
+    <div class="badges-section">
+      <div class="badges-grid">
+        <% earned.each do |badge| %>
+          <div class="badge-chip badge-earned" title="<%= badge[:desc] %>">
+            <span class="material-icons-outlined"><%= badge[:icon] %></span>
+            <span><%= badge[:name] %></span>
+          </div>
+        <% end %>
+        <% next_badge = badges.find { |b| !b[:earned] } %>
+        <% if next_badge %>
+          <div class="badge-chip badge-locked" title="<%= next_badge[:desc] %>">
+            <span class="material-icons-outlined">lock</span>
+            <span><%= next_badge[:name] %></span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+<% end %>
+
+<% if @stats.present? && !@stats["error"] %>
+  <% insights = trading_insights(@stats, @streaks) %>
+  <% if insights.any? %>
+    <div class="insights-banner">
+      <% insights.each do |insight| %>
+        <div class="insight-item insight-<%= insight[:type] %>">
+          <span class="material-icons-outlined"><%= insight[:icon] %></span>
+          <span><%= insight[:text] %></span>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# Streak alerts %>
+  <% if @streaks.present? && !@streaks["error"] %>
+    <% if @streaks["current_winning_day_streak"].to_i >= 3 %>
+      <div class="streak-alert streak-alert-positive">
+        <span class="material-icons-outlined">local_fire_department</span>
+        <strong>Hot streak!</strong> You're on a <%= @streaks["current_winning_day_streak"] %>-day winning streak. Keep it going!
+      </div>
+    <% elsif @streaks["current_losing_day_streak"].to_i >= 3 %>
+      <div class="streak-alert streak-alert-negative">
+        <span class="material-icons-outlined">warning</span>
+        <strong>Heads up:</strong> <%= @streaks["current_losing_day_streak"] %>-day losing streak. Consider reviewing your strategy or taking a break.
+      </div>
+    <% end %>
+
+    <% if @streaks["journal_entry_streak"].to_i >= 7 %>
+      <div class="streak-alert streak-alert-info">
+        <span class="material-icons-outlined">auto_stories</span>
+        <strong>Journal streak!</strong> <%= @streaks["journal_entry_streak"] %> consecutive days journaling. Great discipline!
+      </div>
+    <% end %>
+  <% end %>
+
+  <% if @unreviewed_count.to_i > 0 %>
+    <div class="streak-alert streak-alert-info">
+      <span class="material-icons-outlined">rate_review</span>
+      <strong><%= @unreviewed_count %> unreviewed trade<%= @unreviewed_count == 1 ? '' : 's' %></strong> —
+      <%= link_to "Review now", review_trades_path, style: "color: inherit; text-decoration: underline;" %>
+    </div>
+  <% end %>
+
+  <%# Review completion rate %>
+  <% if @review_stats.present? && !@review_stats["error"] %>
+    <%
+      reviewed = @review_stats["reviewed_count"].to_i
+      total_for_review = @review_stats["total_count"].to_i
+      review_pct = total_for_review > 0 ? (reviewed.to_f / total_for_review * 100).round(0) : 0
+      graded = @review_stats["graded_count"].to_i
+    %>
+    <% if total_for_review > 0 %>
+      <div class="card" style="margin-bottom: 1rem;">
+        <div style="padding: 0.75rem 1.25rem; display: flex; align-items: center; gap: 1rem;">
+          <div style="flex-shrink: 0; position: relative; width: 48px; height: 48px;">
+            <svg viewBox="0 0 36 36" style="transform: rotate(-90deg);">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" stroke-width="3" />
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="<%= review_pct >= 80 ? 'var(--positive)' : review_pct >= 50 ? 'var(--primary)' : 'var(--negative)' %>"
+                      stroke-width="3" stroke-dasharray="<%= review_pct %> 100" stroke-linecap="round" />
+            </svg>
+            <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.6875rem; font-weight: 700;">
+              <%= review_pct %>%
+            </div>
+          </div>
+          <div style="flex: 1;">
+            <div style="font-size: 0.875rem; font-weight: 600;">Trade Review Rate</div>
+            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+              <%= reviewed %> of <%= total_for_review %> trades reviewed
+              <% if graded > 0 %> · <%= graded %> graded<% end %>
+            </div>
+          </div>
+          <%= link_to "Review", review_trades_path, class: "btn btn-sm" %>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <div class="card">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(@stats["total_pnl"]) %>"><%= number_to_currency(@stats["total_pnl"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @stats["total_trades"] %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= @stats["win_rate"].to_f >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= @stats["win_rate"] %>%</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profit Factor</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @stats["profit_factor"] %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(@stats["avg_win"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(@stats["avg_loss"]) %></div>
+      </div>
+    </div>
+  </div>
+
+  <% if @streaks.present? && !@streaks["error"] %>
+    <% trading_days = @streaks["trading_days"] || {} %>
+    <div class="card">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Current Streak</div>
+          <%
+            cs = @streaks["current_streak"]
+            if cs.is_a?(Hash)
+              cs_count = cs["count"].to_i
+              cs_type = cs["type"]&.capitalize || (cs_count >= 0 ? "Win" : "Loss")
+            else
+              cs_count = cs.to_i
+              cs_type = @streaks["current_streak_type"]&.capitalize || (cs_count >= 0 ? "Win" : "Loss")
+            end
+          %>
+          <div style="font-size: 1.5rem; font-weight: 700;" class="<%= cs_type == "Win" ? 'positive' : 'negative' %>"><%= cs_count.abs %> <%= cs_type %></div>
+        </div>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Best Win Streak</div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @streaks["best_win_streak"] %></div>
+        </div>
+        <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Worst Loss Streak</div>
+          <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= @streaks["worst_loss_streak"] %></div>
+        </div>
+        <% if trading_days["this_week"] %>
+          <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">This Week</div>
+            <div style="font-size: 1.5rem; font-weight: 700;"><%= trading_days["this_week"] %> days</div>
+          </div>
+        <% end %>
+        <% if trading_days["this_month"] %>
+          <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">This Month</div>
+            <div style="font-size: 1.5rem; font-weight: 700;"><%= trading_days["this_month"] %> days</div>
+          </div>
+        <% end %>
+        <% if @streaks["journal_entry_streak"].to_i > 0 %>
+          <div style="padding: 1rem; text-align: center;">
+            <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Journal Streak</div>
+            <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= @streaks["journal_entry_streak"] %> days</div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+
+    <%# Trading activity calendar for current month %>
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-header">
+          <h2><%= Date.today.strftime("%B %Y") %> Trading Activity</h2>
+        </div>
+        <div style="padding: 1rem;">
+          <div class="streak-grid">
+            <% %w[Sun Mon Tue Wed Thu Fri Sat].each do |day| %>
+              <div class="streak-day" style="font-weight: 600; font-size: 0.625rem;"><%= day %></div>
+            <% end %>
+            <%
+              today = Date.today
+              first_of_month = today.beginning_of_month
+              raw_pnl = @stats.is_a?(Hash) ? (@stats["daily_pnl"] || {}) : {}
+              daily_pnl = raw_pnl.is_a?(Array) ? raw_pnl.to_h : raw_pnl
+              first_of_month.wday.times do %>
+              <div class="streak-day"></div>
+            <% end %>
+            <% (first_of_month..today.end_of_month).each do |date| %>
+              <%
+                date_str = date.strftime("%Y-%m-%d")
+                has_trade = daily_pnl.key?(date_str)
+                is_today = date == today
+                pnl_val = daily_pnl[date_str]&.to_f
+              %>
+              <div class="streak-day <%= 'streak-day-active' if has_trade %> <%= 'streak-day-empty' unless has_trade %> <%= 'streak-day-today' if is_today %>"
+                   <% if has_trade %>
+                     title="<%= date_str %>: <%= number_to_currency(pnl_val) %>"
+                     style="background: <%= pnl_val && pnl_val >= 0 ? 'var(--positive)' : 'var(--negative)' %>"
+                   <% end %>>
+                <%= date.day %>
+              </div>
+            <% end %>
+          </div>
+        </div>
+      </div>
+
+      <%
+        total_pnl = @stats["total_pnl"].to_f
+        total_trades = @stats["total_trades"].to_i
+        win_rate = @stats["win_rate"].to_f
+      %>
+      <div class="card" data-controller="goals"
+           data-goals-pnl-value="<%= total_pnl %>"
+           data-goals-win-rate-value="<%= win_rate %>"
+           data-goals-trade-count-value="<%= total_trades %>">
+        <div class="card-header">
+          <h2>Goals</h2>
+          <button class="btn btn-sm" data-action="goals#toggleEditor" title="Edit goals">
+            <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">tune</span>
+          </button>
+        </div>
+
+        <div class="goals-editor hidden" data-goals-target="editor">
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; padding: 0.75rem 1.25rem;">
+            <div class="form-group">
+              <label>P&L Target ($)</label>
+              <input type="number" class="form-control" data-goals-target="pnlTarget" step="1000">
+            </div>
+            <div class="form-group">
+              <label>Win Rate Target (%)</label>
+              <input type="number" class="form-control" data-goals-target="winRateTarget" step="5" min="0" max="100">
+            </div>
+            <div class="form-group">
+              <label>Trade Count Target</label>
+              <input type="number" class="form-control" data-goals-target="tradeCountTarget" step="10">
+            </div>
+          </div>
+          <div style="display: flex; gap: 0.5rem; padding: 0 1.25rem 0.75rem;">
+            <button class="btn btn-primary btn-sm" data-action="goals#apply">Save Goals</button>
+            <button class="btn btn-sm" data-action="goals#reset">Reset to Defaults</button>
+          </div>
+        </div>
+
+        <div class="goal-item">
+          <div class="goal-header">
+            <span>Monthly P&L Target</span>
+            <span data-goals-target="pnlLabel"></span>
+          </div>
+          <div class="goal-bar" data-goals-target="pnlBar">
+            <div class="goal-bar-fill" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <div class="goal-item">
+          <div class="goal-header">
+            <span>Win Rate Target</span>
+            <span data-goals-target="winRateLabel" data-suffix="%"></span>
+          </div>
+          <div class="goal-bar" data-goals-target="winRateBar">
+            <div class="goal-bar-fill" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <div class="goal-item">
+          <div class="goal-header">
+            <span>Trade Count Target</span>
+            <span data-goals-target="tradeCountLabel"></span>
+          </div>
+          <div class="goal-bar" data-goals-target="tradeCountBar">
+            <div class="goal-bar-fill" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Performance grade %>
+  <% grade = performance_grade(@stats) %>
+  <% if grade %>
+    <div class="card" style="display: flex; align-items: center; gap: 1.5rem; padding: 1.25rem 1.5rem;">
+      <div class="grade-circle <%= grade_color_class(grade[:letter]) %>" style="width: 4rem; height: 4rem; border-width: 3px; flex-shrink: 0;">
+        <span class="grade-letter" style="font-size: 1.25rem;"><%= grade[:letter] %></span>
+        <span class="grade-score" style="font-size: 0.625rem;"><%= grade[:overall] %></span>
+      </div>
+      <div>
+        <h3 style="margin-bottom: 0.25rem;">Performance Score</h3>
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <% grade[:letters].each do |key, letter| %>
+            <span style="font-size: 0.8125rem;">
+              <span class="text-muted"><%= key.to_s.titleize %>:</span>
+              <strong class="<%= grade_color_class(letter) %>"><%= letter %></strong>
+            </span>
+          <% end %>
+        </div>
+        <%= link_to "Full Scorecard", reports_scorecard_path, style: "font-size: 0.8125rem;" %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @stats["daily_pnl"].present? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Daily P&L</h2>
+        <%= link_to "Full Report", reports_overview_path, class: "btn btn-sm" %>
+      </div>
+      <div class="chart-container"
+           data-controller="chart"
+           data-chart-type-value="bar"
+           data-chart-points-value="<%= @stats["daily_pnl"].last(30).map { |date, pnl| { x: date, y: pnl } }.to_json %>">
+      </div>
+    </div>
+  <% end %>
+
+  <%# Portfolio Concentration %>
+  <% if @recent_trades.is_a?(Array) && @recent_trades.any? %>
+    <%
+      symbol_counts = Hash.new(0)
+      symbol_pnl = Hash.new(0.0)
+      @recent_trades.each do |t|
+        sym = t["symbol"]
+        next unless sym.present?
+        symbol_counts[sym] += 1
+        symbol_pnl[sym] += t["pnl"].to_f
+      end
+      total = symbol_counts.values.sum.to_f
+      sorted_symbols = symbol_counts.sort_by { |_, c| -c }
+      top_symbol_pct = total > 0 ? (sorted_symbols.first[1] / total * 100).round(0) : 0
+      unique_count = symbol_counts.keys.count
+      # Herfindahl-Hirschman Index (HHI) for concentration
+      hhi = total > 0 ? symbol_counts.values.sum { |c| ((c / total) * 100) ** 2 }.round(0) : 0
+      concentration_level = hhi > 5000 ? "High" : hhi > 2500 ? "Moderate" : "Low"
+      concentration_color = hhi > 5000 ? "var(--negative)" : hhi > 2500 ? "var(--primary)" : "var(--positive)"
+    %>
+    <% if unique_count >= 2 %>
+      <div class="card" style="margin-bottom: 1rem;">
+        <div class="card-header">
+          <h2>Portfolio Concentration</h2>
+          <%= link_to "By Symbol", reports_by_symbol_path, class: "btn btn-sm" %>
+        </div>
+        <div style="padding: 0.75rem 1.25rem;">
+          <div style="display: flex; align-items: center; gap: 1.25rem; margin-bottom: 0.75rem;">
+            <div style="flex-shrink: 0;">
+              <svg viewBox="0 0 80 80" style="width: 80px; height: 80px;">
+                <%
+                  start_angle = -90
+                  colors = ["#1a73e8", "#0d904f", "#e8710a", "#d93025", "#9334e6", "#f9ab00", "#80868b"]
+                %>
+                <% sorted_symbols.first(6).each_with_index do |(sym, count), i| %>
+                  <%
+                    pct = count / total
+                    sweep = pct * 360
+                    end_angle = start_angle + sweep
+                    large_arc = sweep > 180 ? 1 : 0
+                    sr = start_angle * Math::PI / 180
+                    er = end_angle * Math::PI / 180
+                    x1 = 40 + 35 * Math.cos(sr)
+                    y1 = 40 + 35 * Math.sin(sr)
+                    x2 = 40 + 35 * Math.cos(er)
+                    y2 = 40 + 35 * Math.sin(er)
+                  %>
+                  <path d="M40,40 L<%= x1.round(2) %>,<%= y1.round(2) %> A35,35 0 <%= large_arc %>,1 <%= x2.round(2) %>,<%= y2.round(2) %> Z"
+                        fill="<%= colors[i % colors.length] %>" opacity="0.8">
+                    <title><%= sym %>: <%= count %> trades (<%= (pct * 100).round(0) %>%)</title>
+                  </path>
+                  <% start_angle = end_angle %>
+                <% end %>
+                <% if sorted_symbols.count > 6 %>
+                  <%
+                    other_count = sorted_symbols[6..].sum { |_, c| c }
+                    other_pct = other_count / total
+                    sweep = other_pct * 360
+                    end_angle = start_angle + sweep
+                    large_arc = sweep > 180 ? 1 : 0
+                    sr = start_angle * Math::PI / 180
+                    er = end_angle * Math::PI / 180
+                    x1 = 40 + 35 * Math.cos(sr)
+                    y1 = 40 + 35 * Math.sin(sr)
+                    x2 = 40 + 35 * Math.cos(er)
+                    y2 = 40 + 35 * Math.sin(er)
+                  %>
+                  <path d="M40,40 L<%= x1.round(2) %>,<%= y1.round(2) %> A35,35 0 <%= large_arc %>,1 <%= x2.round(2) %>,<%= y2.round(2) %> Z"
+                        fill="#80868b" opacity="0.5">
+                    <title>Other: <%= other_count %> trades</title>
+                  </path>
+                <% end %>
+                <circle cx="40" cy="40" r="18" fill="var(--surface)" />
+                <text x="40" y="43" text-anchor="middle" fill="var(--text)" font-size="11" font-weight="700"><%= unique_count %></text>
+              </svg>
+            </div>
+            <div style="flex: 1;">
+              <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.375rem;">
+                <span style="font-size: 0.875rem; font-weight: 600;">Concentration: </span>
+                <span style="font-size: 0.8125rem; font-weight: 700; color: <%= concentration_color %>;"><%= concentration_level %></span>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-secondary); line-height: 1.5;">
+                <strong><%= sorted_symbols.first[0] %></strong> is <%= top_symbol_pct %>% of trades.
+                <% if unique_count <= 3 %>Consider diversifying across more symbols.<% end %>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.5rem;">
+                <% sorted_symbols.first(5).each_with_index do |(sym, count), i| %>
+                  <span style="font-size: 0.6875rem; padding: 0.125rem 0.375rem; border-radius: 3px; background: <%= colors[i % colors.length] %>22; border: 1px solid <%= colors[i % colors.length] %>44;">
+                    <strong><%= sym %></strong> <%= (count / total * 100).round(0) %>%
+                  </span>
+                <% end %>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <% if @equity_curve.present? && @equity_curve.length > 1 %>
+    <%
+      eq_data = @equity_curve.map { |pt| pt["cumulative_pnl"].to_f }
+      eq_current = eq_data.last
+      eq_peak = eq_data.max
+      eq_trough = eq_data.min
+      eq_drawdown = eq_peak > 0 ? ((eq_peak - eq_current) / eq_peak * 100).round(1) : 0
+      eq_last_30 = @equity_curve.last(30)
+
+      # SVG sparkline for equity curve
+      sp_w = 600
+      sp_h = 120
+      sp_pad = 4
+      sp_vals = eq_data.last(60)
+      sp_min = sp_vals.min
+      sp_max = sp_vals.max
+      sp_range = sp_max - sp_min
+      sp_range = 1 if sp_range == 0
+      sp_points = sp_vals.each_with_index.map { |v, i|
+        x = sp_pad + (i.to_f / (sp_vals.length - 1) * (sp_w - sp_pad * 2))
+        y = sp_pad + (sp_h - sp_pad * 2) - ((v - sp_min) / sp_range * (sp_h - sp_pad * 2))
+        "#{x.round(1)},#{y.round(1)}"
+      }.join(' ')
+      # Fill area
+      sp_zero_y = sp_pad + (sp_h - sp_pad * 2) - ((0 - sp_min).clamp(0, sp_range) / sp_range * (sp_h - sp_pad * 2))
+      sp_fill = sp_points + " #{sp_w - sp_pad},#{sp_zero_y.round(1)} #{sp_pad},#{sp_zero_y.round(1)}"
+    %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Equity Curve</h2>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+          <span class="<%= pnl_class(eq_current) %>" style="font-size: 1rem; font-weight: 700;"><%= number_to_currency(eq_current) %></span>
+          <%= link_to "Full Report", reports_equity_curve_path, class: "btn btn-sm" %>
+        </div>
+      </div>
+      <div style="padding: 0.5rem 1rem;">
+        <svg viewBox="0 0 <%= sp_w %> <%= sp_h %>" style="width: 100%; height: auto;">
+          <polygon points="<%= sp_fill %>" fill="<%= eq_current >= 0 ? 'var(--positive)' : 'var(--negative)' %>" opacity="0.08" />
+          <polyline points="<%= sp_points %>" fill="none"
+                    stroke="<%= eq_current >= 0 ? 'var(--positive)' : 'var(--negative)' %>" stroke-width="2" />
+          <%# End dot %>
+          <% last_pt = sp_points.split(' ').last.split(',') %>
+          <circle cx="<%= last_pt[0] %>" cy="<%= last_pt[1] %>" r="3"
+                  fill="<%= eq_current >= 0 ? 'var(--positive)' : 'var(--negative)' %>"
+                  stroke="var(--surface)" stroke-width="1.5" />
+        </svg>
+      </div>
+      <div style="display: flex; gap: 1.5rem; padding: 0 1rem 0.75rem; font-size: 0.75rem; color: var(--text-secondary);">
+        <span>Peak: <strong class="positive"><%= number_to_currency(eq_peak) %></strong></span>
+        <span>Trough: <strong class="negative"><%= number_to_currency(eq_trough) %></strong></span>
+        <% if eq_drawdown > 0 %>
+          <span>Drawdown: <strong class="negative"><%= eq_drawdown %>%</strong></span>
+        <% end %>
+        <span style="margin-left: auto;"><%= @equity_curve.length %> data points</span>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Achievements %>
+  <% badges = earned_badges(@stats, @streaks) %>
+  <% earned = badges.select { |b| b[:earned] } %>
+  <% if earned.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Achievements</h2>
+        <span class="text-muted"><%= earned.count %>/<%= badges.count %> earned</span>
+      </div>
+      <div class="badges-grid">
+        <% badges.each do |badge| %>
+          <div class="badge-item <%= 'badge-earned' if badge[:earned] %>">
+            <span class="material-icons-outlined badge-icon"><%= badge[:icon] %></span>
+            <div class="badge-info">
+              <strong><%= badge[:name] %></strong>
+              <span><%= badge[:desc] %></span>
+            </div>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @activity.present? && @activity.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Recent Activity</h2>
+      </div>
+      <div class="activity-timeline">
+        <% @activity.each do |item| %>
+          <a href="<%= item[:path] %>" class="activity-item">
+            <span class="activity-icon activity-icon-<%= item[:type] %>">
+              <span class="material-icons-outlined"><%= item[:icon] %></span>
+            </span>
+            <div class="activity-content">
+              <span class="activity-title"><%= item[:title] %></span>
+              <span class="activity-detail <%= item[:css] %>"><%= item[:detail] %></span>
+            </div>
+            <span class="activity-time"><%= time_ago_short(item[:time]) %></span>
+          </a>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
 
   <div class="content-grid">
     <div class="card">
       <div class="card-header">
         <h2>Recent Trades</h2>
+        <%= link_to "View All", trades_path, class: "btn btn-sm" %>
       </div>
 
       <% if @recent_trades.present? && @recent_trades.any? %>
@@ -55,25 +624,24 @@
           <tbody>
             <% @recent_trades.first(10).each do |trade| %>
               <tr>
-                <td><%= Date.parse(trade["entry_time"]).strftime("%b %d, %Y") if trade["entry_time"] %></td>
-                <td><strong><%= trade["symbol"] %></strong></td>
+                <td><%= Date.parse(trade["entry_time"]).strftime("%b %d") if trade["entry_time"] %></td>
+                <td><strong><%= link_to trade["symbol"], trade_path(trade["id"]) %></strong></td>
                 <td><%= trade["side"]&.capitalize %></td>
-                <td class="<%= trade["pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
-                  <%= trade["pnl"] ? number_to_currency(trade["pnl"]) : "—" %>
-                </td>
-                <td><span class="badge badge-<%= trade["status"] %>"><%= trade["status"]&.capitalize %></span></td>
+                <td><%= pnl_display(trade["pnl"]) %></td>
+                <td><%= badge_for(trade["status"]) %></td>
               </tr>
             <% end %>
           </tbody>
         </table>
       <% else %>
-        <p class="empty-state">No trades yet.</p>
+        <p class="empty-state">No trades yet. <%= link_to "Log your first trade", new_trade_path %>.</p>
       <% end %>
     </div>
 
     <div class="card">
       <div class="card-header">
         <h2>Tags</h2>
+        <%= link_to "By Tag Report", reports_by_tag_path, class: "btn btn-sm" %>
       </div>
 
       <% if @tags.present? && @tags.any? %>
@@ -97,12 +665,483 @@
       <% end %>
     </div>
   </div>
+
+  <%# Recent Journal Entries %>
+  <% if @recent_journal.present? && @recent_journal.is_a?(Array) && @recent_journal.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">auto_stories</span> Recent Journal</h2>
+        <%= link_to "View All", journal_entries_path, class: "btn btn-sm" %>
+      </div>
+      <% @recent_journal.first(5).each do |entry| %>
+        <%
+          j_date = Date.parse(entry["date"]) rescue nil
+          j_mood = entry["mood"]
+          j_mood_color = case j_mood&.downcase
+                         when "confident", "disciplined", "focused", "calm" then "var(--positive)"
+                         when "anxious", "frustrated", "fearful", "angry" then "var(--negative)"
+                         when "neutral", "uncertain" then "var(--text-secondary)"
+                         else "var(--primary)"
+                         end
+          j_preview = entry["content"].to_s.truncate(120)
+        %>
+        <a href="<%= journal_entry_path(entry["id"]) %>" class="activity-item" style="border-bottom: 1px solid var(--border);">
+          <span class="activity-icon" style="background: rgba(26,115,232,0.1); color: var(--primary);">
+            <span class="material-icons-outlined">auto_stories</span>
+          </span>
+          <div class="activity-content" style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.125rem;">
+              <span class="activity-title"><%= j_date&.strftime("%b %d, %Y") || "Journal Entry" %></span>
+              <% if j_mood.present? %>
+                <span class="badge" style="font-size: 0.5625rem; color: <%= j_mood_color %>;"><%= j_mood %></span>
+              <% end %>
+            </div>
+            <% if j_preview.present? %>
+              <span class="activity-detail text-muted" style="display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><%= j_preview %></span>
+            <% end %>
+          </div>
+        </a>
+      <% end %>
+      <div style="padding: 0.75rem 1.25rem; text-align: center;">
+        <%= link_to "New Journal Entry", new_journal_entry_path, class: "btn btn-sm btn-primary" %>
+      </div>
+    </div>
+  <% end %>
+
+  <%# Watchlists %>
+  <% if @watchlists.present? && @watchlists.is_a?(Array) && @watchlists.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">visibility</span> Watchlists</h2>
+        <%= link_to "Manage", watchlists_path, class: "btn btn-sm" %>
+      </div>
+      <div style="padding: 0.75rem 1.25rem;">
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+          <% @watchlists.first(6).each do |wl| %>
+            <%
+              wl_symbols = wl["symbols"].is_a?(Array) ? wl["symbols"] : []
+              wl_count = wl["symbols_count"] || wl_symbols.count
+            %>
+            <%= link_to watchlist_path(wl["id"]), style: "text-decoration: none; flex: 1; min-width: 140px;" do %>
+              <div style="padding: 0.625rem; border: 1px solid var(--border); border-radius: var(--radius); transition: border-color 0.15s;">
+                <div style="font-size: 0.8125rem; font-weight: 600; margin-bottom: 0.25rem; color: var(--text);"><%= wl["name"] %></div>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+                  <span class="material-icons-outlined" style="font-size: 0.75rem; vertical-align: -1px;">list</span>
+                  <%= wl_count %> symbol<%= wl_count == 1 ? '' : 's' %>
+                </div>
+                <% if wl_symbols.any? %>
+                  <div style="margin-top: 0.375rem; font-size: 0.6875rem; color: var(--primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    <%= wl_symbols.first(5).join(", ") %><%= ", ..." if wl_symbols.count > 5 %>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  <% end %>
 <% else %>
   <div class="card">
     <div class="setup-notice">
-      <span class="material-icons-outlined">link_off</span>
+      <%= icon("link_off") %>
       <h2>Trading Journal Not Connected</h2>
       <p>Set <code>TRADING_JOURNAL_URL</code> and <code>TRADING_JOURNAL_TOKEN</code> environment variables to connect.</p>
+    </div>
+  </div>
+<% end %>
+
+<% if @notes_stats.present? && !@notes_stats["error"] %>
+  <h2 style="margin-top: 2rem;">Notes</h2>
+
+  <div class="card">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notes</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @notes_stats["total_notes"] || @notes_stats["notes_count"] || 0 %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notebooks</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @notes_stats["total_notebooks"] || @notes_stats["notebooks_count"] || 0 %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Tags</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @notes_stats["total_tags"] || @notes_stats["tags_count"] || 0 %></div>
+      </div>
+    </div>
+  </div>
+
+  <% if @pinned_notes.present? && @pinned_notes.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><%= icon("push_pin", class: "icon-sm") %> Pinned Notes</h2>
+        <%= link_to "Pinboard", pinboard_notes_path, class: "btn btn-sm" %>
+      </div>
+      <div class="pinned-notes-grid">
+        <% @pinned_notes.first(6).each do |note| %>
+          <%= link_to note_path(note["id"]), class: "pinned-note-card" do %>
+            <div class="pinned-note-title">
+              <% if note["favorited"] %><span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--warning, #f59e0b);">star</span><% end %>
+              <%= note["title"].presence || "Untitled" %>
+            </div>
+            <% if note["content_preview"].present? || note["content"].present? %>
+              <div class="pinned-note-preview"><%= truncate(note["content_preview"] || note["content"], length: 80) %></div>
+            <% end %>
+            <div class="pinned-note-meta">
+              <% if note.dig("notebook", "name").present? %>
+                <span><%= note.dig("notebook", "name") %></span>
+              <% end %>
+              <span><%= time_ago_short(note["updated_at"]) if note["updated_at"] %></span>
+            </div>
+          <% end %>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
+  <div class="content-grid">
+    <div class="card">
+      <div class="card-header">
+        <h2>Recent Notes</h2>
+        <%= link_to "New Note", new_note_path, class: "btn btn-primary btn-sm" %>
+      </div>
+
+      <% if @recent_notes.present? && @recent_notes.is_a?(Array) && @recent_notes.any? %>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Notebook</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @recent_notes.first(5).each do |note| %>
+              <tr>
+                <td>
+                  <% if note["pinned"] %><%= icon("push_pin", class: "icon-sm") %><% end %>
+                  <% if note["favorited"] %><%= icon("star", class: "icon-sm text-warning") %><% end %>
+                  <%= link_to note["title"].presence || "Untitled", note_path(note["id"]) %>
+                </td>
+                <td><%= note.dig("notebook", "name") %></td>
+                <td><%= time_ago_short(note["updated_at"]) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      <% else %>
+        <p class="empty-state">No notes yet. <%= link_to "Create your first note", new_note_path %>.</p>
+      <% end %>
+    </div>
+  </div>
+<% elsif notes_api_token.blank? %>
+  <div class="card" style="margin-top: 2rem;">
+    <div class="setup-notice">
+      <%= icon("link_off") %>
+      <h2>Notes API Not Connected</h2>
+      <p>Set <code>NOTES_API_URL</code> and <code>NOTES_API_TOKEN</code> environment variables to connect.</p>
+    </div>
+  </div>
+<% end %>
+
+<% if @budget_overview.is_a?(Hash) && !@budget_overview["error"] %>
+  <h2 style="margin-top: 2rem;">Budget</h2>
+
+  <% income = @budget_overview["actual_income"].to_f %>
+  <% expenses = @budget_overview["total_spent"].to_f %>
+  <% savings = income - expenses %>
+  <% savings_rate = @budget_overview["savings_rate"].to_f %>
+
+  <div class="card">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Income</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(income) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Expenses</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--negative);"><%= number_to_currency(expenses) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Saved</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= savings >= 0 ? 'positive' : 'negative' %>"><%= number_to_currency(savings) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Savings Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= savings_rate %>%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content-grid">
+    <% if income > 0 %>
+      <div class="card" style="padding: 1.25rem;">
+        <h3 style="margin-bottom: 0.75rem;">Budget Progress</h3>
+        <div class="budget-progress-bar" style="height: 1.25rem; margin-bottom: 0.5rem;">
+          <div class="budget-progress-fill <%= expenses <= income ? 'progress-safe' : 'progress-over' %>"
+               style="width: <%= [expenses / income * 100, 100].min.round(1) %>%"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 0.85rem;">
+          <span>Spent: <%= number_to_currency(expenses) %></span>
+          <span>Budget: <%= number_to_currency(income) %></span>
+        </div>
+      </div>
+    <% end %>
+
+    <% if @budget_forecast.is_a?(Hash) && !@budget_forecast["error"] %>
+      <div class="card" style="padding: 1.25rem;">
+        <h3 style="margin-bottom: 0.75rem;">Forecast</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.9rem;">
+          <div>
+            <span class="text-muted">Daily Spend Rate</span><br>
+            <strong><%= number_to_currency(@budget_forecast["daily_spend_rate"]) %>/day</strong>
+          </div>
+          <div>
+            <span class="text-muted">Projected Total</span><br>
+            <strong class="<%= @budget_forecast["on_track"] ? 'positive' : 'negative' %>">
+              <%= number_to_currency(@budget_forecast["projected_total_spend"]) %>
+            </strong>
+          </div>
+          <div>
+            <span class="text-muted">Safe to Spend</span><br>
+            <strong><%= number_to_currency(@budget_forecast["safe_to_spend_daily"]) %>/day</strong>
+          </div>
+          <div>
+            <span class="text-muted">Status</span><br>
+            <% if @budget_forecast["on_track"] %>
+              <span class="badge badge-success">On Track</span>
+            <% else %>
+              <span class="badge badge-warning">Over Budget</span>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    <% end %>
+  </div>
+
+  <%
+    trends_data = @spending_trends.is_a?(Array) ? @spending_trends : (@spending_trends.is_a?(Hash) ? (@spending_trends["trends"] || []) : [])
+  %>
+  <% if trends_data.length >= 2 %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Spending Trends</h2>
+        <%= link_to "Details", budget_reports_spending_path, class: "btn btn-sm" %>
+      </div>
+      <div class="chart-container"
+           data-controller="chart"
+           data-chart-type-value="bar"
+           data-chart-points-value="<%= trends_data.map { |t| { x: t["label"] || t["month"], y: t["expenses"] || t["total"] } }.to_json %>"
+           style="padding: 0.5rem 1rem;">
+      </div>
+    </div>
+  <% end %>
+
+  <% if @active_goals.present? && @active_goals.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Savings Goals</h2>
+        <%= link_to "All Goals", budget_goals_path, class: "btn btn-sm" %>
+      </div>
+      <% @active_goals.first(4).each do |goal| %>
+        <%
+          current = goal["current_amount"].to_f
+          target = goal["target_amount"].to_f
+          pct = target > 0 ? (current / target * 100).round(1) : 0
+          deadline = goal["deadline"] || goal["target_date"]
+        %>
+        <div class="budget-category-row" style="padding: 0.625rem 1.25rem;">
+          <div class="budget-category-info">
+            <strong><%= goal["name"] %></strong>
+            <span class="text-muted" style="font-size: 0.8125rem;">
+              <%= number_to_currency(current) %> of <%= number_to_currency(target) %>
+              <% if deadline.present? %>
+                <% days_left = (Date.parse(deadline) - Date.current).to_i rescue nil %>
+                <% if days_left && days_left > 0 %>
+                  &middot; <%= days_left %> days left
+                <% end %>
+              <% end %>
+            </span>
+          </div>
+          <div class="budget-progress-bar">
+            <div class="budget-progress-fill progress-safe" style="width: <%= [pct, 100].min %>%"></div>
+          </div>
+          <span class="budget-category-pct"><%= pct %>%</span>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# Active Savings Challenges %>
+  <% if @active_challenges.is_a?(Array) && @active_challenges.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Active Challenges</h2>
+        <%= link_to "All Challenges", budget_challenges_path, class: "btn btn-sm" %>
+      </div>
+      <% @active_challenges.first(3).each do |ch| %>
+        <%
+          target = ch["target_amount"].to_f
+          current = ch["current_amount"].to_f
+          pct = target > 0 ? (current / target * 100).round(0) : 0
+          end_date = ch["end_date"].present? ? (Date.parse(ch["end_date"]) rescue nil) : nil
+          days_left = end_date ? (end_date - Date.current).to_i : nil
+          challenge_type = ch["challenge_type"]
+          type_icon = case challenge_type
+                      when "no_spend" then "block"
+                      when "spending_limit" then "savings"
+                      when "savings_target" then "flag"
+                      when "category_limit" then "category"
+                      else "emoji_events"
+                      end
+        %>
+        <div style="padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.375rem;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: var(--primary);"><%= type_icon %></span>
+            <strong style="font-size: 0.875rem;"><%= ch["name"] %></strong>
+            <% if days_left && days_left > 0 %>
+              <span style="margin-left: auto; font-size: 0.6875rem; color: var(--text-secondary);"><%= days_left %>d left</span>
+            <% elsif days_left && days_left <= 0 %>
+              <span style="margin-left: auto; font-size: 0.6875rem; color: var(--negative);">Ended</span>
+            <% end %>
+          </div>
+          <% if target > 0 %>
+            <div class="budget-progress-bar" style="height: 0.5rem; margin-bottom: 0.25rem;">
+              <div class="budget-progress-fill <%= pct <= 100 ? 'progress-safe' : 'progress-danger' %>" style="width: <%= [pct, 100].min %>%"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 0.6875rem; color: var(--text-secondary);">
+              <span><%= number_to_currency(current) %> / <%= number_to_currency(target) %></span>
+              <span><%= pct %>%</span>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <% if @debt_overview.is_a?(Hash) && !@debt_overview["error"] && @debt_overview["total_debt"].to_f > 0 %>
+    <div class="card">
+      <div class="card-header">
+        <h2>Debt Payoff</h2>
+        <%= link_to "Details", budget_debt_accounts_path, class: "btn btn-sm" %>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; padding: 0.75rem 1.25rem;">
+        <div>
+          <span class="text-muted" style="font-size: 0.75rem;">Total Debt</span><br>
+          <strong class="negative"><%= number_to_currency(@debt_overview["total_debt"]) %></strong>
+        </div>
+        <div>
+          <span class="text-muted" style="font-size: 0.75rem;">Monthly Payments</span><br>
+          <strong><%= number_to_currency(@debt_overview["total_minimum_payments"]) %></strong>
+        </div>
+        <div>
+          <span class="text-muted" style="font-size: 0.75rem;">Monthly Interest</span><br>
+          <strong class="negative"><%= number_to_currency(@debt_overview["total_monthly_interest"]) %></strong>
+        </div>
+      </div>
+      <div style="padding: 0.5rem 1.25rem 0.75rem; display: flex; gap: 0.5rem;">
+        <%= link_to "Snowball Plan", snowball_budget_debt_accounts_path, class: "btn btn-sm" %>
+        <%= link_to "Avalanche Plan", avalanche_budget_debt_accounts_path, class: "btn btn-sm" %>
+      </div>
+    </div>
+  <% end %>
+
+  <% if @recurring_summary.is_a?(Hash) && !@recurring_summary["error"] %>
+    <% upcoming = @recurring_summary["upcoming"] || [] %>
+    <% if upcoming.any? %>
+      <div class="card">
+        <div class="card-header">
+          <h2>Upcoming Bills</h2>
+          <%= link_to "All Recurring", budget_recurring_index_path, class: "btn btn-sm" %>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Due</th>
+              <th>Description</th>
+              <th style="text-align: right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% upcoming.first(5).each do |bill| %>
+              <% due_date = Date.parse(bill["next_date"] || bill["next_due_date"]) rescue nil %>
+              <% days_until = due_date ? (due_date - Date.current).to_i : nil %>
+              <tr>
+                <td>
+                  <% if due_date %>
+                    <strong<% if days_until && days_until <= 3 %> class="negative"<% end %>><%= due_date.strftime("%b %d") %></strong>
+                    <% if days_until && days_until >= 0 %>
+                      <span class="text-muted" style="font-size: 0.75rem;">(<%= days_until == 0 ? "today" : "#{days_until}d" %>)</span>
+                    <% end %>
+                  <% end %>
+                </td>
+                <td><%= bill["description"] || bill["name"] %></td>
+                <td style="text-align: right;"><%= number_to_currency(bill["amount"]) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    <% end %>
+
+    <% monthly_total = @recurring_summary["monthly_total"].to_f %>
+    <% if monthly_total > 0 %>
+      <div class="card" style="padding: 1rem 1.25rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="text-muted">Monthly Recurring Total</span>
+          <strong><%= number_to_currency(monthly_total) %>/mo</strong>
+        </div>
+      </div>
+    <% end %>
+  <% end %>
+
+  <%# Budget Alerts %>
+  <% if @budget_alerts.is_a?(Array) && @budget_alerts.any? %>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px;">notifications_active</span> Alerts</h2>
+        <%= link_to "View All", budget_alerts_path, class: "btn btn-sm" %>
+      </div>
+      <% @budget_alerts.first(5).each do |alert| %>
+        <%
+          a_severity = alert["severity"] || "info"
+          a_color = case a_severity
+                    when "danger", "critical" then "var(--negative)"
+                    when "warning" then "#f9ab00"
+                    else "var(--primary)"
+                    end
+          a_bg = case a_severity
+                 when "danger", "critical" then "rgba(234,67,53,0.1)"
+                 when "warning" then "rgba(249,171,0,0.1)"
+                 else "rgba(26,115,232,0.1)"
+                 end
+        %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+          <div style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 6px; background: <%= a_bg %>; display: flex; align-items: center; justify-content: center;">
+            <span class="material-icons-outlined" style="font-size: 1rem; color: <%= a_color %>;"><%= a_severity == "danger" || a_severity == "critical" ? "error" : a_severity == "warning" ? "warning" : "info" %></span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 0.8125rem; font-weight: 600;"><%= alert["title"] || alert["message"] %></div>
+            <% if alert["message"].present? && alert["title"].present? %>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><%= alert["message"] %></div>
+            <% end %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <div style="text-align: center; margin-top: 0.75rem;">
+    <%= link_to "Full Dashboard", budget_dashboard_path, class: "btn btn-sm" %>
+    <%= link_to "Monthly Digest", budget_reports_digest_path, class: "btn btn-sm" %>
+    <%= link_to "Notifications", notifications_path, class: "btn btn-sm" %>
+  </div>
+<% elsif budget_api_token.blank? %>
+  <div class="card" style="margin-top: 2rem;">
+    <div class="setup-notice">
+      <%= icon("link_off") %>
+      <h2>Budget Not Connected</h2>
+      <p>Set <code>BUDGET_API_URL</code> and <code>BUDGET_API_TOKEN</code> environment variables to connect.</p>
     </div>
   </div>
 <% end %>

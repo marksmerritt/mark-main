@@ -1,5 +1,10 @@
 <div class="page-header">
   <h1>Overview Report</h1>
+  <div class="page-actions">
+    <button onclick="window.print()" class="btn" title="Print">
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: middle;">print</span> Print
+    </button>
+  </div>
 </div>
 
 <div class="card">
@@ -22,79 +27,170 @@
 </div>
 
 <% if @stats.present? && !@stats["error"] %>
-  <div class="stats-grid">
-    <div class="card stat-card">
-      <h3>Total P&L</h3>
-      <p class="stat-value <%= @stats["total_pnl"].to_f >= 0 ? 'positive' : 'negative' %>">
-        <%= number_to_currency(@stats["total_pnl"]) %>
-      </p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Total Trades</h3>
-      <p class="stat-value"><%= @stats["total_trades"] %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Win Rate</h3>
-      <p class="stat-value"><%= @stats["win_rate"] %>%</p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Winning Trades</h3>
-      <p class="stat-value positive"><%= @stats["winning_trades"] %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Losing Trades</h3>
-      <p class="stat-value negative"><%= @stats["losing_trades"] %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Breakeven Trades</h3>
-      <p class="stat-value"><%= @stats["breakeven_trades"] %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Avg Win</h3>
-      <p class="stat-value positive"><%= number_to_currency(@stats["avg_win"]) %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Avg Loss</h3>
-      <p class="stat-value negative"><%= number_to_currency(@stats["avg_loss"]) %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Profit Factor</h3>
-      <p class="stat-value"><%= @stats["profit_factor"] %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Largest Win</h3>
-      <p class="stat-value positive"><%= number_to_currency(@stats["largest_win"]) %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Largest Loss</h3>
-      <p class="stat-value negative"><%= number_to_currency(@stats["largest_loss"]) %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Total Commissions</h3>
-      <p class="stat-value"><%= number_to_currency(@stats["total_commissions"]) %></p>
-    </div>
-
-    <div class="card stat-card">
-      <h3>Total Fees</h3>
-      <p class="stat-value"><%= number_to_currency(@stats["total_fees"]) %></p>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="<%= pnl_class(@stats["total_pnl"]) %>"><%= number_to_currency(@stats["total_pnl"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @stats["total_trades"] %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Win Rate</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @stats["win_rate"] %>%</div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Winning Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= @stats["winning_trades"] %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Losing Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= @stats["losing_trades"] %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Breakeven Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @stats["breakeven_trades"] %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Win</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= number_to_currency(@stats["avg_win"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Loss</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(@stats["avg_loss"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Profit Factor</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @stats["profit_factor"] %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Largest Win</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="positive"><%= number_to_currency(@stats["largest_win"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Largest Loss</div>
+        <div style="font-size: 1.5rem; font-weight: 700;" class="negative"><%= number_to_currency(@stats["largest_loss"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Commissions</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@stats["total_commissions"]) %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Fees</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@stats["total_fees"]) %></div>
+      </div>
     </div>
   </div>
 
+  <% analysis = deep_trade_analysis(@stats) %>
+  <% if analysis.any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2><span class="material-icons-outlined" style="font-size: 1.25rem; vertical-align: -3px;">psychology</span> Trading Analysis</h2>
+      </div>
+      <div class="analysis-items">
+        <% analysis.each do |item| %>
+          <div class="analysis-item analysis-<%= item[:type] %>">
+            <h4><%= item[:title] %></h4>
+            <p><%= item[:text] %></p>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+
   <% if @stats["daily_pnl"].present? %>
+    <div class="content-grid">
+      <div class="card">
+        <div class="card-header">
+          <h2>Daily P&L</h2>
+        </div>
+        <div class="chart-container"
+             data-controller="chart"
+             data-chart-type-value="bar"
+             data-chart-points-value="<%= @stats["daily_pnl"].map { |date, pnl| { x: date, y: pnl } }.to_json %>">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2>Cumulative P&L</h2>
+        </div>
+        <%
+          cum = 0
+          cumulative = @stats["daily_pnl"].map { |date, pnl| cum += pnl.to_f; { x: date, y: cum.round(2) } }
+        %>
+        <div class="chart-container"
+             data-controller="chart"
+             data-chart-type-value="line"
+             data-chart-points-value="<%= cumulative.to_json %>">
+        </div>
+      </div>
+    </div>
+
+    <%
+      # Monthly breakdown from daily P&L data
+      monthly = {}
+      @stats["daily_pnl"].each do |date, pnl|
+        month_key = date.to_s.slice(0, 7) # "YYYY-MM"
+        monthly[month_key] ||= { pnl: 0, days: 0, wins: 0 }
+        monthly[month_key][:pnl] += pnl.to_f
+        monthly[month_key][:days] += 1
+        monthly[month_key][:wins] += 1 if pnl.to_f > 0
+      end
+    %>
+    <% if monthly.keys.count > 1 %>
+      <div class="card">
+        <div class="card-header">
+          <h2>Monthly Breakdown</h2>
+        </div>
+        <% max_monthly = monthly.values.map { |d| d[:pnl].abs }.max.to_f %>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>Trading Days</th>
+              <th>Win Days</th>
+              <th>P&L</th>
+              <th>Performance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% monthly.sort.each do |month, data| %>
+              <tr>
+                <td><strong><%= Date.parse("#{month}-01").strftime("%B %Y") %></strong></td>
+                <td><%= data[:days] %></td>
+                <td><%= data[:wins] %> (<%= data[:days] > 0 ? (data[:wins].to_f / data[:days] * 100).round(0) : 0 %>%)</td>
+                <td class="<%= pnl_class(data[:pnl]) %>"><strong><%= number_to_currency(data[:pnl].round(2)) %></strong></td>
+                <td>
+                  <div class="mini-bar-container">
+                    <div class="mini-bar <%= data[:pnl] >= 0 ? 'positive' : 'negative' %>"
+                         style="width: <%= max_monthly > 0 ? (data[:pnl].abs / max_monthly * 100).round(1) : 0 %>%"></div>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+          <tfoot>
+            <tr style="font-weight: 600;">
+              <td>Total</td>
+              <td><%= monthly.values.sum { |d| d[:days] } %></td>
+              <td><%= monthly.values.sum { |d| d[:wins] } %></td>
+              <td class="<%= pnl_class(monthly.values.sum { |d| d[:pnl] }) %>">
+                <%= number_to_currency(monthly.values.sum { |d| d[:pnl] }.round(2)) %>
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    <% end %>
+
     <div class="card">
       <div class="card-header">
-        <h2>Daily P&L</h2>
+        <h2>Daily P&L Data</h2>
       </div>
       <table class="table">
         <thead>
@@ -107,9 +203,7 @@
           <% @stats["daily_pnl"].each do |date, pnl| %>
             <tr>
               <td><%= date %></td>
-              <td style="text-align: right;" class="<%= pnl.to_f >= 0 ? 'positive' : 'negative' %>">
-                <%= number_to_currency(pnl) %>
-              </td>
+              <td style="text-align: right;"><%= pnl_display(pnl) %></td>
             </tr>
           <% end %>
         </tbody>

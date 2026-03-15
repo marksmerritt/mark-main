@@ -1,0 +1,351 @@
+<% content_for(:title) { "Weekly Planner" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #5c6bc0;">date_range</span>
+    Weekly Planner
+  </h1>
+</div>
+
+<%# ===== Week Navigation ===== %>
+<div style="display: flex; align-items: center; justify-content: center; gap: 1rem; margin-bottom: 1.5rem;">
+  <%= link_to weekly_planner_path(week_offset: @week_offset - 1), class: "btn btn-sm", title: "Previous week" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">chevron_left</span> Prev
+  <% end %>
+  <div style="text-align: center;">
+    <div style="font-size: 1.25rem; font-weight: 700;"><%= @week_start.strftime("%b %d") %> &ndash; <%= @week_end.strftime("%b %d, %Y") %></div>
+    <div style="font-size: 0.75rem; color: var(--text-secondary);">
+      <% if @is_current_week %>
+        This Week
+      <% elsif @week_offset > 0 %>
+        <%= @week_offset %> week<%= 's' if @week_offset != 1 %> from now
+      <% else %>
+        <%= @week_offset.abs %> week<%= 's' if @week_offset.abs != 1 %> ago
+      <% end %>
+    </div>
+  </div>
+  <%= link_to weekly_planner_path(week_offset: @week_offset + 1), class: "btn btn-sm", title: "Next week" do %>
+    Next <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">chevron_right</span>
+  <% end %>
+</div>
+
+<% unless @is_current_week %>
+  <div style="text-align: center; margin-bottom: 1.5rem;">
+    <%= link_to "This Week", weekly_planner_path, class: "btn btn-sm btn-primary" %>
+  </div>
+<% end %>
+
+<%# ===== Weekly Summary Card ===== %>
+<div class="card" style="margin-bottom: 1.5rem; border-top: 3px solid #5c6bc0;">
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0;">
+    <% if api_token.present? %>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Trades</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @trade_count %></div>
+        <% if @trade_count > 0 %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);">
+            <span style="color: var(--positive);"><%= @trade_wins %>W</span> /
+            <span style="color: var(--negative);"><%= @trade_losses %>L</span>
+          </div>
+        <% end %>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">P&L</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: <%= @total_pnl >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+          <%= @total_pnl >= 0 ? '+' : '' %><%= number_to_currency(@total_pnl) %>
+        </div>
+        <% if @trade_count > 0 %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= @win_rate %>% win rate</div>
+        <% end %>
+      </div>
+    <% end %>
+    <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+      <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Journal</div>
+      <div style="font-size: 1.5rem; font-weight: 700;"><%= @journal_count %></div>
+      <div style="font-size: 0.6875rem; color: var(--text-secondary);">entr<%= @journal_count == 1 ? 'y' : 'ies' %></div>
+    </div>
+    <% if notes_api_token.present? %>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Notes</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @notes_count %></div>
+        <div style="font-size: 0.6875rem; color: var(--text-secondary);">written</div>
+      </div>
+    <% end %>
+    <% if budget_api_token.present? %>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Spending</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(@spending) %></div>
+        <% if @income > 0 %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= number_to_currency(@income) %> earned</div>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+</div>
+
+<%# ===== 7-Day Grid ===== %>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+  <% @days.each do |day| %>
+    <%
+      has_activity = day[:trades].any? || day[:journal].any? || day[:notes].any? || day[:transactions].any? || day[:reminders].any? || day[:bills].any?
+      border_style = day[:is_today] ? "border: 2px solid #5c6bc0;" : ""
+      bg_style = day[:is_today] ? "background: color-mix(in srgb, #5c6bc0 4%, transparent);" : ""
+      opacity_style = day[:is_future] ? "opacity: 0.6;" : ""
+    %>
+    <div class="card" style="<%= border_style %> <%= bg_style %> <%= opacity_style %> overflow: hidden;">
+      <%# Day Header %>
+      <div style="padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; <%= 'background: color-mix(in srgb, #5c6bc0 8%, transparent);' if day[:is_today] %>">
+        <div>
+          <span style="font-weight: 700; font-size: 0.9375rem; color: <%= day[:is_today] ? '#5c6bc0' : 'var(--text)' %>;"><%= day[:day_name] %></span>
+          <span style="font-size: 0.8125rem; color: var(--text-secondary); margin-left: 0.375rem;"><%= day[:date].strftime("%b %d") %></span>
+        </div>
+        <% if day[:is_today] %>
+          <span style="font-size: 0.625rem; font-weight: 700; text-transform: uppercase; color: #5c6bc0; background: color-mix(in srgb, #5c6bc0 12%, transparent); padding: 0.125rem 0.5rem; border-radius: 9999px;">Today</span>
+        <% end %>
+        <% if day[:total_pnl] != 0 %>
+          <span style="font-weight: 700; font-size: 0.8125rem; color: <%= day[:total_pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= day[:total_pnl] >= 0 ? '+' : '' %><%= number_to_currency(day[:total_pnl]) %>
+          </span>
+        <% end %>
+      </div>
+
+      <div style="padding: 0.625rem 1rem; min-height: 80px;">
+        <% if has_activity %>
+          <%# Trades %>
+          <% if day[:trades].any? %>
+            <div style="margin-bottom: 0.5rem;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.25rem;">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; color: var(--primary);">show_chart</span>
+                <%= day[:trades].count %> Trade<%= 's' if day[:trades].count != 1 %>
+              </div>
+              <% day[:trades].first(4).each do |trade| %>
+                <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8125rem; padding: 0.125rem 0;">
+                  <%= link_to trade["symbol"], trade_path(trade["id"]), style: "font-weight: 600; text-decoration: none;" %>
+                  <span style="font-weight: 600; color: <%= trade["pnl"].to_f >= 0 ? 'var(--positive)' : 'var(--negative)' %>;">
+                    <%= number_to_currency(trade["pnl"]) %>
+                  </span>
+                </div>
+              <% end %>
+              <% if day[:trades].count > 4 %>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">+<%= day[:trades].count - 4 %> more</div>
+              <% end %>
+            </div>
+          <% end %>
+
+          <%# Journal %>
+          <% if day[:journal].any? %>
+            <div style="margin-bottom: 0.5rem;">
+              <div style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem;">
+                <span class="material-icons-outlined" style="font-size: 0.875rem; color: #ff8f00;">auto_stories</span>
+                <span>Journal entry</span>
+                <% if day[:journal].first["mood"].present? %>
+                  <span class="badge" style="font-size: 0.5625rem;"><%= day[:journal].first["mood"] %></span>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+
+          <%# Notes %>
+          <% if day[:notes].any? %>
+            <div style="margin-bottom: 0.5rem;">
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.125rem; display: flex; align-items: center; gap: 0.25rem;">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; color: #9c27b0;">edit_note</span>
+                <%= day[:notes].count %> Note<%= 's' if day[:notes].count != 1 %>
+              </div>
+              <% day[:notes].first(3).each do |note| %>
+                <div style="font-size: 0.8125rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.0625rem 0;">
+                  <%= link_to (note["title"].presence || "Untitled"), note_path(note["id"]), style: "text-decoration: none; color: var(--text);" %>
+                </div>
+              <% end %>
+              <% if day[:notes].count > 3 %>
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">+<%= day[:notes].count - 3 %> more</div>
+              <% end %>
+            </div>
+          <% end %>
+
+          <%# Transactions %>
+          <% if day[:transactions].any? %>
+            <div style="margin-bottom: 0.5rem;">
+              <%
+                day_spending = day[:transactions].select { |t| t["transaction_type"] != "income" }.sum { |t| t["amount"].to_f }
+                day_income = day[:transactions].select { |t| t["transaction_type"] == "income" }.sum { |t| t["amount"].to_f }
+              %>
+              <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.125rem; display: flex; align-items: center; gap: 0.25rem;">
+                <span class="material-icons-outlined" style="font-size: 0.75rem; color: #0d904f;">payments</span>
+                <%= day[:transactions].count %> Transaction<%= 's' if day[:transactions].count != 1 %>
+              </div>
+              <div style="font-size: 0.8125rem; display: flex; gap: 0.75rem;">
+                <% if day_spending > 0 %>
+                  <span>Spent: <strong><%= number_to_currency(day_spending) %></strong></span>
+                <% end %>
+                <% if day_income > 0 %>
+                  <span style="color: var(--positive);">Earned: <strong><%= number_to_currency(day_income) %></strong></span>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+
+          <%# Reminders %>
+          <% if day[:reminders].any? %>
+            <div style="margin-bottom: 0.5rem;">
+              <% day[:reminders].each do |reminder| %>
+                <div style="display: flex; align-items: center; gap: 0.375rem; font-size: 0.8125rem; padding: 0.125rem 0;">
+                  <span class="material-icons-outlined" style="font-size: 0.875rem; color: #e53935;">alarm</span>
+                  <span style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    <%= reminder["message"].presence || "Reminder" %>
+                  </span>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+
+          <%# Bills %>
+          <% if day[:bills].any? %>
+            <div style="margin-bottom: 0.5rem;">
+              <% day[:bills].each do |bill| %>
+                <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8125rem; padding: 0.125rem 0;">
+                  <div style="display: flex; align-items: center; gap: 0.375rem;">
+                    <span class="material-icons-outlined" style="font-size: 0.875rem; color: var(--negative);">receipt</span>
+                    <span><%= bill["description"] || bill["name"] %></span>
+                  </div>
+                  <span style="font-weight: 600;"><%= number_to_currency(bill["amount"]) %></span>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+
+        <% else %>
+          <%# Empty state %>
+          <div style="display: flex; align-items: center; justify-content: center; height: 60px; color: var(--text-secondary); font-size: 0.8125rem;">
+            <% if day[:is_future] %>
+              <span class="material-icons-outlined" style="font-size: 1rem; margin-right: 0.375rem; opacity: 0.4;">event</span>
+              Nothing planned
+            <% else %>
+              <span class="material-icons-outlined" style="font-size: 1rem; margin-right: 0.375rem; opacity: 0.4;">do_not_disturb</span>
+              No activity
+            <% end %>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+<%# ===== Active Trade Plans ===== %>
+<% if @trade_plans.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #5c6bc0;">playlist_add_check</span>
+        Active Trade Plans
+      </h2>
+      <%= link_to "View All", trade_plans_path, class: "btn btn-sm" %>
+    </div>
+    <% @trade_plans.first(5).each do |plan| %>
+      <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.625rem 1.25rem; border-bottom: 1px solid var(--border);">
+        <span class="material-icons-outlined" style="font-size: 1rem; color: var(--primary);">flag</span>
+        <div style="flex: 1;">
+          <div style="font-size: 0.875rem; font-weight: 500;">
+            <%= link_to (plan["symbol"] || plan["title"] || "Trade Plan"), trade_plan_path(plan["id"]), style: "text-decoration: none;" %>
+          </div>
+          <% if plan["notes"].present? %>
+            <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= truncate(plan["notes"], length: 80) %></div>
+          <% end %>
+        </div>
+        <% if plan["direction"].present? %>
+          <span class="badge" style="font-size: 0.5625rem;"><%= plan["direction"] %></span>
+        <% end %>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+
+<%# ===== Weekly Goals / Suggestions ===== %>
+<% if @goals.any? %>
+  <div class="card" style="margin-bottom: 1.5rem; border-top: 3px solid #5c6bc0;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #5c6bc0;">lightbulb</span>
+        <% if @week_offset < 0 %>
+          Week in Review
+        <% else %>
+          Goals &amp; Suggestions
+        <% end %>
+      </h2>
+    </div>
+    <div style="padding: 0.75rem 1.25rem;">
+      <% @goals.each do |goal| %>
+        <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid var(--border);">
+          <span class="material-icons-outlined" style="font-size: 1.25rem; color: <%= goal[:color] %>;"><%= goal[:icon] %></span>
+          <div style="font-size: 0.875rem;"><%= goal[:text] %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# ===== Plan Next Week Section ===== %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div class="card-header">
+    <h2>
+      <span class="material-icons-outlined" style="font-size: 1.1rem; vertical-align: -2px; color: #5c6bc0;">add_circle_outline</span>
+      Quick Actions
+    </h2>
+  </div>
+  <div style="padding: 1rem 1.25rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <% if api_token.present? %>
+      <%= link_to new_trade_plan_path, class: "btn btn-sm" do %>
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">add</span> New Trade Plan
+      <% end %>
+      <%= link_to new_journal_entry_path, class: "btn btn-sm" do %>
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">auto_stories</span> Journal Entry
+      <% end %>
+    <% end %>
+    <% if notes_api_token.present? %>
+      <%= link_to new_note_path, class: "btn btn-sm" do %>
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">edit_note</span> New Note
+      <% end %>
+      <%= link_to reminders_path, class: "btn btn-sm" do %>
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">alarm</span> Reminders
+      <% end %>
+    <% end %>
+    <% if budget_api_token.present? %>
+      <%= link_to new_budget_transaction_path, class: "btn btn-sm" do %>
+        <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">payments</span> Add Transaction
+      <% end %>
+    <% end %>
+    <%= link_to weekly_planner_path(week_offset: @week_offset + 1), class: "btn btn-sm" do %>
+      <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px;">arrow_forward</span> Plan Next Week
+    <% end %>
+  </div>
+</div>
+
+<%# ===== Empty State ===== %>
+<% if @trade_count == 0 && @transaction_count == 0 && @notes_count == 0 && @journal_count == 0 && @reminders_count == 0 %>
+  <div class="card" style="padding: 3rem; text-align: center; color: var(--text-secondary);">
+    <span class="material-icons-outlined" style="font-size: 3rem; display: block; margin-bottom: 0.75rem; opacity: 0.3;">date_range</span>
+    <div style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.25rem;">No Activity This Week</div>
+    <div style="font-size: 0.875rem;">
+      <% if @is_current_week %>
+        Start trading, budgeting, or writing to see your week take shape.
+      <% elsif @week_offset > 0 %>
+        Plan ahead by adding trade plans, reminders, and notes.
+      <% else %>
+        This was a quiet week. Check other weeks for more activity.
+      <% end %>
+    </div>
+  </div>
+<% end %>
+
+<%# ===== Bottom Navigation ===== %>
+<div style="text-align: center; margin-top: 2rem;">
+  <%= link_to daily_review_path, class: "btn" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">today</span> Daily Review
+  <% end %>
+  <%= link_to weekly_report_path, class: "btn" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">summarize</span> Weekly Report
+  <% end %>
+  <%= link_to digest_path, class: "btn" do %>
+    <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -2px;">auto_awesome</span> Digest
+  <% end %>
+</div>

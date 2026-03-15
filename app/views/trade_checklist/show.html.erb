@@ -1,0 +1,307 @@
+<% content_for(:title) { "Trade Checklist" } %>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: #43a047;">checklist</span>
+    Pre-Trade Checklist
+  </h1>
+  <div class="page-actions">
+    <%= link_to "New Trade", new_trade_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<% if @trades.empty? %>
+  <div class="card" style="padding: 3rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 3rem; color: var(--text-secondary); display: block; margin-bottom: 1rem;">checklist</span>
+    <h3>No Trade Data Yet</h3>
+    <p class="text-muted" style="margin: 0.5rem 0 1rem;">Start logging trades to get personalized pre-trade validation.</p>
+    <%= link_to "Add Your First Trade", new_trade_path, class: "btn btn-primary" %>
+  </div>
+<% else %>
+
+  <%# ===== Readiness Score Card ===== %>
+  <%
+    score_color = case @readiness_score
+                  when 80..100 then "#43a047"
+                  when 60..79 then "#f9ab00"
+                  when 40..59 then "#ff9800"
+                  else "#ea4335"
+                  end
+    ring_circumference = 2 * Math::PI * 54
+    ring_offset = ring_circumference - (@readiness_score / 100.0 * ring_circumference)
+  %>
+  <div class="card" style="margin-bottom: 1.5rem; text-align: center; padding: 2rem; border-top: 4px solid <%= score_color %>;">
+    <div style="display: inline-block; position: relative; width: 140px; height: 140px;">
+      <svg viewBox="0 0 120 120" style="width: 140px; height: 140px; transform: rotate(-90deg);">
+        <circle cx="60" cy="60" r="54" fill="none" stroke="var(--border)" stroke-width="8" />
+        <circle cx="60" cy="60" r="54" fill="none" stroke="<%= score_color %>" stroke-width="8"
+                stroke-dasharray="<%= ring_circumference.round(1) %>"
+                stroke-dashoffset="<%= ring_offset.round(1) %>"
+                stroke-linecap="round"
+                style="transition: stroke-dashoffset 0.6s ease;" />
+      </svg>
+      <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);">
+        <div style="font-size: 2rem; font-weight: 700; color: <%= score_color %>;"><%= @readiness_score %></div>
+        <div style="font-size: 0.875rem; font-weight: 600; color: var(--text-secondary);"><%= @readiness_grade %></div>
+      </div>
+    </div>
+    <div style="margin-top: 1rem;">
+      <div style="font-size: 1.25rem; font-weight: 700; color: <%= score_color %>;"><%= @readiness_label %></div>
+      <div style="font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.25rem;">
+        <%= @checklist_items.count { |i| i[:status] == :pass } %> pass
+        &middot; <%= @checklist_items.count { |i| i[:status] == :warn } %> caution
+        &middot; <%= @checklist_items.count { |i| i[:status] == :fail } %> fail
+      </div>
+    </div>
+  </div>
+
+  <%# ===== Stats Strip ===== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Trades</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @closed_trades.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Open Positions</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= @open_trades.count %></div>
+      </div>
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Current Streak</div>
+        <% if @streak_type %>
+          <div style="font-size: 1.25rem; font-weight: 700; color: <%= @streak_type == :win ? 'var(--positive)' : 'var(--negative)' %>;">
+            <%= @current_streak %> <%= @streak_type == :win ? 'W' : 'L' %>
+          </div>
+        <% else %>
+          <div style="font-size: 1.25rem; font-weight: 700;">&mdash;</div>
+        <% end %>
+      </div>
+      <div style="padding: 1rem; text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Readiness</div>
+        <div style="font-size: 1.25rem; font-weight: 700; color: <%= score_color %>;"><%= @readiness_score %>%</div>
+      </div>
+    </div>
+  </div>
+
+  <%# ===== Checklist Items ===== %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+      <h2>
+        <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #43a047;">fact_check</span>
+        Validation Checklist
+      </h2>
+      <span style="font-size: 0.75rem; color: var(--text-secondary);">
+        <%= @checklist_items.count { |i| i[:status] == :pass } %>/<%= @checklist_items.count %> passing
+      </span>
+    </div>
+    <div style="padding: 1rem 1.25rem; display: grid; gap: 0.75rem;">
+      <% @checklist_items.each do |item| %>
+        <%
+          case item[:status]
+          when :pass
+            status_icon = "check_circle"
+            status_color = "var(--positive)"
+            bg_color = "rgba(67,160,71,0.04)"
+            border_color = "var(--positive)"
+          when :warn
+            status_icon = "warning"
+            status_color = "#f9ab00"
+            bg_color = "rgba(249,171,0,0.04)"
+            border_color = "#f9ab00"
+          when :fail
+            status_icon = "cancel"
+            status_color = "var(--negative)"
+            bg_color = "rgba(234,67,53,0.04)"
+            border_color = "var(--negative)"
+          end
+        %>
+        <div style="display: flex; gap: 0.75rem; padding: 1rem; background: <%= bg_color %>; border-radius: var(--radius); border-left: 3px solid <%= border_color %>;">
+          <div style="flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 0.375rem;">
+            <span class="material-icons-outlined" style="color: <%= status_color %>; font-size: 1.5rem;"><%= status_icon %></span>
+            <span class="material-icons-outlined" style="color: var(--text-secondary); font-size: 1.125rem;"><%= item[:icon] %></span>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.25rem;"><%= item[:name] %></div>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5;"><%= item[:detail] %></div>
+            <div style="font-size: 0.8125rem; margin-top: 0.5rem; padding: 0.5rem 0.625rem; background: var(--bg); border-radius: var(--radius); color: var(--text-secondary);">
+              <span class="material-icons-outlined" style="font-size: 0.875rem; vertical-align: -2px; color: <%= status_color %>; margin-right: 4px;">lightbulb</span>
+              <%= item[:recommendation] %>
+            </div>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+
+    <%# ===== Personalized Tips ===== %>
+    <% if @tips.any? %>
+      <div class="card">
+        <div class="card-header">
+          <h2>
+            <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #ff9800;">psychology</span>
+            Personalized Insights
+          </h2>
+        </div>
+        <div style="padding: 1.25rem; display: grid; gap: 0.75rem;">
+          <% @tips.each_with_index do |tip, idx| %>
+            <div style="display: flex; align-items: flex-start; gap: 0.625rem; <%= idx < @tips.length - 1 ? 'padding-bottom: 0.75rem; border-bottom: 1px solid var(--border);' : '' %>">
+              <span class="material-icons-outlined" style="font-size: 1.125rem; color: #ff9800; margin-top: 1px; flex-shrink: 0;">arrow_forward</span>
+              <div style="font-size: 0.8125rem; color: var(--text-secondary); line-height: 1.5;"><%= tip %></div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    <% end %>
+
+    <%# ===== Quick Reference Card ===== %>
+    <div class="card">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px; color: #1a73e8;">bookmark</span>
+          Quick Reference
+        </h2>
+      </div>
+      <div style="padding: 1.25rem;">
+        <%# Best Symbols %>
+        <div style="margin-bottom: 1.25rem;">
+          <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 600; margin-bottom: 0.5rem;">Best Symbols</div>
+          <% if @top_symbols.any? %>
+            <% @top_symbols.each do |sym, stats| %>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.375rem 0; border-bottom: 1px solid var(--border);">
+                <span style="font-weight: 600; font-size: 0.875rem;"><%= sym %></span>
+                <div style="display: flex; gap: 0.75rem; font-size: 0.75rem; color: var(--text-secondary);">
+                  <span style="color: var(--positive); font-weight: 600;"><%= stats[:win_rate] %>% WR</span>
+                  <span><%= stats[:total] %> trades</span>
+                  <span style="color: <%= stats[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>; font-weight: 600;"><%= number_to_currency(stats[:pnl]) %></span>
+                </div>
+              </div>
+            <% end %>
+          <% else %>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">Need 3+ trades per symbol for rankings</div>
+          <% end %>
+        </div>
+
+        <%# Best Hours %>
+        <div style="margin-bottom: 1.25rem;">
+          <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 600; margin-bottom: 0.5rem;">Best Trading Hours</div>
+          <% if @top_hours.any? %>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+              <% @top_hours.each do |hour, stats| %>
+                <div style="padding: 0.375rem 0.75rem; background: rgba(67,160,71,0.06); border-radius: var(--radius); border: 1px solid rgba(67,160,71,0.15);">
+                  <div style="font-size: 0.8125rem; font-weight: 600;"><%= format_hour(hour) %></div>
+                  <div style="font-size: 0.6875rem; color: var(--text-secondary);"><%= stats[:win_rate] %>% WR (<%= stats[:total] %>)</div>
+                </div>
+              <% end %>
+            </div>
+          <% else %>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">Need 2+ trades per hour for rankings</div>
+          <% end %>
+        </div>
+
+        <%# Position Size Reference %>
+        <div>
+          <div style="font-size: 0.75rem; text-transform: uppercase; color: var(--text-secondary); font-weight: 600; margin-bottom: 0.5rem;">Position Sizing</div>
+          <% if @ref_avg_size > 0 %>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+              <div style="padding: 0.625rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">Avg Size</div>
+                <div style="font-size: 1rem; font-weight: 700;"><%= number_to_currency(@ref_avg_size) %></div>
+              </div>
+              <div style="padding: 0.625rem; background: var(--bg); border-radius: var(--radius); text-align: center;">
+                <div style="font-size: 0.6875rem; color: var(--text-secondary);">Size Variance</div>
+                <div style="font-size: 1rem; font-weight: 700; color: <%= (@position_cv || 0) > 50 ? '#f9ab00' : 'var(--text)' %>;"><%= @position_cv || 0 %>%</div>
+              </div>
+            </div>
+          <% else %>
+            <div style="font-size: 0.8125rem; color: var(--text-secondary);">Need more trade data for sizing reference</div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%# ===== Symbol Performance Table ===== %>
+  <% if (@symbol_stats || {}).any? %>
+    <div class="card" style="margin-bottom: 1.5rem;">
+      <div class="card-header">
+        <h2>
+          <span class="material-icons-outlined" style="font-size: 1.125rem; vertical-align: -3px;">leaderboard</span>
+          Symbol Performance
+        </h2>
+        <span style="font-size: 0.75rem; color: var(--text-secondary);"><%= @symbol_stats.count %> symbols traded</span>
+      </div>
+      <div style="overflow-x: auto;">
+        <table class="data-table" style="width: 100%; font-size: 0.875rem;">
+          <thead>
+            <tr>
+              <th style="text-align: left; padding: 0.625rem 1rem;">Symbol</th>
+              <th style="text-align: right; padding: 0.625rem 0.5rem;">Trades</th>
+              <th style="text-align: right; padding: 0.625rem 0.5rem;">Wins</th>
+              <th style="text-align: right; padding: 0.625rem 0.5rem;">Losses</th>
+              <th style="text-align: right; padding: 0.625rem 0.5rem;">Win Rate</th>
+              <th style="text-align: right; padding: 0.625rem 1rem;">P&L</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% @symbol_stats.sort_by { |_, s| -s[:total] }.first(10).each do |sym, stats| %>
+              <tr>
+                <td style="padding: 0.625rem 1rem; font-weight: 600;"><%= sym %></td>
+                <td style="padding: 0.625rem 0.5rem; text-align: right;"><%= stats[:total] %></td>
+                <td style="padding: 0.625rem 0.5rem; text-align: right; color: var(--positive);"><%= stats[:wins] %></td>
+                <td style="padding: 0.625rem 0.5rem; text-align: right; color: var(--negative);"><%= stats[:losses] %></td>
+                <td style="padding: 0.625rem 0.5rem; text-align: right;">
+                  <div style="display: flex; align-items: center; gap: 0.375rem; justify-content: flex-end;">
+                    <div style="width: 40px; height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden;">
+                      <div style="height: 100%; width: <%= stats[:win_rate] %>%; background: <%= stats[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>; border-radius: 2px;"></div>
+                    </div>
+                    <span style="font-size: 0.75rem; font-weight: 600; color: <%= stats[:win_rate] >= 50 ? 'var(--positive)' : 'var(--negative)' %>;"><%= stats[:win_rate] %>%</span>
+                  </div>
+                </td>
+                <td style="padding: 0.625rem 1rem; text-align: right; font-weight: 600; color: <%= stats[:pnl] >= 0 ? 'var(--positive)' : 'var(--negative)' %>;"><%= number_to_currency(stats[:pnl]) %></td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% end %>
+
+  <%# ===== Bottom Navigation ===== %>
+  <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <%= link_to trades_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">swap_horiz</span>
+      Trades
+    <% end %>
+    <%= link_to position_risk_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">shield</span>
+      Position Risk
+    <% end %>
+    <%= link_to trading_challenges_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">emoji_events</span>
+      Challenges
+    <% end %>
+    <%= link_to journal_entries_path, class: "btn" do %>
+      <span class="material-icons-outlined" style="font-size: 1rem; vertical-align: -3px;">edit_note</span>
+      Journal
+    <% end %>
+  </div>
+
+<% end %>
+
+<style>
+  @media (max-width: 640px) {
+    div[style*="grid-template-columns: repeat(auto-fit, minmax(320px"] {
+      grid-template-columns: 1fr !important;
+    }
+    div[style*="grid-template-columns: repeat(auto-fit, minmax(130px"] {
+      grid-template-columns: repeat(2, 1fr) !important;
+    }
+  }
+  @media print {
+    .navbar, .page-actions, .app-footer, .back-to-top, .toast-container { display: none !important; }
+    .main-content { padding: 0 !important; }
+    .card { break-inside: avoid; box-shadow: none !important; border: 1px solid #ddd !important; }
+  }
+</style>

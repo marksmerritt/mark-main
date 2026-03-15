@@ -1,0 +1,86 @@
+<%
+  category_icons = {
+    "meeting" => "groups",
+    "project" => "folder_open",
+    "journal" => "auto_stories",
+    "checklist" => "checklist",
+    "blank" => "description"
+  }
+%>
+
+<div class="page-header">
+  <h1>
+    <span class="material-icons-outlined" style="font-size: 1.5rem; vertical-align: -4px; color: var(--primary);">dashboard_customize</span>
+    Note Templates
+  </h1>
+  <div class="page-actions">
+    <%= link_to "New Template", new_note_template_path, class: "btn btn-primary" %>
+  </div>
+</div>
+
+<% if @templates.any? %>
+  <div class="card" style="margin-bottom: 1.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0;">
+      <div style="padding: 1rem; text-align: center; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Templates</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= @templates.count %></div>
+      </div>
+      <% cats = @templates.group_by { |t| t["category"] || "blank" } %>
+      <% cats.each_with_index do |(cat, items), i| %>
+        <div style="padding: 1rem; text-align: center; <%= i < cats.count - 1 ? 'border-right: 1px solid var(--border);' : '' %>">
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;"><%= cat.capitalize %></div>
+          <div style="font-size: 1.5rem; font-weight: 700;"><%= items.count %></div>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem;">
+    <% @templates.each do |template| %>
+      <%
+        cat = template["category"] || "blank"
+        icon = category_icons[cat] || "description"
+      %>
+      <div class="card" style="display: flex; flex-direction: column;">
+        <div style="padding: 1.25rem 1.25rem 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+            <span class="material-icons-outlined" style="font-size: 1.25rem; color: var(--primary);"><%= icon %></span>
+            <h3 style="margin: 0; font-size: 1rem;"><%= template["name"] || template["title"] || "Untitled" %></h3>
+          </div>
+          <span class="badge" style="font-size: 0.5625rem;"><%= cat.capitalize %></span>
+          <% if template["is_default"] %>
+            <span class="badge badge-success" style="font-size: 0.5625rem;">Default</span>
+          <% end %>
+        </div>
+        <% if template["description"].present? %>
+          <div style="padding: 0 1.25rem; flex: 1;">
+            <p class="text-muted" style="font-size: 0.8125rem; margin: 0;"><%= truncate(template["description"], length: 120) %></p>
+          </div>
+        <% elsif template["content"].present? %>
+          <div style="padding: 0 1.25rem; flex: 1;">
+            <p class="text-muted" style="font-size: 0.8125rem; margin: 0;"><%= truncate(template["content"], length: 120) %></p>
+          </div>
+        <% else %>
+          <div style="flex: 1;"></div>
+        <% end %>
+        <div style="padding: 0.75rem 1.25rem; border-top: 1px solid var(--border); display: flex; gap: 0.5rem; justify-content: space-between;">
+          <div style="display: flex; gap: 0.25rem;">
+            <%= link_to edit_note_template_path(template["id"]), class: "btn btn-sm", title: "Edit" do %>
+              <span class="material-icons-outlined" style="font-size: 0.875rem;">edit</span>
+            <% end %>
+            <%= link_to note_template_path(template["id"]), data: { turbo_method: :delete, turbo_confirm: "Delete this template?" }, class: "btn btn-sm btn-danger", title: "Delete" do %>
+              <span class="material-icons-outlined" style="font-size: 0.875rem;">delete</span>
+            <% end %>
+          </div>
+          <%= link_to "Use Template", apply_note_template_path(template["id"]), data: { turbo_method: :post }, class: "btn btn-sm btn-primary" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+<% else %>
+  <div class="card empty-state" style="padding: 2rem; text-align: center;">
+    <span class="material-icons-outlined" style="font-size: 2.5rem; color: var(--text-secondary);">dashboard_customize</span>
+    <p style="margin: 0.5rem 0 0; color: var(--text-secondary);">No templates yet.</p>
+    <p style="margin: 0.5rem 0 0;"><%= link_to "Create your first template", new_note_template_path, class: "btn btn-primary" %></p>
+  </div>
+<% end %>

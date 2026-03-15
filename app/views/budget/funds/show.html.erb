@@ -1,0 +1,293 @@
+<%
+  f_pct = @fund["percentage_funded"].to_f
+  f_current = @fund["current_amount"].to_f
+  f_target = @fund["target_amount"].to_f
+  f_remaining = @fund["remaining_amount"].to_f
+  f_monthly = @fund["monthly_target"].to_f
+  f_completed = @fund["status"] == "completed"
+  f_active = @fund["status"] == "active"
+  f_contributions = @fund["fund_contributions"].is_a?(Array) ? @fund["fund_contributions"] : []
+%>
+
+<div class="page-header">
+  <h1><%= @fund["name"] %></h1>
+  <div class="page-actions">
+    <span class="badge badge-<%= f_completed ? "success" : "primary" %>"><%= @fund["status"]&.capitalize %></span>
+    <%= link_to "Edit", edit_budget_fund_path(@fund["id"]), class: "btn" %>
+    <%= link_to "Delete", budget_fund_path(@fund["id"]), data: { turbo_method: :delete, turbo_confirm: "Delete this fund?" }, class: "btn btn-danger" %>
+    <%= link_to "Back", budget_funds_path, class: "btn" %>
+  </div>
+</div>
+
+<%# Progress Hero %>
+<div class="card" style="margin-bottom: 1.5rem;">
+  <div style="display: flex; align-items: stretch; flex-wrap: wrap;">
+    <%# Circular gauge %>
+    <div style="flex: 0 0 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; border-right: 1px solid var(--border);">
+      <%
+        fr = 65; fcx = 90; fcy = 78
+        f_circum = Math::PI * fr
+        f_filled = f_circum * [f_pct, 100].min / 100.0
+        f_color = f_pct >= 100 ? "var(--positive)" : f_pct >= 50 ? "var(--primary)" : "#f9ab00"
+      %>
+      <svg width="180" height="105" viewBox="0 0 180 105">
+        <path d="M <%= fcx - fr %> <%= fcy %> A <%= fr %> <%= fr %> 0 1 1 <%= fcx + fr %> <%= fcy %>"
+              fill="none" stroke="var(--border)" stroke-width="10" stroke-linecap="round" />
+        <path d="M <%= fcx - fr %> <%= fcy %> A <%= fr %> <%= fr %> 0 1 1 <%= fcx + fr %> <%= fcy %>"
+              fill="none" stroke="<%= f_color %>" stroke-width="10" stroke-linecap="round"
+              stroke-dasharray="<%= f_filled.round(1) %> <%= f_circum.round(1) %>" />
+        <text x="<%= fcx %>" y="<%= fcy - 12 %>" text-anchor="middle" font-size="24" font-weight="700" fill="<%= f_color %>"><%= f_pct.round(0) %>%</text>
+        <text x="<%= fcx %>" y="<%= fcy + 4 %>" text-anchor="middle" font-size="9" fill="var(--text-secondary)">
+          <%= f_completed ? "FUNDED" : "PROGRESS" %>
+        </text>
+      </svg>
+    </div>
+
+    <%# Key metrics grid %>
+    <div style="flex: 1; min-width: 280px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0;">
+      <div style="padding: 1.25rem; border-bottom: 1px solid var(--border); border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Balance</div>
+        <div style="font-size: 1.5rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(f_current) %></div>
+      </div>
+      <div style="padding: 1.25rem; border-bottom: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Target</div>
+        <div style="font-size: 1.5rem; font-weight: 700;"><%= number_to_currency(f_target) %></div>
+      </div>
+      <div style="padding: 1.25rem; border-right: 1px solid var(--border);">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Remaining</div>
+        <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(f_remaining) %></div>
+      </div>
+      <div style="padding: 1.25rem;">
+        <% if f_contributions.any? %>
+          <%
+            avg_contribution = f_contributions.sum { |c| c["amount"].to_f } / f_contributions.count
+            largest_contribution = f_contributions.max_by { |c| c["amount"].to_f }
+          %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg Contribution</div>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(avg_contribution) %></div>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); margin-top: 0.125rem;"><%= f_contributions.count %> contributions</div>
+        <% elsif f_monthly > 0 %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Monthly Target</div>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= number_to_currency(f_monthly) %></div>
+        <% else %>
+          <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Contributions</div>
+          <div style="font-size: 1.25rem; font-weight: 700;"><%= f_contributions.count %></div>
+        <% end %>
+      </div>
+    </div>
+  </div>
+
+  <%# Full-width progress bar with milestones %>
+  <div style="padding: 0.75rem 1.25rem 1rem;">
+    <div style="position: relative; height: 1.5rem; background: var(--bg); border-radius: 0.75rem; overflow: hidden;">
+      <div style="width: <%= [f_pct, 100].min %>%; height: 100%; background: <%= f_color %>; border-radius: 0.75rem; transition: width 0.3s;"></div>
+      <% [25, 50, 75].each do |m| %>
+        <div style="position: absolute; left: <%= m %>%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.3);"></div>
+      <% end %>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-top: 0.25rem; font-size: 0.625rem; color: var(--text-secondary);">
+      <span>$0</span>
+      <span><%= number_to_currency(f_target * 0.25) %></span>
+      <span><%= number_to_currency(f_target * 0.5) %></span>
+      <span><%= number_to_currency(f_target * 0.75) %></span>
+      <span><%= number_to_currency(f_target) %></span>
+    </div>
+  </div>
+</div>
+
+<div class="content-grid">
+  <div class="card">
+    <div class="card-header"><h2>Details</h2></div>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <span class="detail-label">Current Balance</span>
+        <span class="detail-value"><%= number_to_currency(f_current) %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Target Amount</span>
+        <span class="detail-value"><%= number_to_currency(f_target) %></span>
+      </div>
+      <div class="detail-item">
+        <span class="detail-label">Remaining</span>
+        <span class="detail-value"><%= number_to_currency(f_remaining) %></span>
+      </div>
+      <% if @fund["target_date"].present? %>
+        <div class="detail-item">
+          <span class="detail-label">Target Date</span>
+          <span class="detail-value"><%= Date.parse(@fund["target_date"]).strftime("%B %d, %Y") rescue @fund["target_date"] %></span>
+        </div>
+      <% end %>
+      <% if f_monthly > 0 %>
+        <div class="detail-item">
+          <span class="detail-label">Monthly Target</span>
+          <span class="detail-value"><%= number_to_currency(f_monthly) %></span>
+        </div>
+      <% end %>
+      <% if @fund["on_track?"] != nil %>
+        <div class="detail-item">
+          <span class="detail-label">On Track?</span>
+          <span class="detail-value">
+            <% if @fund["on_track?"] %>
+              <span class="badge badge-success">On Track</span>
+            <% else %>
+              <span class="badge badge-warning">Behind</span>
+            <% end %>
+          </span>
+        </div>
+      <% end %>
+      <% if f_contributions.any? %>
+        <div class="detail-item">
+          <span class="detail-label">Total Contributions</span>
+          <span class="detail-value positive"><%= f_contributions.size %></span>
+        </div>
+      <% end %>
+    </div>
+  </div>
+
+  <% if f_active %>
+    <div class="card">
+      <div class="card-header"><h2>Add Contribution</h2></div>
+      <%= form_with url: contribute_budget_fund_path(@fund["id"]), method: :post, class: "form-container" do |f| %>
+        <div class="form-group">
+          <%= f.label :amount, "Amount" %>
+          <%= f.number_field :amount, step: "0.01", class: "form-control", placeholder: "500.00", required: true %>
+        </div>
+        <div class="form-group">
+          <%= f.label :note, "Note (optional)" %>
+          <%= f.text_field :note, class: "form-control", placeholder: "Monthly savings" %>
+        </div>
+        <div class="form-actions">
+          <%= f.submit "Add Contribution", class: "btn btn-primary" %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+</div>
+
+<% if f_contributions.any? %>
+  <% contributions = f_contributions.sort_by { |c| c["contributed_on"] || "" } %>
+
+  <%# Contribution stats %>
+  <%
+    c_amounts = contributions.map { |c| c["amount"].to_f }
+    c_avg = c_amounts.sum / c_amounts.count
+    c_max = c_amounts.max
+    c_min = c_amounts.min
+    c_total = c_amounts.sum
+    # Monthly grouping for contribution frequency
+    c_by_month = contributions.group_by { |c| c["contributed_on"].to_s.slice(0, 7) }
+    c_months_active = c_by_month.count
+    c_avg_per_month = c_months_active > 0 ? (c_total / c_months_active).round(2) : 0
+  %>
+  <div class="card" style="margin-top: 1rem;">
+    <div class="card-header"><h2>Contribution Stats</h2></div>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0; padding: 0;">
+      <div style="padding: 1rem 1.25rem; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Total Added</div>
+        <div style="font-size: 1.125rem; font-weight: 700; color: var(--positive);"><%= number_to_currency(c_total) %></div>
+      </div>
+      <div style="padding: 1rem 1.25rem; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Average</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(c_avg) %></div>
+      </div>
+      <div style="padding: 1rem 1.25rem; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Largest</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(c_max) %></div>
+      </div>
+      <div style="padding: 1rem 1.25rem; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Smallest</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(c_min) %></div>
+      </div>
+      <div style="padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); text-align: center;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase;">Avg/Month</div>
+        <div style="font-size: 1.125rem; font-weight: 700;"><%= number_to_currency(c_avg_per_month) %></div>
+      </div>
+    </div>
+
+    <%# Monthly contribution bar chart %>
+    <% if c_by_month.count >= 2 %>
+      <%
+        month_data = c_by_month.map { |m, cs| { month: m, total: cs.sum { |c| c["amount"].to_f } } }.sort_by { |d| d[:month] }
+        mb_max = month_data.map { |d| d[:total] }.max
+        mb_max = 1 if mb_max == 0
+        mb_bar_w = 380.0 / month_data.length
+      %>
+      <div style="padding: 0.75rem 1.25rem;">
+        <div style="font-size: 0.6875rem; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 0.5rem;">Monthly Contributions</div>
+        <svg width="100%" viewBox="0 0 400 120" preserveAspectRatio="xMidYMid meet">
+          <% month_data.each_with_index do |d, i| %>
+            <%
+              bar_h = (d[:total] / mb_max * 80).round(1)
+              x = 10 + i * mb_bar_w
+            %>
+            <rect x="<%= x + 2 %>" y="<%= 90 - bar_h %>" width="<%= [mb_bar_w - 4, 4].max %>" height="<%= [bar_h, 2].max %>"
+                  fill="var(--positive)" opacity="0.6" rx="2" />
+            <text x="<%= x + mb_bar_w / 2 %>" y="<%= 87 - bar_h %>" text-anchor="middle" font-size="7" font-weight="600" fill="var(--positive)">
+              <%= number_to_currency(d[:total], precision: 0) %>
+            </text>
+            <text x="<%= x + mb_bar_w / 2 %>" y="105" text-anchor="middle" font-size="7" fill="var(--text-secondary)">
+              <%= Date.parse("#{d[:month]}-01").strftime("%b") rescue d[:month] %>
+            </text>
+          <% end %>
+        </svg>
+      </div>
+    <% end %>
+  </div>
+
+  <%# Growth chart %>
+  <%
+    running_total = 0
+    chart_data = contributions.map do |c|
+      running_total += c["amount"].to_f
+      running_total.round(2)
+    end
+  %>
+  <div class="card" style="margin-top: 1rem;">
+    <div class="card-header"><h2>Growth Over Time</h2></div>
+    <div class="chart-container" data-controller="chart"
+         data-chart-type-value="line"
+         data-chart-labels-value="<%= contributions.map { |c| Date.parse(c["contributed_on"]).strftime("%b %d") rescue c["contributed_on"] }.to_json %>"
+         data-chart-data-value="<%= chart_data.to_json %>"
+         data-chart-color-value="var(--success, #22c55e)"
+         style="height: 200px; padding: 1rem;">
+      <canvas data-chart-target="canvas"></canvas>
+    </div>
+  </div>
+
+  <%# Contribution History %>
+  <div class="card" style="margin-top: 1rem;">
+    <div class="card-header">
+      <h2>Contribution History</h2>
+      <span class="text-muted"><%= contributions.count %> contributions</span>
+    </div>
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th style="text-align: right;">Amount</th>
+          <th style="text-align: right;">Running Total</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        <%
+          rt = 0
+        %>
+        <% contributions.reverse.each do |c| %>
+          <%
+            # Calculate running total up to this contribution
+            rt_for_row = contributions.select { |x|
+              (x["contributed_on"] || "") <= (c["contributed_on"] || "")
+            }.sum { |x| x["amount"].to_f }
+          %>
+          <tr>
+            <td><%= Date.parse(c["contributed_on"]).strftime("%b %d, %Y") rescue c["contributed_on"] %></td>
+            <td style="text-align: right;" class="positive"><%= number_to_currency(c["amount"]) %></td>
+            <td style="text-align: right; font-weight: 600;"><%= number_to_currency(rt_for_row) %></td>
+            <td><%= c["note"] %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
